@@ -87,6 +87,17 @@ class PythonPipDetector:
 
         req = root / "requirements.txt"
         if not req.exists():
+            pyproject = read_toml(root / "pyproject.toml")
+            if pyproject and "dependencies" in pyproject.get("project", {}):
+                return CategoryResult(
+                    Tier.ABSENT,
+                    evidence=["pyproject.toml#project.dependencies"],
+                    reason=(
+                        "PEP 621 dependencies are unpinned in pyproject.toml and no "
+                        "lock mechanism (requirements.txt, uv.lock, pip-compile output) "
+                        "was found"
+                    ),
+                )
             return CategoryResult(Tier.ABSENT, reason="no requirements.txt found")
         text = read_text(req) or ""
         lines = [ln for ln in text.splitlines() if ln.strip() and not ln.strip().startswith("#")]

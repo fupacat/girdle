@@ -31,6 +31,17 @@ def test_unpinned_requirements_absent(tmp_path: Path):
     assert result["reproducibility"].tier == Tier.ABSENT
 
 
+def test_pep621_unpinned_gets_specific_reason(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        "[project]\nname = 'x'\ndependencies = ['click>=8.1']\n"
+    )
+    det = PythonPipDetector()
+    fp = det.detect(tmp_path)
+    result = det.scan(fp, mode="static")
+    assert result["reproducibility"].tier == Tier.ABSENT
+    assert "PEP 621" in result["reproducibility"].reason
+
+
 def test_poetry_lock_gitignored(tmp_path: Path):
     (tmp_path / "pyproject.toml").write_text("[tool.poetry]\nname = 'x'\n")
     (tmp_path / "poetry.lock").write_text("")
