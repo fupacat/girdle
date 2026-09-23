@@ -33,3 +33,12 @@ class Detector(Protocol):
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]: ...
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]: ...
+
+    def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
+        """Optional: category name -> command to execute for --run (tier-2)
+        verification. Only categories with an entry here are eligible for
+        upgrade from CONFIGURED to VERIFIED; omit a category (or the whole
+        method) if there's no safe/well-defined invocation for it. Detectors
+        that don't implement this are treated as returning {}.
+        """
+        ...

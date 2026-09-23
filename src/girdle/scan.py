@@ -8,7 +8,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from girdle.detectors import ALL_DETECTORS
-from girdle.schema import EcosystemResult, ScanResult
+from girdle.detectors.base import Detector, Fingerprint
+from girdle.runner import run_check
+from girdle.schema import CategoryResult, EcosystemResult, ScanResult, Tier
 
 
 def run_scan(repo_root: Path, mode: str = "static") -> ScanResult:
@@ -21,6 +23,8 @@ def run_scan(repo_root: Path, mode: str = "static") -> ScanResult:
         if fp is None:
             continue
         categories = detector.scan(fp, mode)
+        if mode == "run":
+            _verify(detector, fp, categories)
         ecosystems.append(
             EcosystemResult(
                 id=fp.id,
@@ -43,3 +47,26 @@ def run_scan(repo_root: Path, mode: str = "static") -> ScanResult:
         ecosystems=ecosystems,
         warnings=warnings,
     )
+
+
+def _verify(detector: Detector, fp: Fingerprint, categories: dict[str, CategoryResult]) -> None:
+    """Mutates `categories` in place: upgrade CONFIGURED -> VERIFIED for any
+    category the detector declares a run command for, if that command
+    actually passes when executed against the repo.
+    """
+    get_commands = getattr(detector, "run_commands", None)
+    if get_commands is None:
+        return
+    commands = get_commands(fp)
+    for category, command in commands.items():
+        result = categories.get(category)
+        if result is None or result.tier != Tier.CONFIGURED:
+            continue
+        outcome = run_check(command, fp.root)
+        if outcome.passed:
+            result.tier = Tier.VERIFIED
+            result.evidence = [*result.evidence, f"verified: `{' '.join(command)}` exited 0"]
+        elif outcome.ran:
+            result.reason = outcome.reason
+        else:
+            result.evidence = [*result.evidence, f"not verified: {outcome.reason}"]

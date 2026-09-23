@@ -39,6 +39,11 @@ class JavaMavenDetector:
             "ci_gating": self._scan_ci(root),
         }
 
+    def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
+        # Lint execution skipped: checkstyle/spotbugs/pmd goal names vary by
+        # plugin config and aren't safe to guess.
+        return {"tests": ["mvn", "test"]}
+
     def _scan_tests(self, root: Path, pom_text: str) -> CategoryResult:
         has_test_dir = (root / "src" / "test" / "java").is_dir()
         has_junit = "junit" in pom_text.lower() or "testng" in pom_text.lower()

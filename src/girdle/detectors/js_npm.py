@@ -38,6 +38,9 @@ class JsNpmDetector:
             "ci_gating": js_common.scan_ci(root, r"\bnpm (run )?(test|ci)\b", "npm test"),
         }
 
+    def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
+        return js_common.run_commands(fp.root, "npm")
+
     def _scan_reproducibility(self, root: Path) -> CategoryResult:
         lockfile = root / "package-lock.json"
         if not lockfile.exists():

@@ -27,6 +27,13 @@ class PythonPipenvDetector:
             "ci_gating": python_common.scan_ci(root),
         }
 
+    def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
+        commands = {"tests": ["pipenv", "run", "pytest", "-q"]}
+        lint_cmd = python_common.lint_command(fp.root)
+        if lint_cmd:
+            commands["lint"] = ["pipenv", "run", *lint_cmd]
+        return commands
+
     def _scan_reproducibility(self, root: Path) -> CategoryResult:
         if not (root / "Pipfile.lock").exists():
             return CategoryResult(Tier.ABSENT, reason="no Pipfile.lock found")

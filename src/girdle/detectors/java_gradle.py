@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -32,6 +33,12 @@ class JavaGradleDetector:
             "reproducibility": self._scan_reproducibility(root, build_text),
             "ci_gating": self._scan_ci(root),
         }
+
+    def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
+        wrapper_name = "gradlew.bat" if os.name == "nt" else "gradlew"
+        wrapper_path = fp.root / wrapper_name
+        exe = str(wrapper_path) if wrapper_path.exists() else "gradle"
+        return {"tests": [exe, "test"]}
 
     def _scan_tests(self, root: Path, build_text: str) -> CategoryResult:
         has_test_dir = (root / "src" / "test").is_dir()

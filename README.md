@@ -33,6 +33,16 @@ pip-compile --extra dev pyproject.toml -o requirements-dev.txt
 Exit code is nonzero if the weakest applicable category falls below
 `--fail-under` (default: tier 1, "configured").
 
+`--run` executes the scanned repo's own test/lint tooling to upgrade a
+category from "configured" to "verified" (tier 2) — e.g. `pytest`,
+`ruff check .`, `cargo test`, `dotnet test`. It runs arbitrary code from the
+target repo, so it is opt-in only, never the default (see the security
+section of the design note for why). It also assumes whatever
+interpreter/toolchain is already active or on `PATH` is the right one for
+the scanned repo — girdle does not install dependencies or activate
+environments first, so run it from within the repo's own venv/toolchain
+context for accurate results.
+
 ## Design
 
 See the project's `AGENTS.md` and the `Agent-Ready Repository Design` vault

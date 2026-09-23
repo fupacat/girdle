@@ -78,3 +78,15 @@ def scan_ci(root: Path, run_pattern: str, run_label: str) -> CategoryResult:
 def is_lockfile_gitignored(root: Path, lockfile_name: str) -> bool:
     gitignore = read_text(root / ".gitignore") or ""
     return bool(re.search(rf"^{re.escape(lockfile_name)}$", gitignore, re.MULTILINE))
+
+
+def run_commands(root: Path, pkg_manager: str) -> dict[str, list[str]]:
+    """--run commands for a package.json-based toolchain. `pkg_manager` is
+    the literal command (npm/yarn/pnpm/bun); only a declared `scripts.lint`
+    is run for lint, since there's no universal lint entry point otherwise.
+    """
+    commands = {"tests": [pkg_manager, "test"]}
+    pkg_data = read_json(root / "package.json") or {}
+    if "lint" in pkg_data.get("scripts", {}):
+        commands["lint"] = [pkg_manager, "run", "lint"]
+    return commands

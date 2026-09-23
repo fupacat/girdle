@@ -32,6 +32,9 @@ class JsPnpmDetector:
             "ci_gating": js_common.scan_ci(root, r"\bpnpm (run )?test\b", "pnpm test"),
         }
 
+    def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
+        return js_common.run_commands(fp.root, "pnpm")
+
     def _scan_reproducibility(self, root: Path, fp: Fingerprint) -> CategoryResult:
         if js_common.is_lockfile_gitignored(root, "pnpm-lock.yaml"):
             return CategoryResult(Tier.ABSENT, reason="pnpm-lock.yaml exists but is gitignored")

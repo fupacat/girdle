@@ -32,6 +32,9 @@ class JsYarnDetector:
             "ci_gating": js_common.scan_ci(root, r"\byarn (run )?test\b", "yarn test"),
         }
 
+    def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
+        return js_common.run_commands(fp.root, "yarn")
+
     def _scan_reproducibility(self, root: Path, fp: Fingerprint) -> CategoryResult:
         if js_common.is_lockfile_gitignored(root, "yarn.lock"):
             return CategoryResult(Tier.ABSENT, reason="yarn.lock exists but is gitignored")

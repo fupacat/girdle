@@ -44,6 +44,11 @@ class DotNetDetector:
             "ci_gating": self._scan_ci(root),
         }
 
+    def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
+        # Analyzers run as part of the build, not a separate lint invocation;
+        # no standalone lint command to declare here.
+        return {"tests": ["dotnet", "test"]}
+
     def _scan_tests(self, root: Path, combined: str) -> CategoryResult:
         has_test_sdk = "Microsoft.NET.Test.Sdk" in combined
         has_test_proj = any(root.rglob("*.Tests.csproj")) or any(root.rglob("*Tests.csproj"))

@@ -36,6 +36,12 @@ class RustDetector:
             "ci_gating": self._scan_ci(root),
         }
 
+    def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
+        return {
+            "tests": ["cargo", "test"],
+            "lint": ["cargo", "clippy", "--all-targets", "--", "-D", "warnings"],
+        }
+
     def _scan_tests(self, root: Path) -> CategoryResult:
         has_tests_dir = (root / "tests").is_dir()
         has_inline = any(

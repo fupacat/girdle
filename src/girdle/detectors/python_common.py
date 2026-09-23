@@ -61,3 +61,22 @@ def scan_ci(root: Path) -> CategoryResult:
 def is_lockfile_gitignored(root: Path, lockfile_name: str) -> bool:
     gitignore = read_text(root / ".gitignore") or ""
     return bool(re.search(rf"^{re.escape(lockfile_name)}$", gitignore, re.MULTILINE))
+
+
+def lint_command(root: Path) -> list[str] | None:
+    """Pick a --run lint command matching whichever tool's config was found.
+    Preference order matches nothing in particular except common adoption.
+    """
+    pyproject = read_toml(root / "pyproject.toml")
+    tools = pyproject.get("tool", {}) if pyproject else {}
+    if "ruff" in tools or (root / "ruff.toml").exists() or (root / ".ruff.toml").exists():
+        return ["ruff", "check", "."]
+    if "mypy" in tools or (root / "mypy.ini").exists():
+        return ["mypy", "."]
+    if (root / ".flake8").exists() or "flake8" in tools:
+        return ["flake8"]
+    return None
+
+
+def test_command() -> list[str]:
+    return ["pytest", "-q"]

@@ -29,6 +29,13 @@ class PythonUvDetector:
             "ci_gating": python_common.scan_ci(root),
         }
 
+    def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
+        commands = {"tests": ["uv", "run", "pytest", "-q"]}
+        lint_cmd = python_common.lint_command(fp.root)
+        if lint_cmd:
+            commands["lint"] = ["uv", "run", *lint_cmd]
+        return commands
+
     def _scan_reproducibility(self, root: Path) -> CategoryResult:
         if python_common.is_lockfile_gitignored(root, "uv.lock"):
             return CategoryResult(Tier.ABSENT, reason="uv.lock exists but is gitignored")

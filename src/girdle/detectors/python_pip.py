@@ -47,6 +47,14 @@ class PythonPipDetector:
             "ci_gating": python_common.scan_ci(root),
         }
 
+    def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
+        prefix = ["poetry", "run"] if fp.toolchain == "poetry" else []
+        commands = {"tests": [*prefix, *python_common.test_command()]}
+        lint_cmd = python_common.lint_command(fp.root)
+        if lint_cmd:
+            commands["lint"] = [*prefix, *lint_cmd]
+        return commands
+
     def _scan_reproducibility(self, root: Path, fp: Fingerprint) -> CategoryResult:
         if fp.toolchain == "poetry":
             lock = root / "poetry.lock"

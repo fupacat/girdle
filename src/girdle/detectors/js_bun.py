@@ -35,6 +35,9 @@ class JsBunDetector:
             "ci_gating": js_common.scan_ci(root, r"\bbun (run )?test\b", "bun test"),
         }
 
+    def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
+        return js_common.run_commands(fp.root, "bun")
+
     def _scan_reproducibility(self, root: Path) -> CategoryResult:
         # bun.lockb is binary: existence-only check, can't diff or content-scan it.
         if (root / "bun.lockb").exists():

@@ -29,6 +29,12 @@ class GoModDetector:
             "ci_gating": self._scan_ci(root),
         }
 
+    def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
+        commands = {"tests": ["go", "test", "./..."]}
+        if (fp.root / ".golangci.yml").exists() or (fp.root / ".golangci.yaml").exists():
+            commands["lint"] = ["golangci-lint", "run"]
+        return commands
+
     def _scan_tests(self, root: Path) -> CategoryResult:
         test_files = list(root.rglob("*_test.go"))
         if not test_files:
