@@ -15,3 +15,4 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check .
       - run: pytest
+      - run: girdle index . --check AGENTS.md

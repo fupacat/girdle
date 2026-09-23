@@ -16,7 +16,22 @@ pip install -e .
 girdle scan .              # static analysis, JSON if piped
 girdle scan . --run        # also execute test/lint tooling for tier-2 verification
 girdle dashboard .          # writes girdle-report.html
+
+girdle index .                        # deterministic structural manifest (path/language/symbols)
+girdle index . --inject AGENTS.md     # insert/update the manifest between markers in a file
+girdle index . --check AGENTS.md      # exit nonzero if that file's manifest block is stale (for CI/hooks)
 ```
+
+`girdle index` is a separate, mechanically-generated structural index — not
+part of the verification score. It's a flat, budget-capped (`--budget-tokens`,
+default 4000) path -> {language, line count, top-level symbols} manifest,
+ranked for truncation by symbol count as a lightweight significance proxy
+(not a real reference-graph/PageRank signal). Content is structural facts
+only (paths, symbol names) — never free text scraped from comments or
+docstrings, since those could originate from an untrusted fork. `--inject`
+and `--check` are the mechanical regenerate/verify hooks for wiring this
+into a pre-commit hook or CI step, as this repo's own `.github/workflows/ci.yml`
+does against its own `AGENTS.md`.
 
 ## Development
 
