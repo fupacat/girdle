@@ -1,0 +1,26 @@
+# Zero-exception local checks per the design note's enforcement-hooks
+# stance: hooks are deterministic, CLAUDE.md/AGENTS.md are advisory.
+# --no-verify still bypasses this - hooks reduce but don't eliminate the
+# need for a separate review step (code review / CI), which stays in place.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8
+    hooks:
+      - id: ruff
+        args: [--exit-non-zero-on-fix]
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: pytest -q
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: girdle-index-fresh
+        name: girdle index freshness (AGENTS.md)
+        entry: girdle index . --check AGENTS.md
+        language: system
+        pass_filenames: false
+        always_run: true

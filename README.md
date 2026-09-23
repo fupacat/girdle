@@ -49,6 +49,25 @@ pip-compile pyproject.toml -o requirements.txt
 pip-compile --extra dev pyproject.toml -o requirements-dev.txt
 ```
 
+### Enforcement hooks
+
+`.pre-commit-config.yaml` wires ruff, pytest, and `girdle index --check
+AGENTS.md` as zero-exception pre-commit gates, per the design note's
+enforcement-hooks stance (hooks are deterministic; AGENTS.md/CLAUDE.md are
+advisory). Activate once per clone:
+
+```bash
+pip install -e ".[dev]"
+pre-commit install
+```
+
+These are `language: system` hooks — they run whatever `ruff`/`pytest`/
+`girdle` resolve to on `PATH` at commit time, so make sure this repo's own
+venv is active first (same precondition as `--run`, above). `--no-verify`
+still bypasses them, per the design note's documented failure mode of
+agents dropping to `--no-verify`/`git stash` under pressure — a hook
+reduces but doesn't eliminate the need for a separate review step.
+
 Exit code is nonzero if the weakest applicable category falls below
 `--fail-under` (default: tier 1, "configured").
 

@@ -37,4 +37,5 @@ select = ["E", "F", "I", "UP", "B"]
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",
+    "pre-commit>=3.8",
 ]
