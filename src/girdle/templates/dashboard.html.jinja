@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>girdle report — {{ data.repo_root }}</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --border: #2a2f3a;
+    --text: #e6e8eb; --muted: #8a919e;
+    --absent: #e05252; --configured: #d9a441; --verified: #4caf7d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2.5rem; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Inter, sans-serif;
+  }
+  h1 { font-size: 1.4rem; font-weight: 600; margin: 0 0 0.25rem; }
+  .meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 2rem; }
+  .summary-row { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
+  .summary-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1rem 1.4rem; min-width: 160px;
+  }
+  .summary-card .label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .summary-card .value { font-size: 1.6rem; font-weight: 600; margin-top: 0.2rem; }
+  .ecosystem {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1.2rem 1.4rem; margin-bottom: 1.2rem;
+  }
+  .ecosystem h2 { font-size: 1.05rem; margin: 0 0 0.9rem; }
+  .ecosystem h2 .sub { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
+  .cat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.7rem; }
+  .cat {
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.9rem;
+    border-left-width: 4px;
+  }
+  .cat.tier-absent { border-left-color: var(--absent); }
+  .cat.tier-configured { border-left-color: var(--configured); }
+  .cat.tier-verified { border-left-color: var(--verified); }
+  .cat .cat-name { font-weight: 600; font-size: 0.85rem; text-transform: capitalize; }
+  .cat .cat-status { font-size: 0.8rem; margin-top: 0.15rem; }
+  .cat .cat-status.tier-absent { color: var(--absent); }
+  .cat .cat-status.tier-configured { color: var(--configured); }
+  .cat .cat-status.tier-verified { color: var(--verified); }
+  .cat .evidence, .cat .reason { color: var(--muted); font-size: 0.75rem; margin-top: 0.35rem; }
+  .warnings { color: var(--configured); font-size: 0.85rem; margin-top: 1.5rem; }
+</style>
+</head>
+<body>
+  <h1>girdle report</h1>
+  <div class="meta">{{ data.repo_root }} &middot; mode={{ data.mode }} &middot; scanned {{ data.scanned_at }} &middot; girdle {{ data.girdle_version }}</div>
+
+  <div class="summary-row">
+    <div class="summary-card">
+      <div class="label">Ecosystems</div>
+      <div class="value">{{ data.summary.ecosystem_count }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Weakest overall tier</div>
+      <div class="value">{{ data.summary.overall_min | tier_label }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Weakest category</div>
+      <div class="value">{{ data.summary.weakest_category or "—" }}</div>
+    </div>
+  </div>
+
+  {% for eco in data.ecosystems %}
+  <div class="ecosystem">
+    <h2>{{ eco.language }}/{{ eco.toolchain }} <span class="sub">{{ eco.id }} &middot; root: {{ eco.root }}{% if eco.variants %} &middot; {{ eco.variants | join(', ') }}{% endif %}</span></h2>
+    <div class="cat-grid">
+      {% for name, cat in eco.categories.items() %}
+      <div class="cat {{ cat.tier | tier_class }}">
+        <div class="cat-name">{{ name.replace('_', ' ') }}</div>
+        <div class="cat-status {{ cat.tier | tier_class }}">{{ cat.tier | tier_label }}</div>
+        {% if cat.evidence %}<div class="evidence">{{ cat.evidence | join(' · ') }}</div>{% endif %}
+        {% if cat.reason %}<div class="reason">{{ cat.reason }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if data.warnings %}
+  <div class="warnings">
+    {% for w in data.warnings %}&#9888; {{ w }}<br>{% endfor %}
+  </div>
+  {% endif %}
+</body>
+</html>
