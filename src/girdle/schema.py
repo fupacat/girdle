@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from enum import IntEnum
 
+from girdle.platform import PlatformResult
+
 GIRDLE_VERSION = "0.1.0"
 
 CATEGORY_NAMES = ("tests", "lint", "reproducibility", "ci_gating")
@@ -93,6 +95,7 @@ class ScanResult:
     mode: str  # "static" | "run"
     ecosystems: list[EcosystemResult] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    platform: PlatformResult | None = None
 
     @property
     def overall_min(self) -> int:
@@ -130,6 +133,7 @@ class ScanResult:
                 "overall_avg": self.overall_avg,
             },
             "warnings": self.warnings,
+            "platform": self.platform.to_dict() if self.platform is not None else None,
         }
 
 

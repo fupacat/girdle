@@ -20,6 +20,8 @@ girdle dashboard .          # writes girdle-report.html
 girdle index .                        # deterministic structural manifest (path/language/symbols)
 girdle index . --inject AGENTS.md     # insert/update the manifest between markers in a file
 girdle index . --check AGENTS.md      # exit nonzero if that file's manifest block is stale (for CI/hooks)
+
+girdle scan . --platform               # also check live GitHub branch protection via `gh`
 ```
 
 `girdle index` is a separate, mechanically-generated structural index — not
@@ -48,6 +50,28 @@ pip install pip-tools
 pip-compile pyproject.toml -o requirements.txt
 pip-compile --extra dev pyproject.toml -o requirements-dev.txt
 ```
+
+### Platform-level enforcement (`--platform`)
+
+`--platform` checks live GitHub branch protection (required reviews, required
+status checks, `enforce_admins`, force-push/signature policy) via the `gh`
+CLI, reusing whatever `gh auth login` session is already active. This is a
+different trust category from every other check girdle does: everything
+else is a local file read with zero auth and zero network; this one is a
+live authenticated API call. It's opt-in only, never part of the default
+scan, and girdle never implements its own OAuth flow or asks a user to
+newly authorize it — if `gh` isn't installed or isn't authenticated, the
+check reports `available: false` with a reason and the rest of the scan
+proceeds normally.
+
+Branch protection lives on GitHub's side, not in the repo's files, so this
+genuinely can't be answered by static analysis. A repo declaring its
+*intended* protection as versioned policy-as-code (e.g. a committed
+`.github/settings.yml` for the Probot Settings app, or a Terraform
+GitHub-provider config) would be a separate, complementary, zero-auth
+signal — not yet implemented, but it stays inside girdle's normal trust
+model in a way a live API check never can, and is the right answer for
+scanning someone else's repo without asking them to authorize anything.
 
 ### Enforcement hooks
 

@@ -9,11 +9,14 @@ from pathlib import Path
 
 from girdle.detectors import ALL_DETECTORS
 from girdle.detectors.base import Detector, Fingerprint
+from girdle.platform import check_platform
 from girdle.runner import run_check
 from girdle.schema import CategoryResult, EcosystemResult, ScanResult, Tier
 
 
-def run_scan(repo_root: Path, mode: str = "static") -> ScanResult:
+def run_scan(
+    repo_root: Path, mode: str = "static", check_platform_enforcement: bool = False
+) -> ScanResult:
     repo_root = repo_root.resolve()
     ecosystems: list[EcosystemResult] = []
     warnings: list[str] = []
@@ -40,12 +43,15 @@ def run_scan(repo_root: Path, mode: str = "static") -> ScanResult:
     if not ecosystems:
         warnings.append("no known ecosystem detected at repo root")
 
+    platform = check_platform(repo_root) if check_platform_enforcement else None
+
     return ScanResult(
         repo_root=str(repo_root),
         scanned_at=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         mode=mode,
         ecosystems=ecosystems,
         warnings=warnings,
+        platform=platform,
     )
 
 

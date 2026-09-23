@@ -28,9 +28,18 @@ def main() -> None:
     "--fail-under", type=int, default=1,
     help="Exit nonzero if overall_min is below this tier (0-2)."
 )
-def scan(path: str, do_run: bool, as_json: bool, fail_under: int) -> None:
+@click.option(
+    "--platform", "check_platform_flag", is_flag=True,
+    help="Also check GitHub branch protection via `gh` (opt-in: needs gh CLI, network, your auth).",
+)
+def scan(
+    path: str, do_run: bool, as_json: bool, fail_under: int, check_platform_flag: bool
+) -> None:
     """Scan PATH and report verification-infrastructure readiness."""
-    result = run_scan(Path(path), mode="run" if do_run else "static")
+    result = run_scan(
+        Path(path), mode="run" if do_run else "static",
+        check_platform_enforcement=check_platform_flag,
+    )
     data = result.to_dict()
 
     if as_json or not sys.stdout.isatty():
@@ -128,6 +137,28 @@ def _print_human(data: dict) -> None:
     if data["warnings"]:
         for w in data["warnings"]:
             click.echo(f"warning: {w}")
+    platform = data.get("platform")
+    if platform is not None:
+        click.echo("")
+        _print_platform(platform)
+
+
+def _print_platform(platform: dict) -> None:
+    if not platform["available"]:
+        click.echo(f"platform: not checked ({platform['reason']})")
+        return
+    if not platform["protected"]:
+        loc = f"{platform['repo']}@{platform['default_branch']}"
+        click.echo(f"platform: {loc} - no branch protection")
+        return
+    click.echo(f"platform: {platform['repo']}@{platform['default_branch']} - protected")
+    click.echo(f"  required reviews        {platform['required_approving_review_count']}")
+    click.echo(f"  require code owners     {platform['require_code_owner_reviews']}")
+    click.echo(f"  enforce for admins      {platform['enforce_admins']}")
+    click.echo(f"  allow force pushes      {platform['allow_force_pushes']}")
+    click.echo(f"  require signed commits  {platform['required_signatures']}")
+    contexts = platform["required_status_check_contexts"]
+    click.echo(f"  required status checks  {', '.join(contexts) if contexts else '(none named)'}")
 
 
 if __name__ == "__main__":

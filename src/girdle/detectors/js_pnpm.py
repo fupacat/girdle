@@ -41,6 +41,6 @@ class JsPnpmDetector:
         evidence = ["pnpm-lock.yaml"]
         if "workspace" in fp.variants:
             evidence.append(
-                "pnpm-workspace.yaml (monorepo — packages may warrant per-package scoring)"
+                "pnpm-workspace.yaml (monorepo - packages may warrant per-package scoring)"
             )
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
