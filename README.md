@@ -18,6 +18,18 @@ girdle scan . --run        # also execute test/lint tooling for tier-2 verificat
 girdle dashboard .          # writes girdle-report.html
 ```
 
+## Development
+
+`requirements.txt` / `requirements-dev.txt` are pinned via `pip-compile`
+(from `pip-tools`) against `pyproject.toml`. Regenerate after changing
+dependencies:
+
+```bash
+pip install pip-tools
+pip-compile pyproject.toml -o requirements.txt
+pip-compile --extra dev pyproject.toml -o requirements-dev.txt
+```
+
 Exit code is nonzero if the weakest applicable category falls below
 `--fail-under` (default: tier 1, "configured").
 
