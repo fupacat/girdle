@@ -24,3 +24,9 @@ pytest==9.1.1
     # via girdle (pyproject.toml)
 ruff==0.16.8
     # via girdle (pyproject.toml)
+tree-sitter==0.26.0
+    # via
+    #   girdle (pyproject.toml)
+    #   tree-sitter-language-pack
+tree-sitter-language-pack==1.20.0
+    # via girdle (pyproject.toml)

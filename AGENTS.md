@@ -36,13 +36,14 @@ src/girdle/detectors/python_pipenv.py | python | 43L | PythonPipenvDetector
 src/girdle/detectors/python_uv.py | python | 43L | PythonUvDetector
 src/girdle/detectors/registry.py | python | 34L | 
 src/girdle/detectors/rust.py | python | 102L | RustDetector
-src/girdle/indexer.py | python | 254L | IndexEntry, RepoIndex, _iter_source_files, _walk, _extract_symbols, build_index, _estimate_tokens, _render_entry, render_manifest, render_block, inject_into, is_stale
+src/girdle/indexer.py | python | 361L | _parser, _text, _name_of, _defs_python, _defs_js_ts, _defs_go, _defs_rust, _defs_java, _defs_csharp_from, IndexEntry, RepoIndex, _iter_source_files, _extract_symbols, build_index, _estimate_tokens, _render_entry, render_manifest, render_block, inject_into, is_stale
 src/girdle/runner.py | python | 53L | RunOutcome, run_check
 src/girdle/scan.py | python | 73L | run_scan, _verify
 src/girdle/schema.py | python | 145L | Tier, CategoryResult, EcosystemResult, ScanResult
 tests/test_dotnet.py | python | 62L | test_detect_none_without_project_files, test_pinned_packagereference_configured, test_floating_version_without_lockfile_is_absent, test_packages_lock_json_configured_even_with_ranges, test_test_sdk_reference_detected
 tests/test_go_mod.py | python | 28L | test_detect_none_without_go_mod, test_missing_go_sum_is_absent, test_test_files_detected
 tests/test_indexer.py | python | 97L | test_python_symbols_extracted, test_excluded_dirs_are_skipped, test_go_and_rust_symbols, test_budget_truncates_and_flags, test_manifest_render_is_deterministic, test_inject_creates_markers_in_empty_file, test_inject_replaces_existing_block, test_is_stale_true_when_missing, test_is_stale_false_when_matching, test_is_stale_true_when_drifted
+tests/test_indexer_treesitter.py | python | 86L | _symbols_for, test_python_decorated_and_multiline_signature, test_python_async_def, test_js_export_const_arrow, test_js_non_function_const_not_captured, test_ts_interface_and_type_alias, test_tsx_extension_parses, test_java_multiple_top_level_types, test_csharp_namespace_unwrapped, test_rust_impl_for_trait, test_go_multiple_types_in_one_type_declaration_group
 tests/test_java.py | python | 77L | test_maven_detect_none_without_pom, test_maven_pinned_versions_configured, test_maven_version_range_is_absent, test_gradle_detect_none_without_build_file, test_gradle_lockfile_configured, test_gradle_no_lock_mechanism_is_absent, test_gradle_kotlin_dsl_variant
 tests/test_js_npm.py | python | 46L | test_detect_none_without_package_json, test_detect_yields_to_yarn, test_full_configured_repo, test_gitignored_lockfile_scores_absent
 tests/test_js_variants.py | python | 57L | test_npm_yields_to_yarn, test_npm_yields_to_pnpm, test_npm_yields_to_bun, test_yarn_gitignored_lockfile_is_absent, test_bun_binary_lockfile_presence_only, test_pnpm_workspace_variant_detected

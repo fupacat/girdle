@@ -25,13 +25,17 @@ girdle index . --check AGENTS.md      # exit nonzero if that file's manifest blo
 `girdle index` is a separate, mechanically-generated structural index — not
 part of the verification score. It's a flat, budget-capped (`--budget-tokens`,
 default 4000) path -> {language, line count, top-level symbols} manifest,
-ranked for truncation by symbol count as a lightweight significance proxy
-(not a real reference-graph/PageRank signal). Content is structural facts
-only (paths, symbol names) — never free text scraped from comments or
-docstrings, since those could originate from an untrusted fork. `--inject`
-and `--check` are the mechanical regenerate/verify hooks for wiring this
-into a pre-commit hook or CI step, as this repo's own `.github/workflows/ci.yml`
-does against its own `AGENTS.md`.
+parsed with [tree-sitter](https://tree-sitter.github.io/tree-sitter/) grammars
+(Python, JS/TS/TSX, Go, Rust, Java, C#) rather than regex, so multi-line
+signatures, decorators, and language-specific wrapping (TS interfaces/type
+aliases, C# block namespaces) resolve correctly. Truncation ranking still
+uses symbol count as a lightweight significance proxy (not a real reference-
+graph/PageRank signal). Content is structural facts only (paths, symbol
+names) — never free text scraped from comments or docstrings, since those
+could originate from an untrusted fork. `--inject` and `--check` are the
+mechanical regenerate/verify hooks for wiring this into a pre-commit hook or
+CI step, as this repo's own `.github/workflows/ci.yml` does against its own
+`AGENTS.md`.
 
 ## Development
 

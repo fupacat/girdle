@@ -1,10 +1,15 @@
 """Deterministic structural index: a compressed path -> {language, symbols}
-manifest, mechanically generated (regex-based symbol extraction, no LLM in
+manifest, mechanically generated via tree-sitter grammar parsing (no LLM in
 the loop), flat, budget-capped. Content is structural facts only (paths,
 symbol names) - never free text scraped from comments/docstrings, per the
 design note's injection-safety stance (an untrusted file's docstring must
 never become "trusted" instruction context just because it's near a symbol
 name girdle extracted).
+
+Only top-level definitions are extracted (one level of unwrapping through
+decorators/export statements/block namespaces) to keep the index flat and
+compressed, not a full symbol table - this is a deliberate scope choice,
+independent of using a real parser instead of regex.
 
 Ranking for budget truncation uses symbol count as a lightweight proxy for
 "structurally significant" - this is NOT a real reference-graph/PageRank
@@ -18,7 +23,11 @@ import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from functools import cache
 from pathlib import Path
+
+from tree_sitter import Node
+from tree_sitter_language_pack import get_parser
 
 DEFAULT_BUDGET_TOKENS = 4000
 CHARS_PER_TOKEN_ESTIMATE = 4  # crude approximation, not a real tokenizer
@@ -29,53 +38,161 @@ EXCLUDED_DIRS = {
     ".ruff_cache", "vendor", ".idea", ".vscode", ".egg-info",
 }
 
+# extension -> (display language, tree-sitter grammar name)
 LANGUAGE_BY_EXT = {
-    ".py": "python",
-    ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript",
-    ".ts": "typescript", ".tsx": "typescript",
-    ".go": "go",
-    ".rs": "rust",
-    ".java": "java",
-    ".cs": "csharp",
+    ".py": ("python", "python"),
+    ".js": ("javascript", "javascript"),
+    ".jsx": ("javascript", "javascript"),
+    ".mjs": ("javascript", "javascript"),
+    ".cjs": ("javascript", "javascript"),
+    ".ts": ("typescript", "typescript"),
+    ".tsx": ("typescript", "tsx"),
+    ".go": ("go", "go"),
+    ".rs": ("rust", "rust"),
+    ".java": ("java", "java"),
+    ".cs": ("csharp", "csharp"),
 }
 
-# Top-level-only patterns (no indentation before the keyword) to keep the
-# index flat/compressed rather than enumerating every nested method.
-SYMBOL_PATTERNS = {
-    "python": [
-        re.compile(r"^(?:async def|def|class)\s+(\w+)", re.MULTILINE),
-    ],
-    "javascript": [
-        re.compile(r"^(?:export\s+)?(?:default\s+)?function\s*\*?\s+(\w+)", re.MULTILINE),
-        re.compile(r"^(?:export\s+)?(?:default\s+)?class\s+(\w+)", re.MULTILINE),
-        re.compile(r"^export\s+const\s+(\w+)\s*=", re.MULTILINE),
-    ],
-    "typescript": [
-        re.compile(r"^(?:export\s+)?(?:default\s+)?function\s*\*?\s+(\w+)", re.MULTILINE),
-        re.compile(r"^(?:export\s+)?(?:default\s+)?class\s+(\w+)", re.MULTILINE),
-        re.compile(r"^export\s+const\s+(\w+)\s*=", re.MULTILINE),
-        re.compile(r"^(?:export\s+)?interface\s+(\w+)", re.MULTILINE),
-        re.compile(r"^(?:export\s+)?type\s+(\w+)\s*=", re.MULTILINE),
-    ],
-    "go": [
-        re.compile(r"^func\s+(?:\(\w+ \*?\w+\)\s+)?(\w+)", re.MULTILINE),
-        re.compile(r"^type\s+(\w+)\s+(?:struct|interface)", re.MULTILINE),
-    ],
-    "rust": [
-        re.compile(r"^(?:pub\s+)?fn\s+(\w+)", re.MULTILINE),
-        re.compile(r"^(?:pub\s+)?struct\s+(\w+)", re.MULTILINE),
-        re.compile(r"^(?:pub\s+)?enum\s+(\w+)", re.MULTILINE),
-        re.compile(r"^(?:pub\s+)?trait\s+(\w+)", re.MULTILINE),
-        re.compile(r"^impl(?:<[^>]*>)?\s+(?:\w+\s+for\s+)?(\w+)", re.MULTILINE),
-    ],
-    "java": [
-        re.compile(r"^\s*(?:public|private|protected)?\s*(?:static\s+)?(?:final\s+)?"
-                   r"(?:class|interface|enum|record)\s+(\w+)", re.MULTILINE),
-    ],
-    "csharp": [
-        re.compile(r"^\s*(?:public|private|protected|internal)?\s*(?:static\s+)?"
-                   r"(?:sealed\s+)?(?:class|interface|enum|record|struct)\s+(\w+)", re.MULTILINE),
-    ],
+
+@cache
+def _parser(grammar: str):
+    return get_parser(grammar)
+
+
+def _text(node: Node, source: bytes) -> str:
+    return source[node.start_byte : node.end_byte].decode("utf-8", errors="ignore")
+
+
+def _name_of(node: Node, source: bytes) -> str | None:
+    name_node = node.child_by_field_name("name")
+    return _text(name_node, source) if name_node else None
+
+
+def _defs_python(root: Node, source: bytes) -> list[str]:
+    names = []
+    for child in root.children:
+        node = child
+        if node.type == "decorated_definition":
+            inner = node.child_by_field_name("definition")
+            if inner:
+                node = inner
+        if node.type in ("function_definition", "class_definition"):
+            name = _name_of(node, source)
+            if name:
+                names.append(name)
+    return names
+
+
+_JS_DEF_TYPES = (
+    "function_declaration",
+    "generator_function_declaration",
+    "class_declaration",
+    "interface_declaration",
+    "type_alias_declaration",
+)
+
+
+def _defs_js_ts(root: Node, source: bytes) -> list[str]:
+    names = []
+    for child in root.children:
+        node = child
+        if node.type == "export_statement":
+            inner = node.child_by_field_name("declaration")
+            if inner is None:
+                continue
+            node = inner
+        if node.type in _JS_DEF_TYPES:
+            name = _name_of(node, source)
+            if name:
+                names.append(name)
+        elif node.type == "lexical_declaration":
+            for declarator in node.children:
+                if declarator.type != "variable_declarator":
+                    continue
+                value = declarator.child_by_field_name("value")
+                if value is not None and value.type in (
+                    "arrow_function", "function", "function_expression",
+                ):
+                    name = _name_of(declarator, source)
+                    if name:
+                        names.append(name)
+    return names
+
+
+def _defs_go(root: Node, source: bytes) -> list[str]:
+    names = []
+    for child in root.children:
+        if child.type in ("function_declaration", "method_declaration"):
+            name_node = child.child_by_field_name("name")
+            if name_node is None:
+                continue
+            names.append(_text(name_node, source))
+        elif child.type == "type_declaration":
+            for spec in child.children:
+                if spec.type == "type_spec":
+                    name = _name_of(spec, source)
+                    if name:
+                        names.append(name)
+    return names
+
+
+def _defs_rust(root: Node, source: bytes) -> list[str]:
+    names = []
+    for child in root.children:
+        if child.type in ("function_item", "struct_item", "enum_item", "trait_item"):
+            name = _name_of(child, source)
+            if name:
+                names.append(name)
+        elif child.type == "impl_item":
+            type_node = child.child_by_field_name("type")
+            if type_node is not None:
+                names.append(_text(type_node, source))
+    return names
+
+
+_JAVA_DEF_TYPES = (
+    "class_declaration", "interface_declaration", "enum_declaration", "record_declaration",
+)
+
+
+def _defs_java(root: Node, source: bytes) -> list[str]:
+    names = []
+    for child in root.children:
+        if child.type in _JAVA_DEF_TYPES:
+            name = _name_of(child, source)
+            if name:
+                names.append(name)
+    return names
+
+
+_CSHARP_DEF_TYPES = (
+    "class_declaration", "interface_declaration", "struct_declaration",
+    "enum_declaration", "record_declaration",
+)
+
+
+def _defs_csharp_from(node: Node, source: bytes) -> list[str]:
+    names = []
+    for child in node.children:
+        if child.type in _CSHARP_DEF_TYPES:
+            name = _name_of(child, source)
+            if name:
+                names.append(name)
+        elif child.type == "namespace_declaration":
+            body = child.child_by_field_name("body")
+            if body is not None:
+                names.extend(_defs_csharp_from(body, source))
+    return names
+
+
+_DEF_EXTRACTORS = {
+    "python": _defs_python,
+    "javascript": _defs_js_ts,
+    "typescript": _defs_js_ts,
+    "go": _defs_go,
+    "rust": _defs_rust,
+    "java": _defs_java,
+    "csharp": _defs_csharp_from,
 }
 
 
@@ -111,7 +228,7 @@ class RepoIndex:
 
 
 def _iter_source_files(root: Path):
-    for dirpath, dirnames, filenames in _walk(root):
+    for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in EXCLUDED_DIRS and not d.startswith(".")]
         for name in filenames:
             ext = Path(name).suffix
@@ -119,22 +236,12 @@ def _iter_source_files(root: Path):
                 yield Path(dirpath) / name
 
 
-def _walk(root: Path):
-    yield from os.walk(root)
-
-
-def _extract_symbols(text: str, language: str) -> list[str]:
-    symbols: list[str] = []
-    for pattern in SYMBOL_PATTERNS.get(language, []):
-        symbols.extend(pattern.findall(text))
-    # de-dupe while preserving first-seen order
-    seen = set()
-    ordered = []
-    for s in symbols:
-        if s not in seen:
-            seen.add(s)
-            ordered.append(s)
-    return ordered
+def _extract_symbols(source: bytes, display_language: str, grammar: str) -> list[str]:
+    extractor = _DEF_EXTRACTORS.get(display_language)
+    if extractor is None:
+        return []
+    tree = _parser(grammar).parse(source)
+    return extractor(tree.root_node, source)
 
 
 def build_index(repo_root: Path, budget_tokens: int = DEFAULT_BUDGET_TOKENS) -> RepoIndex:
@@ -143,16 +250,16 @@ def build_index(repo_root: Path, budget_tokens: int = DEFAULT_BUDGET_TOKENS) -> 
 
     for file_path in _iter_source_files(repo_root):
         try:
-            text = file_path.read_text(encoding="utf-8", errors="ignore")
+            source = file_path.read_bytes()
         except OSError:
             continue
-        language = LANGUAGE_BY_EXT[file_path.suffix]
-        symbols = _extract_symbols(text, language)
+        display_language, grammar = LANGUAGE_BY_EXT[file_path.suffix]
+        symbols = _extract_symbols(source, display_language, grammar)
         all_entries.append(
             IndexEntry(
                 path=str(file_path.relative_to(repo_root)).replace("\\", "/"),
-                language=language,
-                lines=text.count("\n") + 1,
+                language=display_language,
+                lines=source.count(b"\n") + 1,
                 symbols=symbols,
             )
         )
