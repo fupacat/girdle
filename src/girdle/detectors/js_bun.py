@@ -8,19 +8,16 @@ from girdle.detectors.base import Fingerprint
 from girdle.schema import CategoryResult, Tier
 
 
-class JsNpmDetector:
+class JsBunDetector:
     def detect(self, root: Path) -> Fingerprint | None:
-        pkg = root / "package.json"
-        if not pkg.exists():
+        if not (root / "package.json").exists():
             return None
-        # Only claim npm if no other lockfile signals a different toolchain.
-        other_lockfiles = ("yarn.lock", "pnpm-lock.yaml", "bun.lockb", "bun.lock")
-        if any((root / lf).exists() for lf in other_lockfiles):
+        if not ((root / "bun.lockb").exists() or (root / "bun.lock").exists()):
             return None
         return Fingerprint(
-            id="js-npm",
+            id="js-bun",
             language="javascript",
-            toolchain="npm",
+            toolchain="bun",
             root=root,
             variants=js_common.detect_variants(root),
         )
@@ -35,15 +32,13 @@ class JsNpmDetector:
             "tests": js_common.scan_tests(pkg_data),
             "lint": js_common.scan_lint(root, fp),
             "reproducibility": self._scan_reproducibility(root),
-            "ci_gating": js_common.scan_ci(root, r"\bnpm (run )?(test|ci)\b", "npm test"),
+            "ci_gating": js_common.scan_ci(root, r"\bbun (run )?test\b", "bun test"),
         }
 
     def _scan_reproducibility(self, root: Path) -> CategoryResult:
-        lockfile = root / "package-lock.json"
-        if not lockfile.exists():
-            return CategoryResult(Tier.ABSENT, reason="no package-lock.json found")
-        if js_common.is_lockfile_gitignored(root, "package-lock.json"):
-            return CategoryResult(
-                Tier.ABSENT, reason="package-lock.json exists but is gitignored (not committed)"
-            )
-        return CategoryResult(Tier.CONFIGURED, evidence=["package-lock.json"])
+        # bun.lockb is binary: existence-only check, can't diff or content-scan it.
+        if (root / "bun.lockb").exists():
+            return CategoryResult(Tier.CONFIGURED, evidence=["bun.lockb (binary, presence-only)"])
+        if (root / "bun.lock").exists():
+            return CategoryResult(Tier.CONFIGURED, evidence=["bun.lock"])
+        return CategoryResult(Tier.ABSENT, reason="no bun.lockb/bun.lock found")
