@@ -26,8 +26,8 @@ class JsYarnDetector:
         root = fp.root
         pkg_data = read_json(root / "package.json") or {}
         return {
-            "tests": js_common.scan_tests(pkg_data),
-            "lint": js_common.scan_lint(root, fp),
+            "tests": js_common.scan_tests(pkg_data, "yarn"),
+            "lint": js_common.scan_lint(root, fp, "yarn"),
             "reproducibility": self._scan_reproducibility(root, fp),
             "ci_gating": js_common.scan_ci(root, r"\byarn (run )?test\b", "yarn test"),
         }
@@ -37,7 +37,10 @@ class JsYarnDetector:
 
     def _scan_reproducibility(self, root: Path, fp: Fingerprint) -> CategoryResult:
         if js_common.is_lockfile_gitignored(root, "yarn.lock"):
-            return CategoryResult(Tier.ABSENT, reason="yarn.lock exists but is gitignored")
+            return CategoryResult(
+                Tier.ABSENT, reason="yarn.lock exists but is gitignored",
+                recommendation="Remove yarn.lock from .gitignore and commit it.",
+            )
         evidence = ["yarn.lock"]
         if "berry" in fp.variants:
             # PnP mode changes what "installed" even means; note it rather than score it.

@@ -1,7 +1,12 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from girdle.platform import PlatformResult, check_platform, extract_protection_facts
+from girdle.platform import (
+    PlatformResult,
+    check_platform,
+    compute_recommendations,
+    extract_protection_facts,
+)
 
 PROTECTION_RESPONSE = {
     "required_pull_request_reviews": {
@@ -105,6 +110,42 @@ def test_check_platform_protected_branch(tmp_path: Path):
 def test_to_dict_unavailable():
     result = PlatformResult(available=False, reason="gh not found")
     assert result.to_dict() == {"available": False, "reason": "gh not found"}
+
+
+def test_compute_recommendations_unavailable_is_empty():
+    result = PlatformResult(available=False, reason="gh not found")
+    assert compute_recommendations(result) == []
+
+
+def test_compute_recommendations_unprotected():
+    result = PlatformResult(
+        available=True, repo="user/repo", default_branch="main", protected=False
+    )
+    recs = compute_recommendations(result)
+    assert len(recs) == 1
+    assert "branch protection" in recs[0]
+
+
+def test_compute_recommendations_protected_but_weak():
+    result = PlatformResult(
+        available=True, repo="user/repo", default_branch="main", protected=True,
+        required_approving_review_count=0, enforce_admins=False, allow_force_pushes=True,
+        required_status_check_contexts=[],
+    )
+    recs = compute_recommendations(result)
+    assert any("approving review" in r for r in recs)
+    assert any("administrators" in r for r in recs)
+    assert any("force-pushes" in r for r in recs)
+    assert any("status checks" in r for r in recs)
+
+
+def test_compute_recommendations_fully_hardened_is_empty():
+    result = PlatformResult(
+        available=True, repo="user/repo", default_branch="main", protected=True,
+        required_approving_review_count=2, enforce_admins=True, allow_force_pushes=False,
+        required_status_check_contexts=["ci/test"],
+    )
+    assert compute_recommendations(result) == []
 
 
 def test_to_dict_available_and_protected():

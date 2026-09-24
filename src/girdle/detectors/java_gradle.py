@@ -45,7 +45,8 @@ class JavaGradleDetector:
         has_junit = "junit" in build_text.lower() or "testng" in build_text.lower()
         if not has_test_dir and not has_junit:
             return CategoryResult(
-                Tier.ABSENT, reason="no src/test or junit/testng dependency found"
+                Tier.ABSENT, reason="no src/test or junit/testng dependency found",
+                recommendation="Add the junit dependency and create tests under src/test.",
             )
         evidence = []
         if has_test_dir:
@@ -61,7 +62,10 @@ class JavaGradleDetector:
         if "spotless" in build_text.lower():
             evidence.append("spotless plugin")
         if not evidence:
-            return CategoryResult(Tier.ABSENT, reason="no checkstyle/spotless plugin found")
+            return CategoryResult(
+                Tier.ABSENT, reason="no checkstyle/spotless plugin found",
+                recommendation="Add the checkstyle or spotless Gradle plugin to your build script.",
+            )
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
     def _scan_reproducibility(self, root: Path, build_text: str) -> CategoryResult:
@@ -80,6 +84,11 @@ class JavaGradleDetector:
         return CategoryResult(
             Tier.ABSENT,
             reason="no gradle.lockfile, version catalog, or dependencyLocking found",
+            recommendation=(
+                "Enable dependency locking (`dependencyLocking { lockAllConfigurations() }` "
+                "then `./gradlew dependencies --write-locks`), or adopt a version catalog "
+                "(gradle/libs.versions.toml)."
+            ),
         )
 
     def _scan_ci(self, root: Path) -> CategoryResult:
@@ -96,4 +105,10 @@ class JavaGradleDetector:
             text = read_text(p) or ""
             if p.exists() and re.search(r"gradlew?\s+.*test\b", text):
                 return CategoryResult(Tier.CONFIGURED, evidence=[f"{f}: runs gradle test"])
-        return CategoryResult(Tier.ABSENT, reason="no CI config found running gradle test")
+        return CategoryResult(
+            Tier.ABSENT, reason="no CI config found running gradle test",
+            recommendation=(
+                "Add a GitHub Actions workflow (.github/workflows/ci.yml) that runs "
+                "`./gradlew test`."
+            ),
+        )

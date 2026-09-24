@@ -50,7 +50,10 @@ class RustDetector:
             for f in rglob_excluding(root, "*.rs")
         )
         if not has_tests_dir and not has_inline:
-            return CategoryResult(Tier.ABSENT, reason="no tests/ dir or #[test]/#[cfg(test)] found")
+            return CategoryResult(
+                Tier.ABSENT, reason="no tests/ dir or #[test]/#[cfg(test)] found",
+                recommendation="Add #[test] functions in source, or a tests/ integration-test dir.",
+            )
         evidence = []
         if has_tests_dir:
             evidence.append("tests/ directory")
@@ -68,7 +71,12 @@ class RustDetector:
         if "lints" in cargo_data:
             evidence.append("Cargo.toml#[lints]")
         if not evidence:
-            return CategoryResult(Tier.ABSENT, reason="no clippy/rustfmt config or [lints] found")
+            return CategoryResult(
+                Tier.ABSENT, reason="no clippy/rustfmt config or [lints] found",
+                recommendation=(
+                    "Add a rustfmt.toml/clippy.toml or a [lints] table; run `cargo clippy`."
+                ),
+            )
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
     def _scan_reproducibility(self, root: Path, fp: Fingerprint) -> CategoryResult:
@@ -83,7 +91,8 @@ class RustDetector:
                     ),
                 )
             return CategoryResult(
-                Tier.ABSENT, reason="no Cargo.lock found (required for a binary crate)"
+                Tier.ABSENT, reason="no Cargo.lock found (required for a binary crate)",
+                recommendation="Run `cargo build` and commit the generated Cargo.lock.",
             )
         return CategoryResult(Tier.CONFIGURED, evidence=["Cargo.lock"])
 
@@ -99,4 +108,10 @@ class RustDetector:
             p = root / f
             if p.exists() and re.search(r"\bcargo test\b", read_text(p) or ""):
                 return CategoryResult(Tier.CONFIGURED, evidence=[f"{f}: runs cargo test"])
-        return CategoryResult(Tier.ABSENT, reason="no CI config found running cargo test")
+        return CategoryResult(
+            Tier.ABSENT, reason="no CI config found running cargo test",
+            recommendation=(
+                "Add a GitHub Actions workflow (.github/workflows/ci.yml) that runs "
+                "`cargo test`."
+            ),
+        )

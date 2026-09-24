@@ -49,7 +49,11 @@ class JavaMavenDetector:
         has_junit = "junit" in pom_text.lower() or "testng" in pom_text.lower()
         if not has_test_dir and not has_junit:
             return CategoryResult(
-                Tier.ABSENT, reason="no src/test/java or junit/testng dependency found"
+                Tier.ABSENT, reason="no src/test/java or junit/testng dependency found",
+                recommendation=(
+                    "Add the junit dependency to pom.xml and create tests under "
+                    "src/test/java."
+                ),
             )
         evidence = []
         if has_test_dir:
@@ -62,7 +66,8 @@ class JavaMavenDetector:
         found = [p for p in LINT_PLUGINS if p in pom_text]
         if not found:
             return CategoryResult(
-                Tier.ABSENT, reason="no checkstyle/spotbugs/pmd plugin found in pom.xml"
+                Tier.ABSENT, reason="no checkstyle/spotbugs/pmd plugin found in pom.xml",
+                recommendation="Add the maven-checkstyle-plugin (or spotbugs/pmd) to pom.xml.",
             )
         return CategoryResult(Tier.CONFIGURED, evidence=[f"pom.xml plugin: {p}" for p in found])
 
@@ -75,9 +80,16 @@ class JavaMavenDetector:
                     f"{len(ranges)} dependency version range(s) found "
                     "(Maven has no native lockfile)"
                 ),
+                recommendation=(
+                    "Replace version ranges with exact pinned <version> elements in "
+                    "pom.xml."
+                ),
             )
         if "<version>" not in pom_text:
-            return CategoryResult(Tier.ABSENT, reason="no dependency versions found to evaluate")
+            return CategoryResult(
+                Tier.ABSENT, reason="no dependency versions found to evaluate",
+                recommendation="Add explicit <version> elements to your <dependency> entries.",
+            )
         return CategoryResult(
             Tier.CONFIGURED, evidence=["all dependency versions appear exact-pinned (no ranges)"]
         )
@@ -94,4 +106,10 @@ class JavaMavenDetector:
             p = root / f
             if p.exists() and re.search(r"\bmvn\b.*\btest\b", read_text(p) or ""):
                 return CategoryResult(Tier.CONFIGURED, evidence=[f"{f}: runs mvn test"])
-        return CategoryResult(Tier.ABSENT, reason="no CI config found running mvn test")
+        return CategoryResult(
+            Tier.ABSENT, reason="no CI config found running mvn test",
+            recommendation=(
+                "Add a GitHub Actions workflow (.github/workflows/ci.yml) that runs "
+                "`mvn test`."
+            ),
+        )

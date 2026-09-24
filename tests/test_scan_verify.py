@@ -21,7 +21,7 @@ def _fp(tmp_path: Path) -> Fingerprint:
 def test_verify_upgrades_to_verified_on_success(tmp_path: Path):
     categories = {"tests": CategoryResult(Tier.CONFIGURED, evidence=["some config"])}
     detector = _FakeDetector([sys.executable, "-c", "exit(0)"])
-    _verify(detector, _fp(tmp_path), categories)
+    _verify(detector, _fp(tmp_path), categories, mode="run")
     assert categories["tests"].tier == Tier.VERIFIED
     assert any("verified" in e for e in categories["tests"].evidence)
 
@@ -29,7 +29,7 @@ def test_verify_upgrades_to_verified_on_success(tmp_path: Path):
 def test_verify_keeps_configured_on_failure(tmp_path: Path):
     categories = {"tests": CategoryResult(Tier.CONFIGURED, evidence=["some config"])}
     detector = _FakeDetector([sys.executable, "-c", "exit(1)"])
-    _verify(detector, _fp(tmp_path), categories)
+    _verify(detector, _fp(tmp_path), categories, mode="run")
     assert categories["tests"].tier == Tier.CONFIGURED
     assert "exited 1" in categories["tests"].reason
 
@@ -37,7 +37,7 @@ def test_verify_keeps_configured_on_failure(tmp_path: Path):
 def test_verify_skips_absent_categories(tmp_path: Path):
     categories = {"tests": CategoryResult(Tier.ABSENT, reason="no config")}
     detector = _FakeDetector([sys.executable, "-c", "exit(0)"])
-    _verify(detector, _fp(tmp_path), categories)
+    _verify(detector, _fp(tmp_path), categories, mode="run")
     assert categories["tests"].tier == Tier.ABSENT
 
 
@@ -47,5 +47,14 @@ def test_verify_noop_without_run_commands(tmp_path: Path):
     class NoRunCommands:
         pass
 
-    _verify(NoRunCommands(), _fp(tmp_path), categories)
+    _verify(NoRunCommands(), _fp(tmp_path), categories, mode="run")
     assert categories["tests"].tier == Tier.CONFIGURED
+
+
+def test_verify_static_mode_adds_generic_hint_not_execution(tmp_path: Path):
+    categories = {"tests": CategoryResult(Tier.CONFIGURED, evidence=["some config"])}
+    detector = _FakeDetector([sys.executable, "-c", "exit(1)"])
+    _verify(detector, _fp(tmp_path), categories, mode="static")
+    assert categories["tests"].tier == Tier.CONFIGURED
+    assert categories["tests"].recommendation is not None
+    assert "--run" in categories["tests"].recommendation

@@ -36,7 +36,13 @@ class PythonPipenvDetector:
 
     def _scan_reproducibility(self, root: Path) -> CategoryResult:
         if not (root / "Pipfile.lock").exists():
-            return CategoryResult(Tier.ABSENT, reason="no Pipfile.lock found")
+            return CategoryResult(
+                Tier.ABSENT, reason="no Pipfile.lock found",
+                recommendation="Run `pipenv lock` and commit the generated Pipfile.lock.",
+            )
         if python_common.is_lockfile_gitignored(root, "Pipfile.lock"):
-            return CategoryResult(Tier.ABSENT, reason="Pipfile.lock exists but is gitignored")
+            return CategoryResult(
+                Tier.ABSENT, reason="Pipfile.lock exists but is gitignored",
+                recommendation="Remove Pipfile.lock from .gitignore and commit it.",
+            )
         return CategoryResult(Tier.CONFIGURED, evidence=["Pipfile.lock"])

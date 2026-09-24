@@ -54,7 +54,10 @@ class DotNetDetector:
         has_test_proj = any(rglob_excluding(root, "*.Tests.csproj", "*Tests.csproj"))
         if not has_test_sdk and not has_test_proj:
             return CategoryResult(
-                Tier.ABSENT, reason="no Microsoft.NET.Test.Sdk reference or *.Tests.csproj found"
+                Tier.ABSENT, reason="no Microsoft.NET.Test.Sdk reference or *.Tests.csproj found",
+                recommendation=(
+                    "Add a *.Tests.csproj project referencing Microsoft.NET.Test.Sdk."
+                ),
             )
         evidence = []
         if has_test_sdk:
@@ -72,7 +75,11 @@ class DotNetDetector:
             evidence.append("Directory.Build.props: EnableNETAnalyzers")
         if not evidence:
             return CategoryResult(
-                Tier.ABSENT, reason="no .editorconfig or EnableNETAnalyzers found"
+                Tier.ABSENT, reason="no .editorconfig or EnableNETAnalyzers found",
+                recommendation=(
+                    "Add a .editorconfig, or set <EnableNETAnalyzers>true</EnableNETAnalyzers> "
+                    "in Directory.Build.props."
+                ),
             )
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
@@ -88,7 +95,11 @@ class DotNetDetector:
             return CategoryResult(Tier.CONFIGURED, evidence=["packages.lock.json"])
         if refs == 0:
             return CategoryResult(
-                Tier.ABSENT, reason="no PackageReference entries found to evaluate"
+                Tier.ABSENT, reason="no PackageReference entries found to evaluate",
+                recommendation=(
+                    "Add explicit-version PackageReference entries as dependencies "
+                    "are added."
+                ),
             )
         if ranges:
             return CategoryResult(
@@ -96,6 +107,11 @@ class DotNetDetector:
                 reason=(
                     f"{len(ranges)} floating/range PackageReference version(s) found and no "
                     "packages.lock.json (RestorePackagesWithLockFile is opt-in in .NET)"
+                ),
+                recommendation=(
+                    "Pin exact PackageReference versions, or enable "
+                    "<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile> and run "
+                    "`dotnet restore`."
                 ),
             )
         return CategoryResult(
@@ -115,4 +131,10 @@ class DotNetDetector:
             p = root / f
             if p.exists() and re.search(r"\bdotnet test\b", read_text(p) or ""):
                 return CategoryResult(Tier.CONFIGURED, evidence=[f"{f}: runs dotnet test"])
-        return CategoryResult(Tier.ABSENT, reason="no CI config found running dotnet test")
+        return CategoryResult(
+            Tier.ABSENT, reason="no CI config found running dotnet test",
+            recommendation=(
+                "Add a GitHub Actions workflow (.github/workflows/ci.yml) that runs "
+                "`dotnet test`."
+            ),
+        )

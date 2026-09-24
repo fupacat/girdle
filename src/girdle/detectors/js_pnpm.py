@@ -26,8 +26,8 @@ class JsPnpmDetector:
         root = fp.root
         pkg_data = read_json(root / "package.json") or {}
         return {
-            "tests": js_common.scan_tests(pkg_data),
-            "lint": js_common.scan_lint(root, fp),
+            "tests": js_common.scan_tests(pkg_data, "pnpm"),
+            "lint": js_common.scan_lint(root, fp, "pnpm"),
             "reproducibility": self._scan_reproducibility(root, fp),
             "ci_gating": js_common.scan_ci(root, r"\bpnpm (run )?test\b", "pnpm test"),
         }
@@ -37,7 +37,10 @@ class JsPnpmDetector:
 
     def _scan_reproducibility(self, root: Path, fp: Fingerprint) -> CategoryResult:
         if js_common.is_lockfile_gitignored(root, "pnpm-lock.yaml"):
-            return CategoryResult(Tier.ABSENT, reason="pnpm-lock.yaml exists but is gitignored")
+            return CategoryResult(
+                Tier.ABSENT, reason="pnpm-lock.yaml exists but is gitignored",
+                recommendation="Remove pnpm-lock.yaml from .gitignore and commit it.",
+            )
         evidence = ["pnpm-lock.yaml"]
         if "workspace" in fp.variants:
             evidence.append(

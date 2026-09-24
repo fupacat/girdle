@@ -54,9 +54,16 @@ def scan(
 @click.argument("path", default=".", type=click.Path(exists=True, file_okay=False))
 @click.option("--run/--static", "do_run", default=False)
 @click.option("-o", "--output", default="girdle-report.html", type=click.Path())
-def dashboard(path: str, do_run: bool, output: str) -> None:
+@click.option(
+    "--platform", "check_platform_flag", is_flag=True,
+    help="Also check GitHub branch protection via `gh` (opt-in: needs gh CLI, network, your auth).",
+)
+def dashboard(path: str, do_run: bool, output: str, check_platform_flag: bool) -> None:
     """Scan PATH and render an HTML dashboard from the same scan data the CLI uses."""
-    result = run_scan(Path(path), mode="run" if do_run else "static")
+    result = run_scan(
+        Path(path), mode="run" if do_run else "static",
+        check_platform_enforcement=check_platform_flag,
+    )
     html = render_dashboard(result.to_dict())
     Path(output).write_text(html, encoding="utf-8")
     click.echo(f"wrote {output}")
@@ -127,6 +134,8 @@ def _print_human(data: dict) -> None:
             click.echo(f"  {cat_name:<18} {marker}")
             if cat["reason"]:
                 click.echo(f"    reason: {cat['reason']}")
+            if cat["recommendation"]:
+                click.echo(f"    fix: {cat['recommendation']}")
         click.echo("")
     summary = data["summary"]
     click.echo(
@@ -150,15 +159,18 @@ def _print_platform(platform: dict) -> None:
     if not platform["protected"]:
         loc = f"{platform['repo']}@{platform['default_branch']}"
         click.echo(f"platform: {loc} - no branch protection")
-        return
-    click.echo(f"platform: {platform['repo']}@{platform['default_branch']} - protected")
-    click.echo(f"  required reviews        {platform['required_approving_review_count']}")
-    click.echo(f"  require code owners     {platform['require_code_owner_reviews']}")
-    click.echo(f"  enforce for admins      {platform['enforce_admins']}")
-    click.echo(f"  allow force pushes      {platform['allow_force_pushes']}")
-    click.echo(f"  require signed commits  {platform['required_signatures']}")
-    contexts = platform["required_status_check_contexts"]
-    click.echo(f"  required status checks  {', '.join(contexts) if contexts else '(none named)'}")
+    else:
+        click.echo(f"platform: {platform['repo']}@{platform['default_branch']} - protected")
+        click.echo(f"  required reviews        {platform['required_approving_review_count']}")
+        click.echo(f"  require code owners     {platform['require_code_owner_reviews']}")
+        click.echo(f"  enforce for admins      {platform['enforce_admins']}")
+        click.echo(f"  allow force pushes      {platform['allow_force_pushes']}")
+        click.echo(f"  require signed commits  {platform['required_signatures']}")
+        contexts = platform["required_status_check_contexts"]
+        named = ", ".join(contexts) if contexts else "(none named)"
+        click.echo(f"  required status checks  {named}")
+    for rec in platform["recommendations"]:
+        click.echo(f"  fix: {rec}")
 
 
 if __name__ == "__main__":

@@ -29,7 +29,7 @@ def detect_variants(root: Path) -> list[str]:
     return ["typescript"] if (root / "tsconfig.json").exists() else []
 
 
-def scan_tests(pkg_data: dict) -> CategoryResult:
+def scan_tests(pkg_data: dict, pkg_manager: str = "npm") -> CategoryResult:
     scripts = pkg_data.get("scripts", {})
     test_script = scripts.get("test", "")
     deps = {**pkg_data.get("dependencies", {}), **pkg_data.get("devDependencies", {})}
@@ -42,20 +42,33 @@ def scan_tests(pkg_data: dict) -> CategoryResult:
         evidence.append(f"devDependency: {found_runner}")
 
     if not evidence:
+        install = "add" if pkg_manager in ("yarn", "pnpm", "bun") else "install --save-dev"
         return CategoryResult(
-            Tier.ABSENT, reason="no test script or known test-runner dependency found"
+            Tier.ABSENT,
+            reason="no test script or known test-runner dependency found",
+            recommendation=(
+                f'Add a test runner (e.g. `{pkg_manager} {install} vitest`) and a '
+                f'"test" script in package.json.'
+            ),
         )
     return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
 
-def scan_lint(root: Path, fp: Fingerprint) -> CategoryResult:
+def scan_lint(root: Path, fp: Fingerprint, pkg_manager: str = "npm") -> CategoryResult:
     evidence = [str(f) for f in LINT_CONFIG_FILES if (root / f).exists()]
     if "typescript" in fp.variants:
         tsconfig = read_json(root / "tsconfig.json") or {}
         if tsconfig.get("compilerOptions", {}).get("strict"):
             evidence.append("tsconfig.json#compilerOptions.strict = true")
     if not evidence:
-        return CategoryResult(Tier.ABSENT, reason="no eslint config or tsconfig strict mode found")
+        install = "add" if pkg_manager in ("yarn", "pnpm", "bun") else "install --save-dev"
+        rec = f"Add an ESLint config (`{pkg_manager} {install} eslint` then create eslint config)"
+        if "typescript" in fp.variants:
+            rec += ", or enable `compilerOptions.strict` in tsconfig.json"
+        return CategoryResult(
+            Tier.ABSENT, reason="no eslint config or tsconfig strict mode found",
+            recommendation=rec + ".",
+        )
     return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
 
@@ -72,7 +85,12 @@ def scan_ci(root: Path, run_pattern: str, run_label: str) -> CategoryResult:
         p = root / f
         if p.exists() and re.search(run_pattern, read_text(p) or ""):
             return CategoryResult(Tier.CONFIGURED, evidence=[f"{f}: runs {run_label}"])
-    return CategoryResult(Tier.ABSENT, reason=f"no CI config found running {run_label}")
+    return CategoryResult(
+        Tier.ABSENT, reason=f"no CI config found running {run_label}",
+        recommendation=(
+            f"Add a GitHub Actions workflow (.github/workflows/ci.yml) that runs `{run_label}`."
+        ),
+    )
 
 
 def is_lockfile_gitignored(root: Path, lockfile_name: str) -> bool:

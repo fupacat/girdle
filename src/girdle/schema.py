@@ -35,6 +35,7 @@ class CategoryResult:
     tier: Tier
     evidence: list[str] = field(default_factory=list)
     reason: str | None = None
+    recommendation: str | None = None
 
     @property
     def status(self) -> str:
@@ -46,6 +47,7 @@ class CategoryResult:
             "status": self.status,
             "evidence": self.evidence,
             "reason": self.reason,
+            "recommendation": self.recommendation,
         }
 
 

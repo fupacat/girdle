@@ -29,8 +29,8 @@ class JsBunDetector:
         root = fp.root
         pkg_data = read_json(root / "package.json") or {}
         return {
-            "tests": js_common.scan_tests(pkg_data),
-            "lint": js_common.scan_lint(root, fp),
+            "tests": js_common.scan_tests(pkg_data, "bun"),
+            "lint": js_common.scan_lint(root, fp, "bun"),
             "reproducibility": self._scan_reproducibility(root),
             "ci_gating": js_common.scan_ci(root, r"\bbun (run )?test\b", "bun test"),
         }
@@ -44,4 +44,7 @@ class JsBunDetector:
             return CategoryResult(Tier.CONFIGURED, evidence=["bun.lockb (binary, presence-only)"])
         if (root / "bun.lock").exists():
             return CategoryResult(Tier.CONFIGURED, evidence=["bun.lock"])
-        return CategoryResult(Tier.ABSENT, reason="no bun.lockb/bun.lock found")
+        return CategoryResult(
+            Tier.ABSENT, reason="no bun.lockb/bun.lock found",
+            recommendation="Run `bun install` and commit the generated bun.lock(b).",
+        )

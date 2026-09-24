@@ -26,7 +26,13 @@ def scan_tests(root: Path) -> CategoryResult:
     if any(rglob_excluding(root, "test_*.py", "*_test.py")):
         evidence.append("test_*.py files present")
     if not evidence:
-        return CategoryResult(Tier.ABSENT, reason="no pytest/tox config or test_*.py files found")
+        return CategoryResult(
+            Tier.ABSENT, reason="no pytest/tox config or test_*.py files found",
+            recommendation=(
+                "Add tests under a tests/ directory (`pip install pytest`, create "
+                "test_*.py files)."
+            ),
+        )
     return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
 
@@ -39,7 +45,13 @@ def scan_lint(root: Path) -> CategoryResult:
             if name in tools:
                 evidence.append(f"pyproject.toml#tool.{name}")
     if not evidence:
-        return CategoryResult(Tier.ABSENT, reason="no ruff/mypy/flake8 config found")
+        return CategoryResult(
+            Tier.ABSENT, reason="no ruff/mypy/flake8 config found",
+            recommendation=(
+                "Add a ruff config: `pip install ruff` and add a [tool.ruff] section to "
+                "pyproject.toml, or run `ruff check --fix .`."
+            ),
+        )
     return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
 
@@ -56,7 +68,12 @@ def scan_ci(root: Path) -> CategoryResult:
         p = root / f
         if p.exists() and re.search(r"\bpytest\b", read_text(p) or ""):
             return CategoryResult(Tier.CONFIGURED, evidence=[f"{f}: runs pytest"])
-    return CategoryResult(Tier.ABSENT, reason="no CI config found running pytest")
+    return CategoryResult(
+        Tier.ABSENT, reason="no CI config found running pytest",
+        recommendation=(
+            "Add a GitHub Actions workflow (.github/workflows/ci.yml) that runs `pytest`."
+        ),
+    )
 
 
 def is_lockfile_gitignored(root: Path, lockfile_name: str) -> bool:

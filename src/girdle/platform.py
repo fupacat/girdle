@@ -41,6 +41,7 @@ class PlatformResult:
     allow_force_pushes: bool = False
     required_signatures: bool = False
     required_status_check_contexts: list[str] = field(default_factory=list)
+    recommendations: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         if not self.available:
@@ -56,7 +57,38 @@ class PlatformResult:
             "allow_force_pushes": self.allow_force_pushes,
             "required_signatures": self.required_signatures,
             "required_status_check_contexts": self.required_status_check_contexts,
+            "recommendations": self.recommendations,
         }
+
+
+def compute_recommendations(result: PlatformResult) -> list[str]:
+    """Pure function, kept separate from check_platform() for the same
+    testability reason as extract_protection_facts().
+    """
+    if not result.available:
+        return []
+    settings_url = f"https://github.com/{result.repo}/settings/branches"
+    if not result.protected:
+        return [
+            f"Enable branch protection on `{result.default_branch}` "
+            f"(requiring at least 1 approving review before merge): {settings_url}"
+        ]
+    recs = []
+    if result.required_approving_review_count < 1:
+        recs.append(
+            f"Require at least 1 approving review before merge on `{result.default_branch}`: "
+            f"{settings_url}"
+        )
+    if not result.enforce_admins:
+        recs.append("Enable 'Include administrators' so branch protection also applies to admins.")
+    if result.allow_force_pushes:
+        recs.append(f"Disable force-pushes on the protected branch `{result.default_branch}`.")
+    if not result.required_status_check_contexts:
+        recs.append(
+            "Add required status checks (e.g. your CI job name) so PRs can't merge with "
+            "failing CI."
+        )
+    return recs
 
 
 def _run(args: list[str], cwd: Path) -> tuple[bool, str]:
@@ -115,17 +147,21 @@ def check_platform(repo_root: Path) -> PlatformResult:
     )
     if not ok:
         if "404" in out or "Branch not protected" in out:
-            return PlatformResult(
+            result = PlatformResult(
                 available=True, repo=name_with_owner, default_branch=default_branch,
                 protected=False,
             )
+            result.recommendations = compute_recommendations(result)
+            return result
         return PlatformResult(available=False, reason=f"gh api call failed: {out}")
 
     facts = extract_protection_facts(json.loads(out))
-    return PlatformResult(
+    result = PlatformResult(
         available=True,
         repo=name_with_owner,
         default_branch=default_branch,
         protected=True,
         **facts,
     )
+    result.recommendations = compute_recommendations(result)
+    return result

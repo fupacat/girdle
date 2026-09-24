@@ -26,8 +26,7 @@ def run_scan(
         if fp is None:
             continue
         categories = detector.scan(fp, mode)
-        if mode == "run":
-            _verify(detector, fp, categories)
+        _verify(detector, fp, categories, mode)
         ecosystems.append(
             EcosystemResult(
                 id=fp.id,
@@ -55,10 +54,17 @@ def run_scan(
     )
 
 
-def _verify(detector: Detector, fp: Fingerprint, categories: dict[str, CategoryResult]) -> None:
-    """Mutates `categories` in place: upgrade CONFIGURED -> VERIFIED for any
-    category the detector declares a run command for, if that command
-    actually passes when executed against the repo.
+def _verify(
+    detector: Detector, fp: Fingerprint, categories: dict[str, CategoryResult], mode: str
+) -> None:
+    """Mutates `categories` in place. In "run" mode: upgrade CONFIGURED ->
+    VERIFIED for any category the detector declares a run command for, if
+    that command actually passes when executed against the repo. In
+    "static" mode: for the same categories, add a generic "run --run to
+    verify" recommendation instead of executing anything - only shown where
+    a verify path genuinely exists (a detector-declared run command), not a
+    blanket suggestion on categories that can never be tier-2 verifiable
+    (e.g. reproducibility, ci_gating).
     """
     get_commands = getattr(detector, "run_commands", None)
     if get_commands is None:
@@ -67,6 +73,12 @@ def _verify(detector: Detector, fp: Fingerprint, categories: dict[str, CategoryR
     for category, command in commands.items():
         result = categories.get(category)
         if result is None or result.tier != Tier.CONFIGURED:
+            continue
+        if mode == "static":
+            if result.recommendation is None:
+                result.recommendation = (
+                    "Run `girdle scan --run` to verify this actually passes (tier 2)."
+                )
             continue
         outcome = run_check(command, fp.root)
         if outcome.passed:

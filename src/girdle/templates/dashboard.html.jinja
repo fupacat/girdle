@@ -43,7 +43,22 @@
   .cat .cat-status.tier-configured { color: var(--configured); }
   .cat .cat-status.tier-verified { color: var(--verified); }
   .cat .evidence, .cat .reason { color: var(--muted); font-size: 0.75rem; margin-top: 0.35rem; }
+  .cat .recommendation {
+    color: var(--text); font-size: 0.75rem; margin-top: 0.5rem; padding-top: 0.5rem;
+    border-top: 1px dashed var(--border);
+  }
+  .cat .recommendation::before { content: "→ "; color: var(--configured); }
   .warnings { color: var(--configured); font-size: 0.85rem; margin-top: 1.5rem; }
+  .platform {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1.2rem 1.4rem; margin-bottom: 1.2rem;
+  }
+  .platform h2 { font-size: 1.05rem; margin: 0 0 0.9rem; }
+  .platform .fact { font-size: 0.8rem; color: var(--muted); margin: 0.2rem 0; }
+  .platform .recommendation {
+    font-size: 0.8rem; margin-top: 0.4rem;
+  }
+  .platform .recommendation::before { content: "→ "; color: var(--configured); }
 </style>
 </head>
 <body>
@@ -75,11 +90,32 @@
         <div class="cat-status {{ cat.tier | tier_class }}">{{ cat.tier | tier_label }}</div>
         {% if cat.evidence %}<div class="evidence">{{ cat.evidence | join(' · ') }}</div>{% endif %}
         {% if cat.reason %}<div class="reason">{{ cat.reason }}</div>{% endif %}
+        {% if cat.recommendation %}<div class="recommendation">{{ cat.recommendation }}</div>{% endif %}
       </div>
       {% endfor %}
     </div>
   </div>
   {% endfor %}
+
+  {% if data.platform %}
+  <div class="platform">
+    <h2>platform</h2>
+    {% if not data.platform.available %}
+      <div class="fact">not checked: {{ data.platform.reason }}</div>
+    {% elif not data.platform.protected %}
+      <div class="fact">{{ data.platform.repo }}@{{ data.platform.default_branch }} — no branch protection</div>
+    {% else %}
+      <div class="fact">{{ data.platform.repo }}@{{ data.platform.default_branch }} — protected</div>
+      <div class="fact">required reviews: {{ data.platform.required_approving_review_count }} &middot; require code owners: {{ data.platform.require_code_owner_reviews }}</div>
+      <div class="fact">enforce for admins: {{ data.platform.enforce_admins }} &middot; allow force pushes: {{ data.platform.allow_force_pushes }}</div>
+      <div class="fact">require signed commits: {{ data.platform.required_signatures }}</div>
+      <div class="fact">required status checks: {{ data.platform.required_status_check_contexts | join(', ') if data.platform.required_status_check_contexts else '(none named)' }}</div>
+    {% endif %}
+    {% for rec in data.platform.recommendations %}
+    <div class="recommendation">{{ rec }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   {% if data.warnings %}
   <div class="warnings">

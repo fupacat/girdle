@@ -59,9 +59,15 @@ class PythonPipDetector:
         if fp.toolchain == "poetry":
             lock = root / "poetry.lock"
             if not lock.exists():
-                return CategoryResult(Tier.ABSENT, reason="no poetry.lock found")
+                return CategoryResult(
+                    Tier.ABSENT, reason="no poetry.lock found",
+                    recommendation="Run `poetry lock` and commit the generated poetry.lock.",
+                )
             if python_common.is_lockfile_gitignored(root, "poetry.lock"):
-                return CategoryResult(Tier.ABSENT, reason="poetry.lock exists but is gitignored")
+                return CategoryResult(
+                    Tier.ABSENT, reason="poetry.lock exists but is gitignored",
+                    recommendation="Remove poetry.lock from .gitignore and commit it.",
+                )
             return CategoryResult(Tier.CONFIGURED, evidence=["poetry.lock"])
 
         req = root / "requirements.txt"
@@ -76,8 +82,18 @@ class PythonPipDetector:
                         "lock mechanism (requirements.txt, uv.lock, pip-compile output) "
                         "was found"
                     ),
+                    recommendation=(
+                        "Pin dependencies: `pip install pip-tools && "
+                        "pip-compile pyproject.toml -o requirements.txt`."
+                    ),
                 )
-            return CategoryResult(Tier.ABSENT, reason="no requirements.txt found")
+            return CategoryResult(
+                Tier.ABSENT, reason="no requirements.txt found",
+                recommendation=(
+                    "Add a pinned requirements.txt: `pip install pip-tools && "
+                    "pip-compile -o requirements.txt` (or `pip freeze > requirements.txt`)."
+                ),
+            )
         text = read_text(req) or ""
         lines = [ln for ln in text.splitlines() if ln.strip() and not ln.strip().startswith("#")]
         pinned = [ln for ln in lines if "==" in ln]
@@ -90,5 +106,12 @@ class PythonPipDetector:
                 Tier.ABSENT,
                 evidence=["requirements.txt"],
                 reason=f"{len(lines) - len(pinned)}/{len(lines)} dependencies unpinned",
+                recommendation=(
+                    "Pin all versions with `==`, ideally regenerated via "
+                    "`pip-compile -o requirements.txt`."
+                ),
             )
-        return CategoryResult(Tier.ABSENT, reason="requirements.txt is empty")
+        return CategoryResult(
+            Tier.ABSENT, reason="requirements.txt is empty",
+            recommendation="Populate requirements.txt with pinned dependencies.",
+        )

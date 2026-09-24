@@ -54,4 +54,8 @@ class PythonCondaDetector:
             Tier.ABSENT,
             evidence=["environment.yml"],
             reason="environment.yml present but no conda-lock.yml (unpinned builds/channels)",
+            recommendation=(
+                "Generate a conda-lock.yml: `pip install conda-lock && "
+                "conda-lock -f environment.yml`."
+            ),
         )

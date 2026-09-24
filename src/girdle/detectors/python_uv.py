@@ -38,5 +38,8 @@ class PythonUvDetector:
 
     def _scan_reproducibility(self, root: Path) -> CategoryResult:
         if python_common.is_lockfile_gitignored(root, "uv.lock"):
-            return CategoryResult(Tier.ABSENT, reason="uv.lock exists but is gitignored")
+            return CategoryResult(
+                Tier.ABSENT, reason="uv.lock exists but is gitignored",
+                recommendation="Remove uv.lock from .gitignore and commit it.",
+            )
         return CategoryResult(Tier.CONFIGURED, evidence=["uv.lock"])
