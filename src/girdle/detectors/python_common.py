@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 
 from girdle.detectors._util import read_text, read_toml
+from girdle.fsutil import rglob_excluding
 from girdle.schema import CategoryResult, Tier
 
 LINT_CONFIG_MARKERS = (".flake8", "ruff.toml", ".ruff.toml", "mypy.ini", "setup.cfg")
@@ -22,7 +23,7 @@ def scan_tests(root: Path) -> CategoryResult:
     pyproject = read_toml(root / "pyproject.toml")
     if pyproject and "pytest" in pyproject.get("tool", {}):
         evidence.append("pyproject.toml#tool.pytest")
-    if any(root.rglob("test_*.py")) or any(root.rglob("*_test.py")):
+    if any(rglob_excluding(root, "test_*.py", "*_test.py")):
         evidence.append("test_*.py files present")
     if not evidence:
         return CategoryResult(Tier.ABSENT, reason="no pytest/tox config or test_*.py files found")

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from girdle.detectors._util import read_text, read_toml
 from girdle.detectors.base import Fingerprint
+from girdle.fsutil import rglob_excluding
 from girdle.schema import CategoryResult, Tier
 
 
@@ -46,7 +47,7 @@ class RustDetector:
         has_tests_dir = (root / "tests").is_dir()
         has_inline = any(
             "#[test]" in (read_text(f) or "") or "#[cfg(test)]" in (read_text(f) or "")
-            for f in root.rglob("*.rs")
+            for f in rglob_excluding(root, "*.rs")
         )
         if not has_tests_dir and not has_inline:
             return CategoryResult(Tier.ABSENT, reason="no tests/ dir or #[test]/#[cfg(test)] found")

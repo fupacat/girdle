@@ -19,7 +19,6 @@ oversold.
 
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -29,14 +28,10 @@ from pathlib import Path
 from tree_sitter import Node
 from tree_sitter_language_pack import get_parser
 
+from girdle.fsutil import walk_excluding
+
 DEFAULT_BUDGET_TOKENS = 4000
 CHARS_PER_TOKEN_ESTIMATE = 4  # crude approximation, not a real tokenizer
-
-EXCLUDED_DIRS = {
-    ".git", "node_modules", "__pycache__", ".venv", "venv", "env",
-    "dist", "build", "target", "bin", "obj", ".mypy_cache", ".pytest_cache",
-    ".ruff_cache", "vendor", ".idea", ".vscode", ".egg-info",
-}
 
 # extension -> (display language, tree-sitter grammar name)
 LANGUAGE_BY_EXT = {
@@ -228,8 +223,7 @@ class RepoIndex:
 
 
 def _iter_source_files(root: Path):
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in EXCLUDED_DIRS and not d.startswith(".")]
+    for dirpath, _dirnames, filenames in walk_excluding(root):
         for name in filenames:
             ext = Path(name).suffix
             if ext in LANGUAGE_BY_EXT:

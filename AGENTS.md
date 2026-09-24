@@ -21,7 +21,7 @@ src/girdle/detectors/__init__.py | python | 4L |
 src/girdle/detectors/_util.py | python | 32L | read_json, read_toml, read_text
 src/girdle/detectors/base.py | python | 45L | Fingerprint, Detector
 src/girdle/detectors/dotnet.py | python | 119L | DotNetDetector
-src/girdle/detectors/go_mod.py | python | 78L | GoModDetector
+src/girdle/detectors/go_mod.py | python | 79L | GoModDetector
 src/girdle/detectors/java_gradle.py | python | 100L | JavaGradleDetector
 src/girdle/detectors/java_maven.py | python | 98L | JavaMavenDetector
 src/girdle/detectors/js_bun.py | python | 48L | JsBunDetector
@@ -29,14 +29,15 @@ src/girdle/detectors/js_common.py | python | 93L | detect_variants, scan_tests, 
 src/girdle/detectors/js_npm.py | python | 53L | JsNpmDetector
 src/girdle/detectors/js_pnpm.py | python | 47L | JsPnpmDetector
 src/girdle/detectors/js_yarn.py | python | 48L | JsYarnDetector
-src/girdle/detectors/python_common.py | python | 83L | scan_tests, scan_lint, scan_ci, is_lockfile_gitignored, lint_command, test_command
+src/girdle/detectors/python_common.py | python | 84L | scan_tests, scan_lint, scan_ci, is_lockfile_gitignored, lint_command, test_command
 src/girdle/detectors/python_conda.py | python | 58L | PythonCondaDetector
 src/girdle/detectors/python_pip.py | python | 95L | PythonPipDetector
 src/girdle/detectors/python_pipenv.py | python | 43L | PythonPipenvDetector
 src/girdle/detectors/python_uv.py | python | 43L | PythonUvDetector
 src/girdle/detectors/registry.py | python | 34L | 
-src/girdle/detectors/rust.py | python | 102L | RustDetector
-src/girdle/indexer.py | python | 361L | _parser, _text, _name_of, _defs_python, _defs_js_ts, _defs_go, _defs_rust, _defs_java, _defs_csharp_from, IndexEntry, RepoIndex, _iter_source_files, _extract_symbols, build_index, _estimate_tokens, _render_entry, render_manifest, render_block, inject_into, is_stale
+src/girdle/detectors/rust.py | python | 103L | RustDetector
+src/girdle/fsutil.py | python | 35L | walk_excluding, rglob_excluding
+src/girdle/indexer.py | python | 355L | _parser, _text, _name_of, _defs_python, _defs_js_ts, _defs_go, _defs_rust, _defs_java, _defs_csharp_from, IndexEntry, RepoIndex, _iter_source_files, _extract_symbols, build_index, _estimate_tokens, _render_entry, render_manifest, render_block, inject_into, is_stale
 src/girdle/platform.py | python | 132L | PlatformResult, _run, extract_protection_facts, check_platform
 src/girdle/runner.py | python | 53L | RunOutcome, run_check
 src/girdle/scan.py | python | 79L | run_scan, _verify
@@ -55,5 +56,6 @@ tests/test_runner.py | python | 33L | test_missing_binary_is_not_ran, test_succe
 tests/test_rust.py | python | 47L | test_detect_none_without_cargo_toml, test_bin_crate_missing_lock_is_absent_and_applicable, test_lib_crate_missing_lock_is_excluded_from_applicable, test_lib_crate_with_committed_lock_is_applicable_and_configured, test_inline_test_detected
 tests/test_scan_verify.py | python | 52L | _FakeDetector, _fp, test_verify_upgrades_to_verified_on_success, test_verify_keeps_configured_on_failure, test_verify_skips_absent_categories, test_verify_noop_without_run_commands
 tests/test_scoring.py | python | 33L | _eco, test_category_min_is_gated_by_weakest, test_inapplicable_categories_excluded_from_min, test_scan_result_overall_min_is_weakest_ecosystem
+tests/test_vendor_exclusion.py | python | 50L | test_python_ignores_test_files_inside_venv, test_python_still_finds_real_top_level_tests, test_go_ignores_test_files_inside_vendor, test_rust_ignores_rs_files_inside_target
 ```
 <!-- girdle:index:end -->

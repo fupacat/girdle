@@ -12,6 +12,7 @@ from pathlib import Path
 
 from girdle.detectors._util import read_text
 from girdle.detectors.base import Fingerprint
+from girdle.fsutil import rglob_excluding
 from girdle.schema import CategoryResult, Tier
 
 VERSION_RANGE_PATTERN = re.compile(r'Version="[^"]*[\*\[\(].*?"|Version="\d+\.\*"')
@@ -34,8 +35,7 @@ class DotNetDetector:
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
-        project_texts = [read_text(p) or "" for p in root.rglob("*.csproj")]
-        project_texts += [read_text(p) or "" for p in root.rglob("*.fsproj")]
+        project_texts = [read_text(p) or "" for p in rglob_excluding(root, "*.csproj", "*.fsproj")]
         combined = "\n".join(project_texts)
         return {
             "tests": self._scan_tests(root, combined),
@@ -51,7 +51,7 @@ class DotNetDetector:
 
     def _scan_tests(self, root: Path, combined: str) -> CategoryResult:
         has_test_sdk = "Microsoft.NET.Test.Sdk" in combined
-        has_test_proj = any(root.rglob("*.Tests.csproj")) or any(root.rglob("*Tests.csproj"))
+        has_test_proj = any(rglob_excluding(root, "*.Tests.csproj", "*Tests.csproj"))
         if not has_test_sdk and not has_test_proj:
             return CategoryResult(
                 Tier.ABSENT, reason="no Microsoft.NET.Test.Sdk reference or *.Tests.csproj found"
@@ -78,7 +78,7 @@ class DotNetDetector:
 
     def _scan_reproducibility(self, root: Path, combined: str) -> CategoryResult:
         has_lockfile = (root / "packages.lock.json").exists() or any(
-            root.rglob("packages.lock.json")
+            rglob_excluding(root, "packages.lock.json")
         )
         ranges = VERSION_RANGE_PATTERN.findall(combined)
         pinned = PINNED_VERSION_PATTERN.findall(combined)

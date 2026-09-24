@@ -5,6 +5,7 @@ from pathlib import Path
 
 from girdle.detectors._util import read_text
 from girdle.detectors.base import Fingerprint
+from girdle.fsutil import rglob_excluding
 from girdle.schema import CategoryResult, Tier
 
 
@@ -36,7 +37,7 @@ class GoModDetector:
         return commands
 
     def _scan_tests(self, root: Path) -> CategoryResult:
-        test_files = list(root.rglob("*_test.go"))
+        test_files = list(rglob_excluding(root, "*_test.go"))
         if not test_files:
             return CategoryResult(Tier.ABSENT, reason="no *_test.go files found")
         return CategoryResult(Tier.CONFIGURED, evidence=[f"{len(test_files)} *_test.go file(s)"])
