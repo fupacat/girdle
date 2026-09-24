@@ -15,7 +15,8 @@ Run checks: `pytest` / `ruff check .`.
 <!-- girdle:index:start -->
 ```
 src/girdle/__init__.py | python | 2L | 
-src/girdle/cli.py | python | 192L | main, scan, dashboard, index, _print_human, _print_hygiene, _print_platform
+src/girdle/align.py | python | 309L | AlignPlan, _python_formatter, _js_formatter, _js_formatter_skip_note, _prettier_settings, _rust_formatter, detect_formatters, _parse_editorconfig_sections, _render_section, plan_editorconfig, plan_gitattributes, plan_gitignore, build_align_plans, apply_plan
+src/girdle/cli.py | python | 224L | main, scan, dashboard, index, align, _print_human, _print_hygiene, _print_platform
 src/girdle/dashboard.py | python | 25L | render_dashboard
 src/girdle/detectors/__init__.py | python | 4L | 
 src/girdle/detectors/_util.py | python | 32L | read_json, read_toml, read_text
@@ -44,6 +45,7 @@ src/girdle/runner.py | python | 53L | RunOutcome, run_check
 src/girdle/scan.py | python | 95L | run_scan, _verify
 src/girdle/schema.py | python | 120L | EcosystemResult, ScanResult
 src/girdle/tiers.py | python | 46L | Tier, CategoryResult
+tests/test_align.py | python | 164L | test_editorconfig_derives_from_black, test_editorconfig_derives_from_ruff_format, test_editorconfig_no_formatter_no_plan, test_editorconfig_appends_without_touching_existing_content, test_editorconfig_skips_glob_already_present, test_editorconfig_js_prettier_json, test_editorconfig_js_unparseable_config_is_skipped, test_editorconfig_rust_from_rustfmt_toml, test_gitattributes_no_eol_signal_no_plan, test_gitattributes_propagates_prettier_eol, test_gitattributes_conflict_when_formatters_disagree, test_gitattributes_existing_text_auto_left_alone, test_gitattributes_appends_to_existing_file, test_gitignore_adds_missing_patterns, test_gitignore_already_covered_no_plan, test_gitignore_multi_language_union, test_apply_plan_writes_file, test_apply_plan_noop_when_no_content, test_build_align_plans_returns_three_plans
 tests/test_dotnet.py | python | 62L | test_detect_none_without_project_files, test_pinned_packagereference_configured, test_floating_version_without_lockfile_is_absent, test_packages_lock_json_configured_even_with_ranges, test_test_sdk_reference_detected
 tests/test_go_mod.py | python | 28L | test_detect_none_without_go_mod, test_missing_go_sum_is_absent, test_test_files_detected
 tests/test_hygiene.py | python | 101L | test_all_absent_on_empty_repo, test_editorconfig_present, test_gitattributes_present, test_gitignore_missing_is_absent, test_gitignore_present_but_missing_stack_patterns, test_gitignore_covers_stack_is_configured, test_gitignore_multi_language_checks_all_stacks, test_codeowners_found_in_github_dir, test_readme_empty_stub_is_absent, test_readme_with_real_content_is_configured, test_contributing_absent, test_contributing_present_in_docs, test_to_dict_shape

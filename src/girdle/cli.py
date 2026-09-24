@@ -6,6 +6,7 @@ from pathlib import Path
 
 import click
 
+from girdle.align import apply_plan, build_align_plans
 from girdle.dashboard import render_dashboard
 from girdle.indexer import build_index, inject_into, is_stale, render_manifest
 from girdle.scan import run_scan
@@ -119,6 +120,37 @@ def index(
         click.echo(f"wrote {output}")
     else:
         click.echo(text)
+
+
+@main.command()
+@click.argument("path", default=".", type=click.Path(exists=True, file_okay=False))
+@click.option(
+    "--write", is_flag=True,
+    help="Apply the changes. Default is dry-run: show the plan only, write nothing.",
+)
+def align(path: str, write: bool) -> None:
+    """Derive/align .editorconfig, .gitattributes, and .gitignore from
+    formatter config already present in the repo (opt-in, append-only,
+    never overwrites existing settings; dry-run unless --write is passed).
+    """
+    root = Path(path)
+    result = run_scan(root)
+    languages = {e.language for e in result.ecosystems}
+    plans = build_align_plans(root, languages)
+
+    for plan in plans:
+        click.echo(f"{plan.file}:")
+        if not plan.additions:
+            click.echo("  no formatter config detected to align from")
+        for line in plan.additions:
+            click.echo(f"  {line}")
+        if write and plan.new_content is not None:
+            apply_plan(root, plan)
+            click.echo("  wrote changes")
+        click.echo("")
+
+    if not write:
+        click.echo("(dry run - pass --write to apply)")
 
 
 def _print_human(data: dict) -> None:
