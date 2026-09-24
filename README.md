@@ -22,6 +22,9 @@ girdle index . --inject AGENTS.md     # insert/update the manifest between marke
 girdle index . --check AGENTS.md      # exit nonzero if that file's manifest block is stale (for CI/hooks)
 
 girdle scan . --platform               # also check live GitHub branch protection via `gh`
+
+girdle align .                          # dry-run: show what would be added to .editorconfig/.gitattributes/.gitignore
+girdle align . --write                  # apply it
 ```
 
 `girdle index` is a separate, mechanically-generated structural index — not
@@ -38,6 +41,20 @@ could originate from an untrusted fork. `--inject` and `--check` are the
 mechanical regenerate/verify hooks for wiring this into a pre-commit hook or
 CI step, as this repo's own `.github/workflows/ci.yml` does against its own
 `AGENTS.md`.
+
+### Alignment (`girdle align`)
+
+Unlike every other command, `align` writes to the scanned repo — it's the
+one place girdle moves from read-only scanner to file writer, which is why
+it's dry-run by default and requires `--write` to apply anything. It only
+derives settings from formatter config *already present* in the repo
+(Black/ruff-format/Prettier/rustfmt), never invents an opinion from
+scratch, and is deliberately conservative: it only appends new
+`.editorconfig` sections/`.gitattributes` lines/`.gitignore` patterns that
+are provably absent, never edits an existing section or line. If detected
+formatters disagree on line endings, that's reported as a conflict and
+left alone rather than guessed. Go is excluded from `.editorconfig`
+derivation since gofmt has no config file to detect a preference from.
 
 ## Development
 
