@@ -97,6 +97,23 @@
   </div>
   {% endfor %}
 
+  {% if data.hygiene %}
+  <div class="ecosystem">
+    <h2>hygiene <span class="sub">repo-wide, language-agnostic</span></h2>
+    <div class="cat-grid">
+      {% for name, cat in data.hygiene.items() %}
+      <div class="cat {{ cat.tier | tier_class }}">
+        <div class="cat-name">{{ name.replace('_', ' ') }}</div>
+        <div class="cat-status {{ cat.tier | tier_class }}">{{ cat.tier | tier_label }}</div>
+        {% if cat.evidence %}<div class="evidence">{{ cat.evidence | join(' · ') }}</div>{% endif %}
+        {% if cat.reason %}<div class="reason">{{ cat.reason }}</div>{% endif %}
+        {% if cat.recommendation %}<div class="recommendation">{{ cat.recommendation }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   {% if data.platform %}
   <div class="platform">
     <h2>platform</h2>

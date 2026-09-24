@@ -146,10 +146,24 @@ def _print_human(data: dict) -> None:
     if data["warnings"]:
         for w in data["warnings"]:
             click.echo(f"warning: {w}")
+    hygiene = data.get("hygiene")
+    if hygiene is not None:
+        click.echo("")
+        _print_hygiene(hygiene)
     platform = data.get("platform")
     if platform is not None:
         click.echo("")
         _print_platform(platform)
+
+
+def _print_hygiene(hygiene: dict) -> None:
+    click.echo("hygiene:")
+    for name, cat in hygiene.items():
+        click.echo(f"  {name:<14} {TIER_LABEL[cat['tier']]}")
+        if cat["reason"]:
+            click.echo(f"    reason: {cat['reason']}")
+        if cat["recommendation"]:
+            click.echo(f"    fix: {cat['recommendation']}")
 
 
 def _print_platform(platform: dict) -> None:

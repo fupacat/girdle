@@ -8,47 +8,14 @@ object. Never build a second, dashboard-only representation.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from enum import IntEnum
 
+from girdle.hygiene import HygieneResult
 from girdle.platform import PlatformResult
+from girdle.tiers import CategoryResult, Tier
 
 GIRDLE_VERSION = "0.1.0"
 
 CATEGORY_NAMES = ("tests", "lint", "reproducibility", "ci_gating")
-
-
-class Tier(IntEnum):
-    ABSENT = 0
-    CONFIGURED = 1
-    VERIFIED = 2
-
-
-TIER_STATUS = {
-    Tier.ABSENT: "absent",
-    Tier.CONFIGURED: "configured",
-    Tier.VERIFIED: "verified",
-}
-
-
-@dataclass
-class CategoryResult:
-    tier: Tier
-    evidence: list[str] = field(default_factory=list)
-    reason: str | None = None
-    recommendation: str | None = None
-
-    @property
-    def status(self) -> str:
-        return TIER_STATUS[self.tier]
-
-    def to_dict(self) -> dict:
-        return {
-            "tier": int(self.tier),
-            "status": self.status,
-            "evidence": self.evidence,
-            "reason": self.reason,
-            "recommendation": self.recommendation,
-        }
 
 
 @dataclass
@@ -98,6 +65,7 @@ class ScanResult:
     ecosystems: list[EcosystemResult] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     platform: PlatformResult | None = None
+    hygiene: HygieneResult | None = None
 
     @property
     def overall_min(self) -> int:
@@ -136,6 +104,7 @@ class ScanResult:
             },
             "warnings": self.warnings,
             "platform": self.platform.to_dict() if self.platform is not None else None,
+            "hygiene": self.hygiene.to_dict() if self.hygiene is not None else None,
         }
 
 

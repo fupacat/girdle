@@ -9,6 +9,7 @@ from pathlib import Path
 
 from girdle.detectors import ALL_DETECTORS
 from girdle.detectors.base import Detector, Fingerprint
+from girdle.hygiene import build_hygiene
 from girdle.platform import check_platform
 from girdle.runner import run_check
 from girdle.schema import CategoryResult, EcosystemResult, ScanResult, Tier
@@ -43,6 +44,8 @@ def run_scan(
         warnings.append("no known ecosystem detected at repo root")
 
     platform = check_platform(repo_root) if check_platform_enforcement else None
+    languages = {e.language for e in ecosystems}
+    hygiene = build_hygiene(repo_root, languages)
 
     return ScanResult(
         repo_root=str(repo_root),
@@ -51,6 +54,7 @@ def run_scan(
         ecosystems=ecosystems,
         warnings=warnings,
         platform=platform,
+        hygiene=hygiene,
     )
 
 

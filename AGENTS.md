@@ -15,7 +15,7 @@ Run checks: `pytest` / `ruff check .`.
 <!-- girdle:index:start -->
 ```
 src/girdle/__init__.py | python | 2L | 
-src/girdle/cli.py | python | 178L | main, scan, dashboard, index, _print_human, _print_platform
+src/girdle/cli.py | python | 192L | main, scan, dashboard, index, _print_human, _print_hygiene, _print_platform
 src/girdle/dashboard.py | python | 25L | render_dashboard
 src/girdle/detectors/__init__.py | python | 4L | 
 src/girdle/detectors/_util.py | python | 32L | read_json, read_toml, read_text
@@ -37,13 +37,16 @@ src/girdle/detectors/python_uv.py | python | 46L | PythonUvDetector
 src/girdle/detectors/registry.py | python | 34L | 
 src/girdle/detectors/rust.py | python | 118L | RustDetector
 src/girdle/fsutil.py | python | 35L | walk_excluding, rglob_excluding
+src/girdle/hygiene.py | python | 172L | _read_text, HygieneResult, _first_existing, check_editorconfig, check_gitattributes, check_gitignore, check_codeowners, check_readme, check_contributing, build_hygiene
 src/girdle/indexer.py | python | 355L | _parser, _text, _name_of, _defs_python, _defs_js_ts, _defs_go, _defs_rust, _defs_java, _defs_csharp_from, IndexEntry, RepoIndex, _iter_source_files, _extract_symbols, build_index, _estimate_tokens, _render_entry, render_manifest, render_block, inject_into, is_stale
 src/girdle/platform.py | python | 168L | PlatformResult, compute_recommendations, _run, extract_protection_facts, check_platform
 src/girdle/runner.py | python | 53L | RunOutcome, run_check
-src/girdle/scan.py | python | 91L | run_scan, _verify
-src/girdle/schema.py | python | 151L | Tier, CategoryResult, EcosystemResult, ScanResult
+src/girdle/scan.py | python | 95L | run_scan, _verify
+src/girdle/schema.py | python | 120L | EcosystemResult, ScanResult
+src/girdle/tiers.py | python | 46L | Tier, CategoryResult
 tests/test_dotnet.py | python | 62L | test_detect_none_without_project_files, test_pinned_packagereference_configured, test_floating_version_without_lockfile_is_absent, test_packages_lock_json_configured_even_with_ranges, test_test_sdk_reference_detected
 tests/test_go_mod.py | python | 28L | test_detect_none_without_go_mod, test_missing_go_sum_is_absent, test_test_files_detected
+tests/test_hygiene.py | python | 101L | test_all_absent_on_empty_repo, test_editorconfig_present, test_gitattributes_present, test_gitignore_missing_is_absent, test_gitignore_present_but_missing_stack_patterns, test_gitignore_covers_stack_is_configured, test_gitignore_multi_language_checks_all_stacks, test_codeowners_found_in_github_dir, test_readme_empty_stub_is_absent, test_readme_with_real_content_is_configured, test_contributing_absent, test_contributing_present_in_docs, test_to_dict_shape
 tests/test_indexer.py | python | 97L | test_python_symbols_extracted, test_excluded_dirs_are_skipped, test_go_and_rust_symbols, test_budget_truncates_and_flags, test_manifest_render_is_deterministic, test_inject_creates_markers_in_empty_file, test_inject_replaces_existing_block, test_is_stale_true_when_missing, test_is_stale_false_when_matching, test_is_stale_true_when_drifted
 tests/test_indexer_treesitter.py | python | 86L | _symbols_for, test_python_decorated_and_multiline_signature, test_python_async_def, test_js_export_const_arrow, test_js_non_function_const_not_captured, test_ts_interface_and_type_alias, test_tsx_extension_parses, test_java_multiple_top_level_types, test_csharp_namespace_unwrapped, test_rust_impl_for_trait, test_go_multiple_types_in_one_type_declaration_group
 tests/test_java.py | python | 77L | test_maven_detect_none_without_pom, test_maven_pinned_versions_configured, test_maven_version_range_is_absent, test_gradle_detect_none_without_build_file, test_gradle_lockfile_configured, test_gradle_no_lock_mechanism_is_absent, test_gradle_kotlin_dsl_variant
