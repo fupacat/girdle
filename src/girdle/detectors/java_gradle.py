@@ -21,7 +21,7 @@ class JavaGradleDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "reproducibility", "ci_gating"]
+        return ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
@@ -30,6 +30,7 @@ class JavaGradleDetector:
         return {
             "tests": self._scan_tests(root, build_text),
             "lint": self._scan_lint(root, build_text),
+            "coverage": self._scan_coverage(build_text),
             "reproducibility": self._scan_reproducibility(root, build_text),
             "ci_gating": self._scan_ci(root),
         }
@@ -38,7 +39,12 @@ class JavaGradleDetector:
         wrapper_name = "gradlew.bat" if os.name == "nt" else "gradlew"
         wrapper_path = fp.root / wrapper_name
         exe = str(wrapper_path) if wrapper_path.exists() else "gradle"
-        return {"tests": [exe, "test"]}
+        commands = {"tests": [exe, "test"]}
+        build_file = "build.gradle.kts" if "kotlin-dsl" in fp.variants else "build.gradle"
+        build_text = read_text(fp.root / build_file) or ""
+        if "jacoco" in build_text.lower():
+            commands["coverage"] = [exe, "test", "jacocoTestReport"]
+        return commands
 
     def _scan_tests(self, root: Path, build_text: str) -> CategoryResult:
         has_test_dir = (root / "src" / "test").is_dir()
@@ -67,6 +73,17 @@ class JavaGradleDetector:
                 recommendation="Add the checkstyle or spotless Gradle plugin to your build script.",
             )
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
+
+    def _scan_coverage(self, build_text: str) -> CategoryResult:
+        if "jacoco" not in build_text.lower():
+            return CategoryResult(
+                Tier.ABSENT, reason="no jacoco plugin found in build script",
+                recommendation=(
+                    "Apply the jacoco plugin (`id 'jacoco'`) and add a jacocoTestReport "
+                    "task."
+                ),
+            )
+        return CategoryResult(Tier.CONFIGURED, evidence=["build script: jacoco plugin"])
 
     def _scan_reproducibility(self, root: Path, build_text: str) -> CategoryResult:
         lockfile = root / "gradle.lockfile"

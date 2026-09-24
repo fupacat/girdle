@@ -31,7 +31,7 @@ class DotNetDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "reproducibility", "ci_gating"]
+        return ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
@@ -40,6 +40,7 @@ class DotNetDetector:
         return {
             "tests": self._scan_tests(root, combined),
             "lint": self._scan_lint(root),
+            "coverage": self._scan_coverage(root, combined),
             "reproducibility": self._scan_reproducibility(root, combined),
             "ci_gating": self._scan_ci(root),
         }
@@ -47,7 +48,13 @@ class DotNetDetector:
     def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
         # Analyzers run as part of the build, not a separate lint invocation;
         # no standalone lint command to declare here.
-        return {"tests": ["dotnet", "test"]}
+        commands = {"tests": ["dotnet", "test"]}
+        project_texts = [
+            read_text(p) or "" for p in rglob_excluding(fp.root, "*.csproj", "*.fsproj")
+        ]
+        if "coverlet" in "\n".join(project_texts).lower():
+            commands["coverage"] = ["dotnet", "test", "--collect:XPlat Code Coverage"]
+        return commands
 
     def _scan_tests(self, root: Path, combined: str) -> CategoryResult:
         has_test_sdk = "Microsoft.NET.Test.Sdk" in combined
@@ -79,6 +86,27 @@ class DotNetDetector:
                 recommendation=(
                     "Add a .editorconfig, or set <EnableNETAnalyzers>true</EnableNETAnalyzers> "
                     "in Directory.Build.props."
+                ),
+            )
+        return CategoryResult(Tier.CONFIGURED, evidence=evidence)
+
+    def _scan_coverage(self, root: Path, combined: str) -> CategoryResult:
+        evidence = []
+        if "coverlet" in combined.lower():
+            evidence.append("PackageReference: coverlet")
+        wf_dir = root / ".github" / "workflows"
+        if not evidence and wf_dir.exists():
+            for wf in wf_dir.glob("*.y*ml"):
+                text = read_text(wf) or ""
+                if "XPlat Code Coverage" in text or "--collect" in text:
+                    evidence.append(f".github/workflows/{wf.name}: collects coverage")
+                    break
+        if not evidence:
+            return CategoryResult(
+                Tier.ABSENT, reason="no coverlet package or coverage collection in CI found",
+                recommendation=(
+                    "Add the coverlet.collector package and run `dotnet test "
+                    '--collect:"XPlat Code Coverage"`.'
                 ),
             )
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)

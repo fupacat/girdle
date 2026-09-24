@@ -21,7 +21,7 @@ class RustDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        cats = ["tests", "lint", "reproducibility", "ci_gating"]
+        cats = ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
         # A gitignored/absent Cargo.lock is correct practice for a library crate
         # (consumers resolve their own versions), so it's not a scoreable gap.
         if "lib" in fp.variants and not (fp.root / "Cargo.lock").exists():
@@ -33,15 +33,19 @@ class RustDetector:
         return {
             "tests": self._scan_tests(root),
             "lint": self._scan_lint(root),
+            "coverage": self._scan_coverage(root),
             "reproducibility": self._scan_reproducibility(root, fp),
             "ci_gating": self._scan_ci(root),
         }
 
     def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
-        return {
+        commands = {
             "tests": ["cargo", "test"],
             "lint": ["cargo", "clippy", "--all-targets", "--", "-D", "warnings"],
         }
+        if (fp.root / "tarpaulin.toml").exists():
+            commands["coverage"] = ["cargo", "tarpaulin"]
+        return commands
 
     def _scan_tests(self, root: Path) -> CategoryResult:
         has_tests_dir = (root / "tests").is_dir()
@@ -76,6 +80,27 @@ class RustDetector:
                 recommendation=(
                     "Add a rustfmt.toml/clippy.toml or a [lints] table; run `cargo clippy`."
                 ),
+            )
+        return CategoryResult(Tier.CONFIGURED, evidence=evidence)
+
+    def _scan_coverage(self, root: Path) -> CategoryResult:
+        evidence = []
+        if (root / "tarpaulin.toml").exists():
+            evidence.append("tarpaulin.toml")
+        cargo_data = read_toml(root / "Cargo.toml") or {}
+        metadata = (cargo_data.get("package", {}) or {}).get("metadata", {}) or {}
+        if "tarpaulin" in metadata:
+            evidence.append("Cargo.toml#package.metadata.tarpaulin")
+        wf_dir = root / ".github" / "workflows"
+        if not evidence and wf_dir.exists():
+            for wf in wf_dir.glob("*.y*ml"):
+                if re.search(r"tarpaulin|llvm-cov|grcov", read_text(wf) or ""):
+                    evidence.append(f".github/workflows/{wf.name}: runs a coverage tool")
+                    break
+        if not evidence:
+            return CategoryResult(
+                Tier.ABSENT, reason="no tarpaulin/llvm-cov/grcov config or CI usage found",
+                recommendation="Add cargo-tarpaulin (or cargo-llvm-cov) and run it in CI.",
             )
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 

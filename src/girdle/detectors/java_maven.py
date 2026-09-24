@@ -27,7 +27,7 @@ class JavaMavenDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "reproducibility", "ci_gating"]
+        return ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
@@ -35,6 +35,7 @@ class JavaMavenDetector:
         return {
             "tests": self._scan_tests(root, pom_text),
             "lint": self._scan_lint(pom_text),
+            "coverage": self._scan_coverage(pom_text),
             "reproducibility": self._scan_reproducibility(pom_text),
             "ci_gating": self._scan_ci(root),
         }
@@ -70,6 +71,17 @@ class JavaMavenDetector:
                 recommendation="Add the maven-checkstyle-plugin (or spotbugs/pmd) to pom.xml.",
             )
         return CategoryResult(Tier.CONFIGURED, evidence=[f"pom.xml plugin: {p}" for p in found])
+
+    def _scan_coverage(self, pom_text: str) -> CategoryResult:
+        if "jacoco" not in pom_text.lower():
+            return CategoryResult(
+                Tier.ABSENT, reason="no jacoco-maven-plugin found in pom.xml",
+                recommendation=(
+                    "Add the jacoco-maven-plugin to pom.xml and bind it to the "
+                    "test/verify phase."
+                ),
+            )
+        return CategoryResult(Tier.CONFIGURED, evidence=["pom.xml: jacoco-maven-plugin"])
 
     def _scan_reproducibility(self, pom_text: str) -> CategoryResult:
         ranges = RANGE_PATTERN.findall(pom_text)

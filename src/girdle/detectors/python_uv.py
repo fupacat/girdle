@@ -18,13 +18,14 @@ class PythonUvDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "reproducibility", "ci_gating"]
+        return ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
         return {
             "tests": python_common.scan_tests(root),
             "lint": python_common.scan_lint(root),
+            "coverage": python_common.scan_coverage(root),
             "reproducibility": self._scan_reproducibility(root),
             "ci_gating": python_common.scan_ci(root),
         }
@@ -34,6 +35,7 @@ class PythonUvDetector:
         lint_cmd = python_common.lint_command(fp.root)
         if lint_cmd:
             commands["lint"] = ["uv", "run", *lint_cmd]
+        commands["coverage"] = ["uv", "run", *python_common.coverage_command()]
         return commands
 
     def _scan_reproducibility(self, root: Path) -> CategoryResult:

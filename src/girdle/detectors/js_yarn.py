@@ -20,7 +20,7 @@ class JsYarnDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "reproducibility", "ci_gating"]
+        return ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
@@ -28,6 +28,7 @@ class JsYarnDetector:
         return {
             "tests": js_common.scan_tests(pkg_data, "yarn"),
             "lint": js_common.scan_lint(root, fp, "yarn"),
+            "coverage": js_common.scan_coverage(pkg_data, "yarn"),
             "reproducibility": self._scan_reproducibility(root, fp),
             "ci_gating": js_common.scan_ci(root, r"\byarn (run )?test\b", "yarn test"),
         }

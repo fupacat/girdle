@@ -36,13 +36,14 @@ class PythonPipDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "reproducibility", "ci_gating"]
+        return ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
         return {
             "tests": python_common.scan_tests(root),
             "lint": python_common.scan_lint(root),
+            "coverage": python_common.scan_coverage(root),
             "reproducibility": self._scan_reproducibility(root, fp),
             "ci_gating": python_common.scan_ci(root),
         }
@@ -53,6 +54,7 @@ class PythonPipDetector:
         lint_cmd = python_common.lint_command(fp.root)
         if lint_cmd:
             commands["lint"] = [*prefix, *lint_cmd]
+        commands["coverage"] = [*prefix, *python_common.coverage_command()]
         return commands
 
     def _scan_reproducibility(self, root: Path, fp: Fingerprint) -> CategoryResult:

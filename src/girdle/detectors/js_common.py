@@ -23,6 +23,9 @@ LINT_CONFIG_FILES = (
     "eslint.config.mjs",
     "eslint.config.ts",
 )
+COVERAGE_DEPS = (
+    "nyc", "c8", "@vitest/coverage-v8", "@vitest/coverage-istanbul", "@vitest/coverage-c8",
+)
 
 
 def detect_variants(root: Path) -> list[str]:
@@ -72,6 +75,36 @@ def scan_lint(root: Path, fp: Fingerprint, pkg_manager: str = "npm") -> Category
     return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
 
+def scan_coverage(pkg_data: dict, pkg_manager: str = "npm") -> CategoryResult:
+    scripts = pkg_data.get("scripts", {})
+    deps = {**pkg_data.get("dependencies", {}), **pkg_data.get("devDependencies", {})}
+    found_dep = next((d for d in COVERAGE_DEPS if d in deps), None)
+    has_coverage_script = "coverage" in scripts or any(
+        "--coverage" in v for v in scripts.values() if isinstance(v, str)
+    )
+    jest_cfg = pkg_data.get("jest", {})
+    jest_coverage = isinstance(jest_cfg, dict) and jest_cfg.get("collectCoverage") is True
+
+    evidence = []
+    if found_dep:
+        evidence.append(f"devDependency: {found_dep}")
+    if has_coverage_script:
+        evidence.append("package.json#scripts.coverage")
+    if jest_coverage:
+        evidence.append("package.json#jest.collectCoverage")
+
+    if not evidence:
+        install = "add" if pkg_manager in ("yarn", "pnpm", "bun") else "install --save-dev"
+        return CategoryResult(
+            Tier.ABSENT, reason="no coverage tooling detected",
+            recommendation=(
+                f"Add coverage tooling (e.g. `{pkg_manager} {install} "
+                f'@vitest/coverage-v8` or `nyc`) and a "coverage" script in package.json.'
+            ),
+        )
+    return CategoryResult(Tier.CONFIGURED, evidence=evidence)
+
+
 def scan_ci(root: Path, run_pattern: str, run_label: str) -> CategoryResult:
     wf_dir = root / ".github" / "workflows"
     if wf_dir.exists():
@@ -107,4 +140,6 @@ def run_commands(root: Path, pkg_manager: str) -> dict[str, list[str]]:
     pkg_data = read_json(root / "package.json") or {}
     if "lint" in pkg_data.get("scripts", {}):
         commands["lint"] = [pkg_manager, "run", "lint"]
+    if "coverage" in pkg_data.get("scripts", {}):
+        commands["coverage"] = [pkg_manager, "run", "coverage"]
     return commands

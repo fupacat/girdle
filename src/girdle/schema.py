@@ -15,7 +15,7 @@ from girdle.tiers import CategoryResult, Tier
 
 GIRDLE_VERSION = "0.1.0"
 
-CATEGORY_NAMES = ("tests", "lint", "reproducibility", "ci_gating")
+CATEGORY_NAMES = ("tests", "lint", "coverage", "reproducibility", "ci_gating")
 
 
 @dataclass

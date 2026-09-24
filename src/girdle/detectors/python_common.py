@@ -55,6 +55,28 @@ def scan_lint(root: Path) -> CategoryResult:
     return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
 
+def scan_coverage(root: Path) -> CategoryResult:
+    pyproject = read_toml(root / "pyproject.toml")
+    evidence = []
+    if (root / ".coveragerc").exists():
+        evidence.append(".coveragerc")
+    if pyproject and "coverage" in pyproject.get("tool", {}):
+        evidence.append("pyproject.toml#tool.coverage")
+    if not evidence:
+        return CategoryResult(
+            Tier.ABSENT, reason="no .coveragerc or [tool.coverage] config found",
+            recommendation=(
+                "Add coverage.py: `pip install pytest-cov`, add a [tool.coverage.run] "
+                "section to pyproject.toml, and run `pytest --cov`."
+            ),
+        )
+    return CategoryResult(Tier.CONFIGURED, evidence=evidence)
+
+
+def coverage_command() -> list[str]:
+    return ["pytest", "--cov"]
+
+
 def scan_ci(root: Path) -> CategoryResult:
     wf_dir = root / ".github" / "workflows"
     if wf_dir.exists():

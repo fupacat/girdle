@@ -19,19 +19,20 @@ class GoModDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "reproducibility", "ci_gating"]
+        return ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
         return {
             "tests": self._scan_tests(root),
             "lint": self._scan_lint(root),
+            "coverage": self._scan_coverage(root),
             "reproducibility": self._scan_reproducibility(root, fp),
             "ci_gating": self._scan_ci(root),
         }
 
     def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
-        commands = {"tests": ["go", "test", "./..."]}
+        commands = {"tests": ["go", "test", "./..."], "coverage": ["go", "test", "-cover", "./..."]}
         if (fp.root / ".golangci.yml").exists() or (fp.root / ".golangci.yaml").exists():
             commands["lint"] = ["golangci-lint", "run"]
         return commands
@@ -54,6 +55,28 @@ class GoModDetector:
             return CategoryResult(
                 Tier.ABSENT, reason="no golangci-lint/staticcheck config found",
                 recommendation="Add a .golangci.yml and run `golangci-lint run`.",
+            )
+        return CategoryResult(Tier.CONFIGURED, evidence=evidence)
+
+    def _scan_coverage(self, root: Path) -> CategoryResult:
+        evidence = []
+        wf_dir = root / ".github" / "workflows"
+        if wf_dir.exists():
+            for wf in wf_dir.glob("*.y*ml"):
+                if re.search(r"-cover(profile)?\b", read_text(wf) or ""):
+                    evidence.append(f".github/workflows/{wf.name}: runs with -cover")
+                    break
+        makefile = root / "Makefile"
+        if not evidence and makefile.exists():
+            if re.search(r"-cover(profile)?\b", read_text(makefile) or ""):
+                evidence.append("Makefile: runs with -cover")
+        if not evidence:
+            return CategoryResult(
+                Tier.ABSENT, reason="no evidence of `go test -cover` in CI or Makefile",
+                recommendation=(
+                    "Add `go test -cover ./...` to CI (or a Makefile target) to track "
+                    "coverage."
+                ),
             )
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
