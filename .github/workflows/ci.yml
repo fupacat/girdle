@@ -14,5 +14,5 @@ jobs:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
       - run: ruff check .
-      - run: pytest
+      - run: pytest --cov
       - run: girdle index . --check AGENTS.md
