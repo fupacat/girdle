@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
+from girdle.coverage_parse import parse_percentage
 from girdle.detectors import ALL_DETECTORS
 from girdle.detectors.base import Detector, Fingerprint
 from girdle.hygiene import build_hygiene
@@ -87,7 +88,12 @@ def _verify(
         outcome = run_check(command, fp.root)
         if outcome.passed:
             result.tier = Tier.VERIFIED
-            result.evidence = [*result.evidence, f"verified: `{' '.join(command)}` exited 0"]
+            evidence_line = f"verified: `{' '.join(command)}` exited 0"
+            if category == "coverage":
+                pct = parse_percentage(fp.language, outcome.stdout)
+                if pct:
+                    evidence_line += f" ({pct} coverage)"
+            result.evidence = [*result.evidence, evidence_line]
         elif outcome.ran:
             result.reason = outcome.reason
         else:

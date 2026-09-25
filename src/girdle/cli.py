@@ -164,6 +164,8 @@ def _print_human(data: dict) -> None:
             else:
                 marker = TIER_LABEL[cat["tier"]]
             click.echo(f"  {cat_name:<18} {marker}")
+            if cat["evidence"]:
+                click.echo(f"    evidence: {'; '.join(cat['evidence'])}")
             if cat["reason"]:
                 click.echo(f"    reason: {cat['reason']}")
             if cat["recommendation"]:

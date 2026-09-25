@@ -16,7 +16,8 @@ Run checks: `pytest` / `ruff check .`.
 ```
 src/girdle/__init__.py | python | 2L | 
 src/girdle/align.py | python | 309L | AlignPlan, _python_formatter, _js_formatter, _js_formatter_skip_note, _prettier_settings, _rust_formatter, detect_formatters, _parse_editorconfig_sections, _render_section, plan_editorconfig, plan_gitattributes, plan_gitignore, build_align_plans, apply_plan
-src/girdle/cli.py | python | 224L | main, scan, dashboard, index, align, _print_human, _print_hygiene, _print_platform
+src/girdle/cli.py | python | 226L | main, scan, dashboard, index, align, _print_human, _print_hygiene, _print_platform
+src/girdle/coverage_parse.py | python | 46L | _first_match, parse_percentage
 src/girdle/dashboard.py | python | 25L | render_dashboard
 src/girdle/detectors/__init__.py | python | 4L | 
 src/girdle/detectors/_util.py | python | 32L | read_json, read_toml, read_text
@@ -41,12 +42,13 @@ src/girdle/fsutil.py | python | 35L | walk_excluding, rglob_excluding
 src/girdle/hygiene.py | python | 172L | _read_text, HygieneResult, _first_existing, check_editorconfig, check_gitattributes, check_gitignore, check_codeowners, check_readme, check_contributing, build_hygiene
 src/girdle/indexer.py | python | 355L | _parser, _text, _name_of, _defs_python, _defs_js_ts, _defs_go, _defs_rust, _defs_java, _defs_csharp_from, IndexEntry, RepoIndex, _iter_source_files, _extract_symbols, build_index, _estimate_tokens, _render_entry, render_manifest, render_block, inject_into, is_stale
 src/girdle/platform.py | python | 168L | PlatformResult, compute_recommendations, _run, extract_protection_facts, check_platform
-src/girdle/runner.py | python | 53L | RunOutcome, run_check
-src/girdle/scan.py | python | 95L | run_scan, _verify
+src/girdle/runner.py | python | 58L | RunOutcome, run_check
+src/girdle/scan.py | python | 101L | run_scan, _verify
 src/girdle/schema.py | python | 120L | EcosystemResult, ScanResult
 src/girdle/tiers.py | python | 46L | Tier, CategoryResult
 tests/test_align.py | python | 164L | test_editorconfig_derives_from_black, test_editorconfig_derives_from_ruff_format, test_editorconfig_no_formatter_no_plan, test_editorconfig_appends_without_touching_existing_content, test_editorconfig_skips_glob_already_present, test_editorconfig_js_prettier_json, test_editorconfig_js_unparseable_config_is_skipped, test_editorconfig_rust_from_rustfmt_toml, test_gitattributes_no_eol_signal_no_plan, test_gitattributes_propagates_prettier_eol, test_gitattributes_conflict_when_formatters_disagree, test_gitattributes_existing_text_auto_left_alone, test_gitattributes_appends_to_existing_file, test_gitignore_adds_missing_patterns, test_gitignore_already_covered_no_plan, test_gitignore_multi_language_union, test_apply_plan_writes_file, test_apply_plan_noop_when_no_content, test_build_align_plans_returns_three_plans
 tests/test_coverage.py | python | 171L | test_python_coverage_absent_by_default, test_python_coverage_configured_via_coveragerc, test_python_coverage_configured_via_pyproject, test_python_coverage_run_command_declared, test_js_npm_coverage_via_dependency, test_js_npm_coverage_absent, test_js_npm_coverage_run_command_only_if_script_declared, test_go_coverage_absent_without_ci_evidence, test_go_coverage_configured_via_ci, test_go_coverage_run_command_always_declared, test_rust_coverage_absent, test_rust_coverage_configured_via_tarpaulin_toml, test_java_maven_coverage_via_jacoco, test_java_gradle_coverage_via_jacoco, test_dotnet_coverage_via_coverlet, test_dotnet_coverage_absent
+tests/test_coverage_parse.py | python | 48L | test_parses_python_total_line, test_parses_go_coverage_line, test_parses_rust_tarpaulin_line, test_parses_js_all_files_row, test_unknown_language_returns_none, test_unparseable_output_returns_none, test_empty_output_returns_none
 tests/test_dotnet.py | python | 62L | test_detect_none_without_project_files, test_pinned_packagereference_configured, test_floating_version_without_lockfile_is_absent, test_packages_lock_json_configured_even_with_ranges, test_test_sdk_reference_detected
 tests/test_go_mod.py | python | 28L | test_detect_none_without_go_mod, test_missing_go_sum_is_absent, test_test_files_detected
 tests/test_hygiene.py | python | 101L | test_all_absent_on_empty_repo, test_editorconfig_present, test_gitattributes_present, test_gitignore_missing_is_absent, test_gitignore_present_but_missing_stack_patterns, test_gitignore_covers_stack_is_configured, test_gitignore_multi_language_checks_all_stacks, test_codeowners_found_in_github_dir, test_readme_empty_stub_is_absent, test_readme_with_real_content_is_configured, test_contributing_absent, test_contributing_present_in_docs, test_to_dict_shape

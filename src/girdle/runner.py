@@ -24,6 +24,8 @@ class RunOutcome:
     ran: bool
     passed: bool
     reason: str | None
+    stdout: str = ""
+    stderr: str = ""
 
 
 def run_check(command: list[str], cwd: Path, timeout: int = DEFAULT_TIMEOUT) -> RunOutcome:
@@ -46,7 +48,10 @@ def run_check(command: list[str], cwd: Path, timeout: int = DEFAULT_TIMEOUT) -> 
         return RunOutcome(ran=False, passed=False, reason=f"failed to execute: {e}")
 
     if proc.returncode == 0:
-        return RunOutcome(ran=True, passed=True, reason=None)
+        return RunOutcome(
+            ran=True, passed=True, reason=None, stdout=proc.stdout, stderr=proc.stderr
+        )
     return RunOutcome(
-        ran=True, passed=False, reason=f"`{' '.join(command)}` exited {proc.returncode}"
+        ran=True, passed=False, reason=f"`{' '.join(command)}` exited {proc.returncode}",
+        stdout=proc.stdout, stderr=proc.stderr,
     )
