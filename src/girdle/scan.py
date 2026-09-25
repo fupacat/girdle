@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
+from girdle.coverage_gate import detect_gate
 from girdle.coverage_parse import parse_percentage
 from girdle.detectors import ALL_DETECTORS
 from girdle.detectors.base import Detector, Fingerprint
@@ -29,6 +30,7 @@ def run_scan(
             continue
         categories = detector.scan(fp, mode)
         _verify(detector, fp, categories, mode)
+        _check_coverage_gate(fp, categories)
         ecosystems.append(
             EcosystemResult(
                 id=fp.id,
@@ -57,6 +59,32 @@ def run_scan(
         platform=platform,
         hygiene=hygiene,
     )
+
+
+def _check_coverage_gate(fp: Fingerprint, categories: dict[str, CategoryResult]) -> None:
+    """Enriches the coverage category's evidence/recommendation with
+    whether it's enforced as a PR-scoped gate in CI - only meaningful, and
+    only checked, when both coverage AND ci_gating are already configured
+    for this ecosystem. Neither half makes sense to report in isolation:
+    a gate with no coverage tool to gate, or no CI to enforce it in, isn't
+    a finding, it's noise.
+    """
+    coverage = categories.get("coverage")
+    ci_gating = categories.get("ci_gating")
+    if coverage is None or ci_gating is None:
+        return
+    if coverage.tier < Tier.CONFIGURED or ci_gating.tier < Tier.CONFIGURED:
+        return
+
+    gate = detect_gate(fp.root)
+    if gate:
+        coverage.evidence = [*coverage.evidence, f"PR-scoped gate: {gate}"]
+    elif coverage.recommendation is None:
+        coverage.recommendation = (
+            "Coverage runs but isn't enforced as a PR-scoped gate. Add a diff-coverage "
+            "check (Codecov's patch status, Coveralls, or `diff-cover --fail-under=N` "
+            "in CI) as a required status check."
+        )
 
 
 def _verify(
