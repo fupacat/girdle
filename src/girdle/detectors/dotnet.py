@@ -19,10 +19,14 @@ VERSION_RANGE_PATTERN = re.compile(r'Version="[^"*[(]*[*[(][^"]*"|Version="\d+\.
 PACKAGE_REF_PATTERN = re.compile(r'<PackageReference\b')
 PINNED_VERSION_PATTERN = re.compile(r'Version="\d+(\.\d+){1,3}"')
 
+CSPROJ_GLOB = "*.csproj"
+FSPROJ_GLOB = "*.fsproj"
+PACKAGES_LOCK_JSON = "packages.lock.json"
+
 
 class DotNetDetector:
     def detect(self, root: Path) -> Fingerprint | None:
-        project_files = list(root.glob("*.csproj")) + list(root.glob("*.fsproj"))
+        project_files = list(root.glob(CSPROJ_GLOB)) + list(root.glob(FSPROJ_GLOB))
         sln_files = list(root.glob("*.sln"))
         if not project_files and not sln_files:
             return None
@@ -35,7 +39,9 @@ class DotNetDetector:
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
-        project_texts = [read_text(p) or "" for p in rglob_excluding(root, "*.csproj", "*.fsproj")]
+        project_texts = [
+            read_text(p) or "" for p in rglob_excluding(root, CSPROJ_GLOB, FSPROJ_GLOB)
+        ]
         combined = "\n".join(project_texts)
         return {
             "tests": self._scan_tests(root, combined),
@@ -50,7 +56,7 @@ class DotNetDetector:
         # no standalone lint command to declare here.
         commands = {"tests": ["dotnet", "test"]}
         project_texts = [
-            read_text(p) or "" for p in rglob_excluding(fp.root, "*.csproj", "*.fsproj")
+            read_text(p) or "" for p in rglob_excluding(fp.root, CSPROJ_GLOB, FSPROJ_GLOB)
         ]
         if "coverlet" in "\n".join(project_texts).lower():
             commands["coverage"] = ["dotnet", "test", "--collect:XPlat Code Coverage"]
@@ -112,15 +118,15 @@ class DotNetDetector:
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
     def _scan_reproducibility(self, root: Path, combined: str) -> CategoryResult:
-        has_lockfile = (root / "packages.lock.json").exists() or any(
-            rglob_excluding(root, "packages.lock.json")
+        has_lockfile = (root / PACKAGES_LOCK_JSON).exists() or any(
+            rglob_excluding(root, PACKAGES_LOCK_JSON)
         )
         ranges = VERSION_RANGE_PATTERN.findall(combined)
         pinned = PINNED_VERSION_PATTERN.findall(combined)
         refs = len(PACKAGE_REF_PATTERN.findall(combined))
 
         if has_lockfile:
-            return CategoryResult(Tier.CONFIGURED, evidence=["packages.lock.json"])
+            return CategoryResult(Tier.CONFIGURED, evidence=[PACKAGES_LOCK_JSON])
         if refs == 0:
             return CategoryResult(
                 Tier.ABSENT, reason="no PackageReference entries found to evaluate",

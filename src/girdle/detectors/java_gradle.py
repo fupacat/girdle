@@ -8,11 +8,14 @@ from girdle.detectors._util import read_text
 from girdle.detectors.base import Fingerprint
 from girdle.schema import CategoryResult, Tier
 
+BUILD_GRADLE_KTS = "build.gradle.kts"
+BUILD_GRADLE = "build.gradle"
+
 
 class JavaGradleDetector:
     def detect(self, root: Path) -> Fingerprint | None:
-        kotlin = root / "build.gradle.kts"
-        groovy = root / "build.gradle"
+        kotlin = root / BUILD_GRADLE_KTS
+        groovy = root / BUILD_GRADLE
         if not kotlin.exists() and not groovy.exists():
             return None
         variants = ["kotlin-dsl"] if kotlin.exists() else []
@@ -25,7 +28,7 @@ class JavaGradleDetector:
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
-        build_file = "build.gradle.kts" if "kotlin-dsl" in fp.variants else "build.gradle"
+        build_file = BUILD_GRADLE_KTS if "kotlin-dsl" in fp.variants else BUILD_GRADLE
         build_text = read_text(root / build_file) or ""
         return {
             "tests": self._scan_tests(root, build_text),
@@ -40,7 +43,7 @@ class JavaGradleDetector:
         wrapper_path = fp.root / wrapper_name
         exe = str(wrapper_path) if wrapper_path.exists() else "gradle"
         commands = {"tests": [exe, "test"]}
-        build_file = "build.gradle.kts" if "kotlin-dsl" in fp.variants else "build.gradle"
+        build_file = BUILD_GRADLE_KTS if "kotlin-dsl" in fp.variants else BUILD_GRADLE
         build_text = read_text(fp.root / build_file) or ""
         if "jacoco" in build_text.lower():
             commands["coverage"] = [exe, "test", "jacocoTestReport"]

@@ -7,10 +7,12 @@ from girdle.detectors._util import read_json, read_text
 from girdle.detectors.base import Fingerprint
 from girdle.schema import CategoryResult, Tier
 
+YARN_LOCK = "yarn.lock"
+
 
 class JsYarnDetector:
     def detect(self, root: Path) -> Fingerprint | None:
-        if not (root / "package.json").exists() or not (root / "yarn.lock").exists():
+        if not (root / "package.json").exists() or not (root / YARN_LOCK).exists():
             return None
         variants = js_common.detect_variants(root)
         if (root / ".yarnrc.yml").exists():
@@ -37,12 +39,12 @@ class JsYarnDetector:
         return js_common.run_commands(fp.root, "yarn")
 
     def _scan_reproducibility(self, root: Path, fp: Fingerprint) -> CategoryResult:
-        if js_common.is_lockfile_gitignored(root, "yarn.lock"):
+        if js_common.is_lockfile_gitignored(root, YARN_LOCK):
             return CategoryResult(
-                Tier.ABSENT, reason="yarn.lock exists but is gitignored",
-                recommendation="Remove yarn.lock from .gitignore and commit it.",
+                Tier.ABSENT, reason=f"{YARN_LOCK} exists but is gitignored",
+                recommendation=f"Remove {YARN_LOCK} from .gitignore and commit it.",
             )
-        evidence = ["yarn.lock"]
+        evidence = [YARN_LOCK]
         if "berry" in fp.variants:
             # PnP mode changes what "installed" even means; note it rather than score it.
             rc = read_text(root / ".yarnrc.yml") or ""

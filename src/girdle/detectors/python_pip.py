@@ -13,11 +13,14 @@ from girdle.detectors._util import read_text, read_toml
 from girdle.detectors.base import Fingerprint
 from girdle.schema import CategoryResult, Tier
 
+POETRY_LOCK = "poetry.lock"
+REQUIREMENTS_TXT = "requirements.txt"
+
 
 class PythonPipDetector:
     def detect(self, root: Path) -> Fingerprint | None:
         pyproject = root / "pyproject.toml"
-        requirements = root / "requirements.txt"
+        requirements = root / REQUIREMENTS_TXT
         setup_py = root / "setup.py"
         data = read_toml(pyproject) if pyproject.exists() else None
 
@@ -59,20 +62,20 @@ class PythonPipDetector:
 
     def _scan_reproducibility(self, root: Path, fp: Fingerprint) -> CategoryResult:
         if fp.toolchain == "poetry":
-            lock = root / "poetry.lock"
+            lock = root / POETRY_LOCK
             if not lock.exists():
                 return CategoryResult(
-                    Tier.ABSENT, reason="no poetry.lock found",
-                    recommendation="Run `poetry lock` and commit the generated poetry.lock.",
+                    Tier.ABSENT, reason=f"no {POETRY_LOCK} found",
+                    recommendation=f"Run `poetry lock` and commit the generated {POETRY_LOCK}.",
                 )
-            if python_common.is_lockfile_gitignored(root, "poetry.lock"):
+            if python_common.is_lockfile_gitignored(root, POETRY_LOCK):
                 return CategoryResult(
-                    Tier.ABSENT, reason="poetry.lock exists but is gitignored",
-                    recommendation="Remove poetry.lock from .gitignore and commit it.",
+                    Tier.ABSENT, reason=f"{POETRY_LOCK} exists but is gitignored",
+                    recommendation=f"Remove {POETRY_LOCK} from .gitignore and commit it.",
                 )
-            return CategoryResult(Tier.CONFIGURED, evidence=["poetry.lock"])
+            return CategoryResult(Tier.CONFIGURED, evidence=[POETRY_LOCK])
 
-        req = root / "requirements.txt"
+        req = root / REQUIREMENTS_TXT
         if not req.exists():
             pyproject = read_toml(root / "pyproject.toml")
             if pyproject and "dependencies" in pyproject.get("project", {}):
@@ -86,14 +89,14 @@ class PythonPipDetector:
                     ),
                     recommendation=(
                         "Pin dependencies: `pip install pip-tools && "
-                        "pip-compile pyproject.toml -o requirements.txt`."
+                        f"pip-compile pyproject.toml -o {REQUIREMENTS_TXT}`."
                     ),
                 )
             return CategoryResult(
-                Tier.ABSENT, reason="no requirements.txt found",
+                Tier.ABSENT, reason=f"no {REQUIREMENTS_TXT} found",
                 recommendation=(
                     "Add a pinned requirements.txt: `pip install pip-tools && "
-                    "pip-compile -o requirements.txt` (or `pip freeze > requirements.txt`)."
+                    f"pip-compile -o {REQUIREMENTS_TXT}` (or `pip freeze > {REQUIREMENTS_TXT}`)."
                 ),
             )
         text = read_text(req) or ""
@@ -101,19 +104,19 @@ class PythonPipDetector:
         pinned = [ln for ln in lines if "==" in ln]
         if lines and len(pinned) == len(lines):
             return CategoryResult(
-                Tier.CONFIGURED, evidence=["requirements.txt (all deps pinned with ==)"]
+                Tier.CONFIGURED, evidence=[f"{REQUIREMENTS_TXT} (all deps pinned with ==)"]
             )
         if lines:
             return CategoryResult(
                 Tier.ABSENT,
-                evidence=["requirements.txt"],
+                evidence=[REQUIREMENTS_TXT],
                 reason=f"{len(lines) - len(pinned)}/{len(lines)} dependencies unpinned",
                 recommendation=(
                     "Pin all versions with `==`, ideally regenerated via "
-                    "`pip-compile -o requirements.txt`."
+                    f"`pip-compile -o {REQUIREMENTS_TXT}`."
                 ),
             )
         return CategoryResult(
-            Tier.ABSENT, reason="requirements.txt is empty",
-            recommendation="Populate requirements.txt with pinned dependencies.",
+            Tier.ABSENT, reason=f"{REQUIREMENTS_TXT} is empty",
+            recommendation=f"Populate {REQUIREMENTS_TXT} with pinned dependencies.",
         )

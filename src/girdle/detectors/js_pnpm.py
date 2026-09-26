@@ -7,10 +7,12 @@ from girdle.detectors._util import read_json
 from girdle.detectors.base import Fingerprint
 from girdle.schema import CategoryResult, Tier
 
+PNPM_LOCK_YAML = "pnpm-lock.yaml"
+
 
 class JsPnpmDetector:
     def detect(self, root: Path) -> Fingerprint | None:
-        if not (root / "package.json").exists() or not (root / "pnpm-lock.yaml").exists():
+        if not (root / "package.json").exists() or not (root / PNPM_LOCK_YAML).exists():
             return None
         variants = js_common.detect_variants(root)
         if (root / "pnpm-workspace.yaml").exists():
@@ -37,12 +39,12 @@ class JsPnpmDetector:
         return js_common.run_commands(fp.root, "pnpm")
 
     def _scan_reproducibility(self, root: Path, fp: Fingerprint) -> CategoryResult:
-        if js_common.is_lockfile_gitignored(root, "pnpm-lock.yaml"):
+        if js_common.is_lockfile_gitignored(root, PNPM_LOCK_YAML):
             return CategoryResult(
-                Tier.ABSENT, reason="pnpm-lock.yaml exists but is gitignored",
-                recommendation="Remove pnpm-lock.yaml from .gitignore and commit it.",
+                Tier.ABSENT, reason=f"{PNPM_LOCK_YAML} exists but is gitignored",
+                recommendation=f"Remove {PNPM_LOCK_YAML} from .gitignore and commit it.",
             )
-        evidence = ["pnpm-lock.yaml"]
+        evidence = [PNPM_LOCK_YAML]
         if "workspace" in fp.variants:
             evidence.append(
                 "pnpm-workspace.yaml (monorepo - packages may warrant per-package scoring)"

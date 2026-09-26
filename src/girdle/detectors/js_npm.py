@@ -7,6 +7,8 @@ from girdle.detectors._util import read_json
 from girdle.detectors.base import Fingerprint
 from girdle.schema import CategoryResult, Tier
 
+PACKAGE_LOCK_JSON = "package-lock.json"
+
 
 class JsNpmDetector:
     def detect(self, root: Path) -> Fingerprint | None:
@@ -43,15 +45,16 @@ class JsNpmDetector:
         return js_common.run_commands(fp.root, "npm")
 
     def _scan_reproducibility(self, root: Path) -> CategoryResult:
-        lockfile = root / "package-lock.json"
+        lockfile = root / PACKAGE_LOCK_JSON
         if not lockfile.exists():
             return CategoryResult(
-                Tier.ABSENT, reason="no package-lock.json found",
-                recommendation="Run `npm install` and commit the generated package-lock.json.",
+                Tier.ABSENT, reason=f"no {PACKAGE_LOCK_JSON} found",
+                recommendation=f"Run `npm install` and commit the generated {PACKAGE_LOCK_JSON}.",
             )
-        if js_common.is_lockfile_gitignored(root, "package-lock.json"):
+        if js_common.is_lockfile_gitignored(root, PACKAGE_LOCK_JSON):
             return CategoryResult(
-                Tier.ABSENT, reason="package-lock.json exists but is gitignored (not committed)",
-                recommendation="Remove package-lock.json from .gitignore and commit it.",
+                Tier.ABSENT,
+                reason=f"{PACKAGE_LOCK_JSON} exists but is gitignored (not committed)",
+                recommendation=f"Remove {PACKAGE_LOCK_JSON} from .gitignore and commit it.",
             )
-        return CategoryResult(Tier.CONFIGURED, evidence=["package-lock.json"])
+        return CategoryResult(Tier.CONFIGURED, evidence=[PACKAGE_LOCK_JSON])

@@ -15,7 +15,7 @@ Run checks: `pytest` / `ruff check .`.
 <!-- girdle:index:start -->
 ```
 src/girdle/__init__.py | python | 2L | 
-src/girdle/align.py | python | 309L | AlignPlan, _python_formatter, _js_formatter, _js_formatter_skip_note, _prettier_settings, _rust_formatter, detect_formatters, _parse_editorconfig_sections, _render_section, plan_editorconfig, plan_gitattributes, plan_gitignore, build_align_plans, apply_plan
+src/girdle/align.py | python | 313L | AlignPlan, _python_formatter, _js_formatter, _js_formatter_skip_note, _prettier_settings, _rust_formatter, detect_formatters, _parse_editorconfig_sections, _render_section, plan_editorconfig, plan_gitattributes, plan_gitignore, build_align_plans, apply_plan
 src/girdle/cli.py | python | 226L | main, scan, dashboard, index, align, _print_human, _print_hygiene, _print_platform
 src/girdle/coverage_gate.py | python | 126L | _ci_texts, detect_gate
 src/girdle/coverage_parse.py | python | 46L | _first_match, parse_percentage
@@ -23,24 +23,24 @@ src/girdle/dashboard.py | python | 25L | render_dashboard
 src/girdle/detectors/__init__.py | python | 4L | 
 src/girdle/detectors/_util.py | python | 32L | read_json, read_toml, read_text
 src/girdle/detectors/base.py | python | 45L | Fingerprint, Detector
-src/girdle/detectors/dotnet.py | python | 169L | DotNetDetector
+src/girdle/detectors/dotnet.py | python | 175L | DotNetDetector
 src/girdle/detectors/go_mod.py | python | 115L | GoModDetector
-src/girdle/detectors/java_gradle.py | python | 132L | JavaGradleDetector
+src/girdle/detectors/java_gradle.py | python | 135L | JavaGradleDetector
 src/girdle/detectors/java_maven.py | python | 128L | JavaMavenDetector
-src/girdle/detectors/js_bun.py | python | 52L | JsBunDetector
-src/girdle/detectors/js_common.py | python | 146L | detect_variants, scan_tests, scan_lint, scan_coverage, scan_ci, is_lockfile_gitignored, run_commands
-src/girdle/detectors/js_npm.py | python | 58L | JsNpmDetector
-src/girdle/detectors/js_pnpm.py | python | 51L | JsPnpmDetector
-src/girdle/detectors/js_yarn.py | python | 52L | JsYarnDetector
-src/girdle/detectors/python_common.py | python | 123L | scan_tests, scan_lint, scan_coverage, coverage_command, scan_ci, is_lockfile_gitignored, lint_command, test_command
-src/girdle/detectors/python_conda.py | python | 66L | PythonCondaDetector
-src/girdle/detectors/python_pip.py | python | 120L | PythonPipDetector
-src/girdle/detectors/python_pipenv.py | python | 51L | PythonPipenvDetector
-src/girdle/detectors/python_uv.py | python | 48L | PythonUvDetector
+src/girdle/detectors/js_bun.py | python | 54L | JsBunDetector
+src/girdle/detectors/js_common.py | python | 152L | _install_verb, detect_variants, scan_tests, scan_lint, scan_coverage, scan_ci, is_lockfile_gitignored, run_commands
+src/girdle/detectors/js_npm.py | python | 61L | JsNpmDetector
+src/girdle/detectors/js_pnpm.py | python | 53L | JsPnpmDetector
+src/girdle/detectors/js_yarn.py | python | 54L | JsYarnDetector
+src/girdle/detectors/python_common.py | python | 124L | scan_tests, scan_lint, scan_coverage, coverage_command, scan_ci, is_lockfile_gitignored, lint_command, test_command
+src/girdle/detectors/python_conda.py | python | 68L | PythonCondaDetector
+src/girdle/detectors/python_pip.py | python | 123L | PythonPipDetector
+src/girdle/detectors/python_pipenv.py | python | 53L | PythonPipenvDetector
+src/girdle/detectors/python_uv.py | python | 50L | PythonUvDetector
 src/girdle/detectors/registry.py | python | 34L | 
-src/girdle/detectors/rust.py | python | 143L | RustDetector
+src/girdle/detectors/rust.py | python | 147L | RustDetector
 src/girdle/fsutil.py | python | 35L | walk_excluding, rglob_excluding
-src/girdle/hygiene.py | python | 172L | _read_text, HygieneResult, _first_existing, check_editorconfig, check_gitattributes, check_gitignore, check_codeowners, check_readme, check_contributing, build_hygiene
+src/girdle/hygiene.py | python | 174L | _read_text, HygieneResult, _first_existing, check_editorconfig, check_gitattributes, check_gitignore, check_codeowners, check_readme, check_contributing, build_hygiene
 src/girdle/indexer.py | python | 355L | _parser, _text, _name_of, _defs_python, _defs_js_ts, _defs_go, _defs_rust, _defs_java, _defs_csharp_from, IndexEntry, RepoIndex, _iter_source_files, _extract_symbols, build_index, _estimate_tokens, _render_entry, render_manifest, render_block, inject_into, is_stale
 src/girdle/platform.py | python | 168L | PlatformResult, compute_recommendations, _run, extract_protection_facts, check_platform
 src/girdle/runner.py | python | 58L | RunOutcome, run_check

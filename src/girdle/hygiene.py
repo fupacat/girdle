@@ -37,6 +37,8 @@ EXPECTED_IGNORE_PATTERNS = {
     "dotnet": ["bin", "obj"],
 }
 
+GITIGNORE = ".gitignore"
+
 README_NAMES = ("README.md", "README.rst", "README.txt", "README")
 CONTRIBUTING_LOCATIONS = (
     "CONTRIBUTING.md", ".github/CONTRIBUTING.md", "docs/CONTRIBUTING.md",
@@ -89,11 +91,11 @@ def check_gitattributes(root: Path) -> CategoryResult:
 
 
 def check_gitignore(root: Path, languages: set[str]) -> CategoryResult:
-    path = root / ".gitignore"
+    path = root / GITIGNORE
     if not path.exists():
         return CategoryResult(
-            Tier.ABSENT, reason="no .gitignore found",
-            recommendation="Add a .gitignore.",
+            Tier.ABSENT, reason=f"no {GITIGNORE} found",
+            recommendation=f"Add a {GITIGNORE}.",
         )
     content = _read_text(path) or ""
     missing_patterns: list[str] = []
@@ -104,14 +106,14 @@ def check_gitignore(root: Path, languages: set[str]) -> CategoryResult:
     if missing_patterns:
         return CategoryResult(
             Tier.ABSENT,
-            evidence=[".gitignore"],
+            evidence=[GITIGNORE],
             reason=f"missing common patterns for this stack: {', '.join(missing_patterns)}",
             recommendation=(
-                f"Add {', '.join(missing_patterns)} to .gitignore for your "
+                f"Add {', '.join(missing_patterns)} to {GITIGNORE} for your "
                 f"{'/'.join(sorted(languages)) or 'detected'} stack."
             ),
         )
-    return CategoryResult(Tier.CONFIGURED, evidence=[".gitignore"])
+    return CategoryResult(Tier.CONFIGURED, evidence=[GITIGNORE])
 
 
 def check_codeowners(root: Path) -> CategoryResult:

@@ -13,6 +13,7 @@ from girdle.fsutil import rglob_excluding
 from girdle.schema import CategoryResult, Tier
 
 LINT_CONFIG_MARKERS = (".flake8", "ruff.toml", ".ruff.toml", "mypy.ini", "setup.cfg")
+PYPROJECT_TOML = "pyproject.toml"
 
 
 def scan_tests(root: Path) -> CategoryResult:
@@ -20,9 +21,9 @@ def scan_tests(root: Path) -> CategoryResult:
     for marker in ("pytest.ini", "tox.ini"):
         if (root / marker).exists():
             evidence.append(marker)
-    pyproject = read_toml(root / "pyproject.toml")
+    pyproject = read_toml(root / PYPROJECT_TOML)
     if pyproject and "pytest" in pyproject.get("tool", {}):
-        evidence.append("pyproject.toml#tool.pytest")
+        evidence.append(f"{PYPROJECT_TOML}#tool.pytest")
     if any(rglob_excluding(root, "test_*.py", "*_test.py")):
         evidence.append("test_*.py files present")
     if not evidence:
@@ -38,12 +39,12 @@ def scan_tests(root: Path) -> CategoryResult:
 
 def scan_lint(root: Path) -> CategoryResult:
     evidence = [m for m in LINT_CONFIG_MARKERS if (root / m).exists()]
-    pyproject = read_toml(root / "pyproject.toml")
+    pyproject = read_toml(root / PYPROJECT_TOML)
     if pyproject:
         tools = pyproject.get("tool", {})
         for name in ("ruff", "mypy", "black", "flake8"):
             if name in tools:
-                evidence.append(f"pyproject.toml#tool.{name}")
+                evidence.append(f"{PYPROJECT_TOML}#tool.{name}")
     if not evidence:
         return CategoryResult(
             Tier.ABSENT, reason="no ruff/mypy/flake8 config found",
@@ -56,12 +57,12 @@ def scan_lint(root: Path) -> CategoryResult:
 
 
 def scan_coverage(root: Path) -> CategoryResult:
-    pyproject = read_toml(root / "pyproject.toml")
+    pyproject = read_toml(root / PYPROJECT_TOML)
     evidence = []
     if (root / ".coveragerc").exists():
         evidence.append(".coveragerc")
     if pyproject and "coverage" in pyproject.get("tool", {}):
-        evidence.append("pyproject.toml#tool.coverage")
+        evidence.append(f"{PYPROJECT_TOML}#tool.coverage")
     if not evidence:
         return CategoryResult(
             Tier.ABSENT, reason="no .coveragerc or [tool.coverage] config found",
@@ -107,7 +108,7 @@ def lint_command(root: Path) -> list[str] | None:
     """Pick a --run lint command matching whichever tool's config was found.
     Preference order matches nothing in particular except common adoption.
     """
-    pyproject = read_toml(root / "pyproject.toml")
+    pyproject = read_toml(root / PYPROJECT_TOML)
     tools = pyproject.get("tool", {}) if pyproject else {}
     if "ruff" in tools or (root / "ruff.toml").exists() or (root / ".ruff.toml").exists():
         return ["ruff", "check", "."]

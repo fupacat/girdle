@@ -8,12 +8,16 @@ from girdle.detectors.base import Fingerprint
 from girdle.fsutil import rglob_excluding
 from girdle.schema import CategoryResult, Tier
 
+CARGO_TOML = "Cargo.toml"
+CARGO_LOCK = "Cargo.lock"
+TARPAULIN_TOML = "tarpaulin.toml"
+
 
 class RustDetector:
     def detect(self, root: Path) -> Fingerprint | None:
-        if not (root / "Cargo.toml").exists():
+        if not (root / CARGO_TOML).exists():
             return None
-        data = read_toml(root / "Cargo.toml") or {}
+        data = read_toml(root / CARGO_TOML) or {}
         is_lib = "lib" in data or (root / "src" / "lib.rs").exists()
         variants = ["lib"] if is_lib else ["bin"]
         return Fingerprint(
@@ -24,7 +28,7 @@ class RustDetector:
         cats = ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
         # A gitignored/absent Cargo.lock is correct practice for a library crate
         # (consumers resolve their own versions), so it's not a scoreable gap.
-        if "lib" in fp.variants and not (fp.root / "Cargo.lock").exists():
+        if "lib" in fp.variants and not (fp.root / CARGO_LOCK).exists():
             cats.remove("reproducibility")
         return cats
 
@@ -43,7 +47,7 @@ class RustDetector:
             "tests": ["cargo", "test"],
             "lint": ["cargo", "clippy", "--all-targets", "--", "-D", "warnings"],
         }
-        if (fp.root / "tarpaulin.toml").exists():
+        if (fp.root / TARPAULIN_TOML).exists():
             commands["coverage"] = ["cargo", "tarpaulin"]
         return commands
 
@@ -71,9 +75,9 @@ class RustDetector:
             evidence.append("clippy.toml")
         if (root / "rustfmt.toml").exists() or (root / ".rustfmt.toml").exists():
             evidence.append("rustfmt.toml")
-        cargo_data = read_toml(root / "Cargo.toml") or {}
+        cargo_data = read_toml(root / CARGO_TOML) or {}
         if "lints" in cargo_data:
-            evidence.append("Cargo.toml#[lints]")
+            evidence.append(f"{CARGO_TOML}#[lints]")
         if not evidence:
             return CategoryResult(
                 Tier.ABSENT, reason="no clippy/rustfmt config or [lints] found",
@@ -85,12 +89,12 @@ class RustDetector:
 
     def _scan_coverage(self, root: Path) -> CategoryResult:
         evidence = []
-        if (root / "tarpaulin.toml").exists():
-            evidence.append("tarpaulin.toml")
-        cargo_data = read_toml(root / "Cargo.toml") or {}
+        if (root / TARPAULIN_TOML).exists():
+            evidence.append(TARPAULIN_TOML)
+        cargo_data = read_toml(root / CARGO_TOML) or {}
         metadata = (cargo_data.get("package", {}) or {}).get("metadata", {}) or {}
         if "tarpaulin" in metadata:
-            evidence.append("Cargo.toml#package.metadata.tarpaulin")
+            evidence.append(f"{CARGO_TOML}#package.metadata.tarpaulin")
         wf_dir = root / ".github" / "workflows"
         if not evidence and wf_dir.exists():
             for wf in wf_dir.glob("*.y*ml"):
@@ -105,7 +109,7 @@ class RustDetector:
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
     def _scan_reproducibility(self, root: Path, fp: Fingerprint) -> CategoryResult:
-        lock = root / "Cargo.lock"
+        lock = root / CARGO_LOCK
         if not lock.exists():
             if "lib" in fp.variants:
                 return CategoryResult(
@@ -119,7 +123,7 @@ class RustDetector:
                 Tier.ABSENT, reason="no Cargo.lock found (required for a binary crate)",
                 recommendation="Run `cargo build` and commit the generated Cargo.lock.",
             )
-        return CategoryResult(Tier.CONFIGURED, evidence=["Cargo.lock"])
+        return CategoryResult(Tier.CONFIGURED, evidence=[CARGO_LOCK])
 
     def _scan_ci(self, root: Path) -> CategoryResult:
         wf_dir = root / ".github" / "workflows"

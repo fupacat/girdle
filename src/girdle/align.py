@@ -31,6 +31,10 @@ from pathlib import Path
 
 from girdle.detectors._util import read_json, read_text, read_toml
 
+EDITORCONFIG = ".editorconfig"
+GITATTRIBUTES = ".gitattributes"
+GITIGNORE = ".gitignore"
+
 LANGUAGE_GLOBS = {
     "python": "*.py",
     "javascript": "*.{js,jsx,mjs,cjs}",
@@ -196,7 +200,7 @@ def _render_section(glob: str, settings: dict) -> str:
 
 
 def plan_editorconfig(root: Path, languages: set[str]) -> AlignPlan:
-    path = root / ".editorconfig"
+    path = root / EDITORCONFIG
     existing_text = read_text(path) or ""
     existing_sections = _parse_editorconfig_sections(existing_text) if path.exists() else set()
     detections, skip_notes = detect_formatters(root, languages)
@@ -215,7 +219,7 @@ def plan_editorconfig(root: Path, languages: set[str]) -> AlignPlan:
         additions.append(f"(skipped) {note}")
 
     if not new_blocks:
-        return AlignPlan(".editorconfig", path.exists(), additions, None)
+        return AlignPlan(EDITORCONFIG, path.exists(), additions, None)
 
     if path.exists():
         base = existing_text.rstrip("\n")
@@ -224,11 +228,11 @@ def plan_editorconfig(root: Path, languages: set[str]) -> AlignPlan:
         new_content = "root = true\n\n" + "\n\n".join(new_blocks) + "\n"
         additions.insert(0, "create new file with root = true")
 
-    return AlignPlan(".editorconfig", path.exists(), additions, new_content)
+    return AlignPlan(EDITORCONFIG, path.exists(), additions, new_content)
 
 
 def plan_gitattributes(root: Path, languages: set[str]) -> AlignPlan:
-    path = root / ".gitattributes"
+    path = root / GITATTRIBUTES
     existing_text = read_text(path) or ""
     detections, _ = detect_formatters(root, languages)
 
@@ -240,7 +244,7 @@ def plan_gitattributes(root: Path, languages: set[str]) -> AlignPlan:
 
     if not eols:
         return AlignPlan(
-            ".gitattributes", path.exists(),
+            GITATTRIBUTES, path.exists(),
             ["no detected formatter expresses an EOL preference - nothing to propagate"],
         )
 
@@ -248,14 +252,14 @@ def plan_gitattributes(root: Path, languages: set[str]) -> AlignPlan:
     if len(distinct) > 1:
         detail = ", ".join(f"{g}={eol} ({src})" for g, (eol, src) in eols.items())
         return AlignPlan(
-            ".gitattributes", path.exists(),
+            GITATTRIBUTES, path.exists(),
             [f"conflict: detected formatters disagree on line endings ({detail}) - skipped"],
         )
 
     eol = next(iter(distinct))
     if "text=auto" in existing_text:
         return AlignPlan(
-            ".gitattributes", path.exists(),
+            GITATTRIBUTES, path.exists(),
             [f"'* text=auto' rule already present - left as-is (would have set eol={eol})"],
         )
 
@@ -266,11 +270,11 @@ def plan_gitattributes(root: Path, languages: set[str]) -> AlignPlan:
     else:
         new_content = f"{line}\n"
 
-    return AlignPlan(".gitattributes", path.exists(), [f"add `{line}`"], new_content)
+    return AlignPlan(GITATTRIBUTES, path.exists(), [f"add `{line}`"], new_content)
 
 
 def plan_gitignore(root: Path, languages: set[str]) -> AlignPlan:
-    path = root / ".gitignore"
+    path = root / GITIGNORE
     existing_text = read_text(path) or ""
 
     missing: list[str] = []
@@ -280,7 +284,7 @@ def plan_gitignore(root: Path, languages: set[str]) -> AlignPlan:
                 missing.append(pattern)
 
     if not missing:
-        return AlignPlan(".gitignore", path.exists(), ["already covers the detected stack"])
+        return AlignPlan(GITIGNORE, path.exists(), ["already covers the detected stack"])
 
     block = "\n".join(missing)
     if path.exists():
@@ -290,7 +294,7 @@ def plan_gitignore(root: Path, languages: set[str]) -> AlignPlan:
         new_content = f"{block}\n"
 
     additions = [f"add `{p}`" for p in missing]
-    return AlignPlan(".gitignore", path.exists(), additions, new_content)
+    return AlignPlan(GITIGNORE, path.exists(), additions, new_content)
 
 
 def build_align_plans(root: Path, languages: set[str]) -> list[AlignPlan]:

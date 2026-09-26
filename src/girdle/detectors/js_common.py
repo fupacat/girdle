@@ -27,6 +27,12 @@ COVERAGE_DEPS = (
     "nyc", "c8", "@vitest/coverage-v8", "@vitest/coverage-istanbul", "@vitest/coverage-c8",
 )
 
+INSTALL_SAVE_DEV = "install --save-dev"
+
+
+def _install_verb(pkg_manager: str) -> str:
+    return "add" if pkg_manager in ("yarn", "pnpm", "bun") else INSTALL_SAVE_DEV
+
 
 def detect_variants(root: Path) -> list[str]:
     return ["typescript"] if (root / "tsconfig.json").exists() else []
@@ -45,7 +51,7 @@ def scan_tests(pkg_data: dict, pkg_manager: str = "npm") -> CategoryResult:
         evidence.append(f"devDependency: {found_runner}")
 
     if not evidence:
-        install = "add" if pkg_manager in ("yarn", "pnpm", "bun") else "install --save-dev"
+        install = _install_verb(pkg_manager)
         return CategoryResult(
             Tier.ABSENT,
             reason="no test script or known test-runner dependency found",
@@ -64,7 +70,7 @@ def scan_lint(root: Path, fp: Fingerprint, pkg_manager: str = "npm") -> Category
         if tsconfig.get("compilerOptions", {}).get("strict"):
             evidence.append("tsconfig.json#compilerOptions.strict = true")
     if not evidence:
-        install = "add" if pkg_manager in ("yarn", "pnpm", "bun") else "install --save-dev"
+        install = _install_verb(pkg_manager)
         rec = f"Add an ESLint config (`{pkg_manager} {install} eslint` then create eslint config)"
         if "typescript" in fp.variants:
             rec += ", or enable `compilerOptions.strict` in tsconfig.json"
@@ -94,7 +100,7 @@ def scan_coverage(pkg_data: dict, pkg_manager: str = "npm") -> CategoryResult:
         evidence.append("package.json#jest.collectCoverage")
 
     if not evidence:
-        install = "add" if pkg_manager in ("yarn", "pnpm", "bun") else "install --save-dev"
+        install = _install_verb(pkg_manager)
         return CategoryResult(
             Tier.ABSENT, reason="no coverage tooling detected",
             recommendation=(

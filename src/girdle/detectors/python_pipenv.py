@@ -6,6 +6,8 @@ from girdle.detectors import python_common
 from girdle.detectors.base import Fingerprint
 from girdle.schema import CategoryResult, Tier
 
+PIPFILE_LOCK = "Pipfile.lock"
+
 
 class PythonPipenvDetector:
     def detect(self, root: Path) -> Fingerprint | None:
@@ -37,14 +39,14 @@ class PythonPipenvDetector:
         return commands
 
     def _scan_reproducibility(self, root: Path) -> CategoryResult:
-        if not (root / "Pipfile.lock").exists():
+        if not (root / PIPFILE_LOCK).exists():
             return CategoryResult(
-                Tier.ABSENT, reason="no Pipfile.lock found",
-                recommendation="Run `pipenv lock` and commit the generated Pipfile.lock.",
+                Tier.ABSENT, reason=f"no {PIPFILE_LOCK} found",
+                recommendation=f"Run `pipenv lock` and commit the generated {PIPFILE_LOCK}.",
             )
-        if python_common.is_lockfile_gitignored(root, "Pipfile.lock"):
+        if python_common.is_lockfile_gitignored(root, PIPFILE_LOCK):
             return CategoryResult(
-                Tier.ABSENT, reason="Pipfile.lock exists but is gitignored",
-                recommendation="Remove Pipfile.lock from .gitignore and commit it.",
+                Tier.ABSENT, reason=f"{PIPFILE_LOCK} exists but is gitignored",
+                recommendation=f"Remove {PIPFILE_LOCK} from .gitignore and commit it.",
             )
-        return CategoryResult(Tier.CONFIGURED, evidence=["Pipfile.lock"])
+        return CategoryResult(Tier.CONFIGURED, evidence=[PIPFILE_LOCK])

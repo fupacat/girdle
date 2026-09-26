@@ -7,12 +7,14 @@ from girdle.detectors._util import read_json
 from girdle.detectors.base import Fingerprint
 from girdle.schema import CategoryResult, Tier
 
+BUN_LOCK = "bun.lock"
+
 
 class JsBunDetector:
     def detect(self, root: Path) -> Fingerprint | None:
         if not (root / "package.json").exists():
             return None
-        if not ((root / "bun.lockb").exists() or (root / "bun.lock").exists()):
+        if not ((root / "bun.lockb").exists() or (root / BUN_LOCK).exists()):
             return None
         return Fingerprint(
             id="js-bun",
@@ -43,8 +45,8 @@ class JsBunDetector:
         # bun.lockb is binary: existence-only check, can't diff or content-scan it.
         if (root / "bun.lockb").exists():
             return CategoryResult(Tier.CONFIGURED, evidence=["bun.lockb (binary, presence-only)"])
-        if (root / "bun.lock").exists():
-            return CategoryResult(Tier.CONFIGURED, evidence=["bun.lock"])
+        if (root / BUN_LOCK).exists():
+            return CategoryResult(Tier.CONFIGURED, evidence=[BUN_LOCK])
         return CategoryResult(
             Tier.ABSENT, reason="no bun.lockb/bun.lock found",
             recommendation="Run `bun install` and commit the generated bun.lock(b).",

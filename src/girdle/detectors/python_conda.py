@@ -8,10 +8,12 @@ from girdle.detectors._util import read_text
 from girdle.detectors.base import Fingerprint
 from girdle.schema import CategoryResult, Tier
 
+ENVIRONMENT_YML = "environment.yml"
+
 
 class PythonCondaDetector:
     def detect(self, root: Path) -> Fingerprint | None:
-        if not (root / "environment.yml").exists() and not (root / "environment.yaml").exists():
+        if not (root / ENVIRONMENT_YML).exists() and not (root / "environment.yaml").exists():
             return None
         return Fingerprint(
             id="python-conda", language="python", toolchain="conda", root=root, variants=[]
@@ -33,7 +35,7 @@ class PythonCondaDetector:
     def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
         # Requires the named env to already exist and be activatable; skip
         # entirely if we can't resolve an env name from environment.yml.
-        env_file = fp.root / "environment.yml"
+        env_file = fp.root / ENVIRONMENT_YML
         if not env_file.exists():
             env_file = fp.root / "environment.yaml"
         match = re.search(r"^name:\s*(\S+)", read_text(env_file) or "", re.MULTILINE)
@@ -56,8 +58,8 @@ class PythonCondaDetector:
             return CategoryResult(Tier.CONFIGURED, evidence=["conda-lock.yml"])
         return CategoryResult(
             Tier.ABSENT,
-            evidence=["environment.yml"],
-            reason="environment.yml present but no conda-lock.yml (unpinned builds/channels)",
+            evidence=[ENVIRONMENT_YML],
+            reason=f"{ENVIRONMENT_YML} present but no conda-lock.yml (unpinned builds/channels)",
             recommendation=(
                 "Generate a conda-lock.yml: `pip install conda-lock && "
                 "conda-lock -f environment.yml`."
