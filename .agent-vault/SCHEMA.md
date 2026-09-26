@@ -55,3 +55,9 @@ reviewed_at: 2026-09-26   # optional, for notes without watches (environment/dep
 - **Regenerating the catalog**: `girdle notes index .` rewrites the
   mechanical block in `index.md` - the same inject/staleness pattern
   AGENTS.md's structural index already uses.
+- **Cross-referencing notes**: use Obsidian-style `[[Note Name]]` wikilinks
+  (this vault is meant to double as an Obsidian vault for human browsing -
+  open the `.agent-vault/` folder directly). `mdformat-wikilink` is wired
+  into the `mdformat` pre-commit hook (and listed in `pyproject.toml`'s
+  `dev` extra) specifically so this survives formatting - without it,
+  mdformat escapes `[[x]]` into `\[[x]\]` and silently breaks the link.
