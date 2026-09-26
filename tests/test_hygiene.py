@@ -33,6 +33,56 @@ def test_precommit_present(tmp_path: Path):
     assert result.checks["precommit"].tier == Tier.CONFIGURED
 
 
+def test_agent_sandbox_bootstrap_absent_without_precommit(tmp_path: Path):
+    result = build_hygiene(tmp_path, languages=set())
+    cat = result.checks["agent_sandbox_bootstrap"]
+    assert cat.tier == Tier.ABSENT
+    assert "no .pre-commit-config.yaml" in cat.reason
+
+
+def test_agent_sandbox_bootstrap_absent_with_precommit_but_no_wiring(tmp_path: Path):
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    result = build_hygiene(tmp_path, languages=set())
+    cat = result.checks["agent_sandbox_bootstrap"]
+    assert cat.tier == Tier.ABSENT
+    assert "not wired into any agent sandbox bootstrap" in cat.reason
+
+
+def test_agent_sandbox_bootstrap_configured_via_copilot_setup_steps(tmp_path: Path):
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "copilot-setup-steps.yml").write_text(
+        "jobs:\n  copilot-setup-steps:\n    runs-on: ubuntu-latest\n"
+    )
+    result = build_hygiene(tmp_path, languages=set())
+    cat = result.checks["agent_sandbox_bootstrap"]
+    assert cat.tier == Tier.CONFIGURED
+    assert ".github/workflows/copilot-setup-steps.yml" in cat.evidence
+
+
+def test_agent_sandbox_bootstrap_configured_via_claude_session_start(tmp_path: Path):
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "settings.json").write_text(
+        '{"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "true"}]}]}}\n'
+    )
+    result = build_hygiene(tmp_path, languages=set())
+    cat = result.checks["agent_sandbox_bootstrap"]
+    assert cat.tier == Tier.CONFIGURED
+    assert ".claude/settings.json" in cat.evidence
+
+
+def test_agent_sandbox_bootstrap_ignores_malformed_claude_settings(tmp_path: Path):
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "settings.json").write_text("not valid json{{{\n")
+    result = build_hygiene(tmp_path, languages=set())
+    assert result.checks["agent_sandbox_bootstrap"].tier == Tier.ABSENT
+
+
 def test_gitignore_missing_is_absent(tmp_path: Path):
     result = build_hygiene(tmp_path, languages={"python"})
     assert result.checks["gitignore"].tier == Tier.ABSENT
@@ -106,7 +156,7 @@ def test_to_dict_shape(tmp_path: Path):
     result = build_hygiene(tmp_path, languages=set())
     d = result.to_dict()
     assert set(d.keys()) == {
-        "editorconfig", "gitattributes", "precommit", "gitignore", "codeowners", "readme",
-        "contributing",
+        "editorconfig", "gitattributes", "precommit", "agent_sandbox_bootstrap", "gitignore",
+        "codeowners", "readme", "contributing",
     }
     assert "tier" in d["editorconfig"]

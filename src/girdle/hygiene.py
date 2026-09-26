@@ -12,6 +12,7 @@ runs as part of every default scan with no opt-in flag.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -102,6 +103,65 @@ def check_precommit(root: Path) -> CategoryResult:
     return CategoryResult(Tier.CONFIGURED, evidence=[".pre-commit-config.yaml"])
 
 
+COPILOT_SETUP_STEPS = ".github/workflows/copilot-setup-steps.yml"
+CLAUDE_SETTINGS = ".claude/settings.json"
+
+
+def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> CategoryResult:
+    """Whether an agent's isolated execution sandbox (GitHub Copilot coding
+    agent, Claude Code cloud/worktree sessions) gets wired into the same
+    local enforcement pre-commit gives a human contributor. Conditional on
+    pre-commit itself being configured - same shape as scan.py's coverage
+    gate check: nothing to bootstrap into an empty sandbox otherwise, so
+    checking this in isolation would be noise, not a finding.
+
+    OpenAI Codex's environment setup script is deliberately not checked -
+    it's configured through OpenAI's own web UI, not a repo-committed file,
+    so it's invisible to a local file scan and would be dishonest to score.
+    """
+    if precommit.tier != Tier.CONFIGURED:
+        return CategoryResult(
+            Tier.ABSENT,
+            reason=(
+                "no .pre-commit-config.yaml to bootstrap into an agent's sandbox "
+                "in the first place"
+            ),
+        )
+
+    evidence = []
+    copilot_setup = root / ".github" / "workflows" / "copilot-setup-steps.yml"
+    if copilot_setup.exists():
+        text = _read_text(copilot_setup) or ""
+        if "copilot-setup-steps" in text:
+            evidence.append(COPILOT_SETUP_STEPS)
+
+    claude_settings = root / ".claude" / "settings.json"
+    if claude_settings.exists():
+        try:
+            data = json.loads(_read_text(claude_settings) or "{}")
+        except ValueError:
+            data = {}
+        if isinstance(data, dict) and data.get("hooks", {}).get("SessionStart"):
+            evidence.append(CLAUDE_SETTINGS)
+
+    if not evidence:
+        return CategoryResult(
+            Tier.ABSENT,
+            reason=(
+                "pre-commit is configured but not wired into any agent sandbox bootstrap - "
+                "no copilot-setup-steps job or Claude Code SessionStart hook found"
+            ),
+            recommendation=(
+                "Add .github/workflows/copilot-setup-steps.yml (job named "
+                "`copilot-setup-steps`) running your dependency install then "
+                "`pre-commit install`, or an equivalent `SessionStart` hook in "
+                ".claude/settings.json, so an agent's isolated sandbox gets the same "
+                "local enforcement a human contributor's `pre-commit install` gives them."
+            ),
+        )
+    return CategoryResult(Tier.CONFIGURED, evidence=evidence)
+
+
 def check_gitignore(root: Path, languages: set[str]) -> CategoryResult:
     path = root / GITIGNORE
     if not path.exists():
@@ -173,11 +233,13 @@ def check_contributing(root: Path) -> CategoryResult:
 
 
 def build_hygiene(root: Path, languages: set[str]) -> HygieneResult:
+    precommit = check_precommit(root)
     return HygieneResult(
         checks={
             "editorconfig": check_editorconfig(root),
             "gitattributes": check_gitattributes(root),
-            "precommit": check_precommit(root),
+            "precommit": precommit,
+            "agent_sandbox_bootstrap": check_agent_sandbox_bootstrap(root, precommit),
             "gitignore": check_gitignore(root, languages),
             "codeowners": check_codeowners(root),
             "readme": check_readme(root),
