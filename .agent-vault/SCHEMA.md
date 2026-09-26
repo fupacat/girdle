@@ -9,17 +9,17 @@ belongs in the OKF vault instead).
 
 ## Folders / note types
 
-| Folder | Type | Watches code? | Freshness model |
-|---|---|---|---|
-| `decisions/` | `decision` | No | Immutable once written, like an ADR. Superseded by a new note, never edited to reverse itself. |
-| `context/` | `context` | Optional | Living "how/why this is shaped this way" documentation. The main candidate for `watches`. |
-| `research/` | `research` | No | Point-in-time findings, spikes, benchmarks. Dated, never kept "in sync." |
-| `brainstorm/` | `brainstorm` | No | A snapshot of a discussion, not living documentation. |
-| `data-models/` | `data-model` | Optional | Schema/data-model documentation - drift-prone against migrations/schema files. |
-| `diagrams/` | `diagram` | Optional | Mermaid-in-markdown, not binary images - stays git-diffable. |
-| `ci/` | `ci` | Optional | Can watch `.github/workflows/*.yml` directly. |
-| `environment/` | `environment` | Rarely | Generic facts only - hosting provider, services used, architecture-level shape. **No account IDs, hostnames, credentials, or anything secret-adjacent** - that stays out of this (public) repo entirely, in the private OKF vault instead. |
-| `deployment/` | `deployment` | Sometimes | Same no-secrets rule as `environment/`. Watchable only if it references specific in-repo IaC/config files. |
+| Folder         | Type          | Watches code? | Freshness model                                                                                                                                                                                                                            |
+| -------------- | ------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `decisions/`   | `decision`    | No            | Immutable once written, like an ADR. Superseded by a new note, never edited to reverse itself.                                                                                                                                             |
+| `context/`     | `context`     | Optional      | Living "how/why this is shaped this way" documentation. The main candidate for `watches`.                                                                                                                                                  |
+| `research/`    | `research`    | No            | Point-in-time findings, spikes, benchmarks. Dated, never kept "in sync."                                                                                                                                                                   |
+| `brainstorm/`  | `brainstorm`  | No            | A snapshot of a discussion, not living documentation.                                                                                                                                                                                      |
+| `data-models/` | `data-model`  | Optional      | Schema/data-model documentation - drift-prone against migrations/schema files.                                                                                                                                                             |
+| `diagrams/`    | `diagram`     | Optional      | Mermaid-in-markdown, not binary images - stays git-diffable.                                                                                                                                                                               |
+| `ci/`          | `ci`          | Optional      | Can watch `.github/workflows/*.yml` directly.                                                                                                                                                                                              |
+| `environment/` | `environment` | Rarely        | Generic facts only - hosting provider, services used, architecture-level shape. **No account IDs, hostnames, credentials, or anything secret-adjacent** - that stays out of this (public) repo entirely, in the private OKF vault instead. |
+| `deployment/`  | `deployment`  | Sometimes     | Same no-secrets rule as `environment/`. Watchable only if it references specific in-repo IaC/config files.                                                                                                                                 |
 
 ## Frontmatter
 

@@ -1,9 +1,9 @@
 ---
 type: decision
 watches:
-- path: src/girdle/scan.py
-  symbol: _check_coverage_gate
-  hash: da4168078e876430317f7261515f8b7b5e96c60316945bb5124a1a1bd5951d61
+  - path: src/girdle/scan.py
+    symbol: _check_coverage_gate
+    hash: da4168078e876430317f7261515f8b7b5e96c60316945bb5124a1a1bd5951d61
 stale: false
 ---
 

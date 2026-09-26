@@ -20,6 +20,7 @@ notes with a `watches` entry are enforced fresh by a pre-commit hook, so
 edit the note in the same commit as the code it watches.
 
 <!-- girdle:index:start -->
+
 ```
 src/girdle/__init__.py | python | 2L | 
 src/girdle/align.py | python | 326L | AlignPlan, _python_formatter, _js_formatter, _js_formatter_skip_note, _prettier_settings, _rust_formatter, _detect_python, _detect_js, _detect_rust, detect_formatters, _parse_editorconfig_sections, _render_section, plan_editorconfig, plan_gitattributes, plan_gitignore, build_align_plans, apply_plan
@@ -48,13 +49,13 @@ src/girdle/detectors/registry.py | python | 34L |
 src/girdle/detectors/rust.py | python | 147L | RustDetector
 src/girdle/fsutil.py | python | 35L | walk_excluding, rglob_excluding
 src/girdle/hygiene.py | python | 174L | _read_text, HygieneResult, _first_existing, check_editorconfig, check_gitattributes, check_gitignore, check_codeowners, check_readme, check_contributing, build_hygiene
-src/girdle/indexer.py | python | 391L | _parser, _text, _name_of, _defs_python, _defs_lexical_declaration, _unwrap_export, _defs_js_ts, _defs_go_type_declaration, _defs_go, _defs_rust, _defs_java, _defs_csharp_from, IndexEntry, RepoIndex, _iter_source_files, _extract_symbol_pairs, _extract_symbols, find_symbol_source, build_index, _estimate_tokens, _render_entry, render_manifest, render_block, inject_into, is_stale
+src/girdle/indexer.py | python | 396L | _parser, _text, _name_of, _defs_python, _defs_lexical_declaration, _unwrap_export, _defs_js_ts, _defs_go_type_declaration, _defs_go, _defs_rust, _defs_java, _defs_csharp_from, IndexEntry, RepoIndex, _iter_source_files, _extract_symbol_pairs, _extract_symbols, find_symbol_source, build_index, _estimate_tokens, _render_entry, render_manifest, render_block, inject_into, is_stale
 src/girdle/platform.py | python | 168L | PlatformResult, compute_recommendations, _run, extract_protection_facts, check_platform
 src/girdle/runner.py | python | 58L | RunOutcome, run_check
 src/girdle/scan.py | python | 140L | _run_detector, run_scan, _check_coverage_gate, _mark_static_hint, _run_and_record, _verify
 src/girdle/schema.py | python | 120L | EcosystemResult, ScanResult
 src/girdle/tiers.py | python | 46L | Tier, CategoryResult
-src/girdle/vault.py | python | 242L | WatchEntry, Note, _parse_frontmatter, _render_frontmatter, load_note, load_all_notes, current_hash, _note_rel, _write_note, _git_add, _staged_files, reconcile, CheckResult, check, ack, render_vault_index, inject_vault_index
+src/girdle/vault.py | python | 257L | WatchEntry, Note, _IndentedDumper, _parse_frontmatter, _render_frontmatter, load_note, load_all_notes, current_hash, _note_rel, _write_note, _git_add, _staged_files, reconcile, CheckResult, check, ack, render_vault_index, inject_vault_index
 tests/test_align.py | python | 164L | test_editorconfig_derives_from_black, test_editorconfig_derives_from_ruff_format, test_editorconfig_no_formatter_no_plan, test_editorconfig_appends_without_touching_existing_content, test_editorconfig_skips_glob_already_present, test_editorconfig_js_prettier_json, test_editorconfig_js_unparseable_config_is_skipped, test_editorconfig_rust_from_rustfmt_toml, test_gitattributes_no_eol_signal_no_plan, test_gitattributes_propagates_prettier_eol, test_gitattributes_conflict_when_formatters_disagree, test_gitattributes_existing_text_auto_left_alone, test_gitattributes_appends_to_existing_file, test_gitignore_adds_missing_patterns, test_gitignore_already_covered_no_plan, test_gitignore_multi_language_union, test_apply_plan_writes_file, test_apply_plan_noop_when_no_content, test_build_align_plans_returns_three_plans
 tests/test_coverage.py | python | 171L | test_python_coverage_absent_by_default, test_python_coverage_configured_via_coveragerc, test_python_coverage_configured_via_pyproject, test_python_coverage_run_command_declared, test_js_npm_coverage_via_dependency, test_js_npm_coverage_absent, test_js_npm_coverage_run_command_only_if_script_declared, test_go_coverage_absent_without_ci_evidence, test_go_coverage_configured_via_ci, test_go_coverage_run_command_always_declared, test_rust_coverage_absent, test_rust_coverage_configured_via_tarpaulin_toml, test_java_maven_coverage_via_jacoco, test_java_gradle_coverage_via_jacoco, test_dotnet_coverage_via_coverlet, test_dotnet_coverage_absent
 tests/test_coverage_gate.py | python | 151L | _wf, test_no_ci_no_gate, test_codecov_upload_without_config_file_not_confirmed, test_codecov_patch_gate_detected, test_codecov_config_without_patch_section, test_coveralls_detected, test_diff_cover_with_fail_under, test_diff_cover_without_fail_under_flagged_as_not_enforcing, test_sonar_without_config_file_not_detected, test_sonar_with_report_path_configured, test_sonar_without_report_path_flags_coverage_not_analyzed, test_sonarqube_scan_action_also_detected, _fp, test_gate_check_skipped_when_coverage_absent, test_gate_check_skipped_when_ci_absent, test_gate_check_adds_evidence_when_both_present_and_gate_found, test_gate_check_recommends_when_both_present_but_no_gate, test_gate_check_does_not_override_existing_recommendation
@@ -78,4 +79,5 @@ tests/test_scoring.py | python | 33L | _eco, test_category_min_is_gated_by_weake
 tests/test_vault.py | python | 188L | _git, _init_repo, _write_example, _write_note, test_load_note_parses_frontmatter, test_current_hash_symbol_level, test_current_hash_missing_symbol_is_none, test_current_hash_file_level_no_symbol, test_load_all_notes_skips_reserved_names, test_ack_records_current_hash_and_stages, test_check_blocks_when_note_not_updated, test_check_auto_reconciles_when_note_staged_too, test_check_skips_notes_without_watches, test_render_vault_index
 tests/test_vendor_exclusion.py | python | 50L | test_python_ignores_test_files_inside_venv, test_python_still_finds_real_top_level_tests, test_go_ignores_test_files_inside_vendor, test_rust_ignores_rs_files_inside_target
 ```
+
 <!-- girdle:index:end -->

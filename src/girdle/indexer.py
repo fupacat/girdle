@@ -348,13 +348,18 @@ def render_manifest(index: RepoIndex) -> str:
 
 MARKER_START = "<!-- girdle:index:start -->"
 MARKER_END = "<!-- girdle:index:end -->"
+# The blank line after MARKER_START (and its \n?, optional for backward
+# compatibility with content generated before this format) matches what a
+# markdown formatter naturally inserts before a fenced code block - so
+# running one (e.g. mdformat) on a file containing this block is a no-op,
+# not something that fights the injected content on every commit.
 _BLOCK_PATTERN = re.compile(
-    re.escape(MARKER_START) + r"\n```\n(.*?)\n```\n" + re.escape(MARKER_END), re.DOTALL
+    re.escape(MARKER_START) + r"\n?\n```\n(.*?)\n```\n\n?" + re.escape(MARKER_END), re.DOTALL
 )
 
 
 def render_block(manifest_text: str) -> str:
-    return f"{MARKER_START}\n```\n{manifest_text}\n```\n{MARKER_END}"
+    return f"{MARKER_START}\n\n```\n{manifest_text}\n```\n\n{MARKER_END}"
 
 
 def inject_into(file_path: Path, manifest_text: str) -> str:

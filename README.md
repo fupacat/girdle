@@ -92,8 +92,7 @@ scanning someone else's repo without asking them to authorize anything.
 
 ### Enforcement hooks
 
-`.pre-commit-config.yaml` wires ruff, pytest, and `girdle index --check
-AGENTS.md` as zero-exception pre-commit gates, per the design note's
+`.pre-commit-config.yaml` wires ruff, pytest, and `girdle index --check AGENTS.md` as zero-exception pre-commit gates, per the design note's
 enforcement-hooks stance (hooks are deterministic; AGENTS.md/CLAUDE.md are
 advisory). Activate once per clone:
 

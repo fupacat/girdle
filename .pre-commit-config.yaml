@@ -9,6 +9,20 @@ repos:
       - id: ruff
         args: [--exit-non-zero-on-fix]
 
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+        args: [--wrap, keep]
+        additional_dependencies:
+          - mdformat-frontmatter==2.1.2
+          - mdformat-gfm==1.0.0
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+
   - repo: local
     hooks:
       - id: pytest

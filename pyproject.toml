@@ -46,4 +46,8 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.6",
     "pre-commit>=3.8",
+    "mdformat>=0.7",
+    "mdformat-frontmatter>=2.0",
+    "mdformat-gfm>=0.3",
+    "yamllint>=1.35",
 ]

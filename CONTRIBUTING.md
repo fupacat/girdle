@@ -14,14 +14,18 @@ pre-commit install
 
 ```bash
 ruff check .
+mdformat --check --wrap keep $(git ls-files '*.md')
+yamllint .
 pytest
 girdle index . --check AGENTS.md
 girdle notes check .
 ```
 
-All four also run automatically on commit via `.pre-commit-config.yaml`
-(see the README's "Enforcement hooks" section); the first three also run
-again in CI on push/PR (the notes check is commit-local only - see below).
+All six also run automatically on commit via `.pre-commit-config.yaml`
+(see the README's "Enforcement hooks" section); everything except the
+notes check also runs again in CI on push/PR (that one's commit-local
+only - see "The vault" below). `mdformat` (no `--check`) rewrites files
+in place; the pre-commit hook does this for you, same as `ruff --fix`.
 
 ## Branch protection
 
@@ -37,8 +41,7 @@ PR instead.
 
 New ecosystem support = a new file in `src/girdle/detectors/` implementing
 the `Detector` protocol (`detectors/base.py`), registered in
-`detectors/registry.py`. See `AGENTS.md` and the `Agent-Ready Repository
-Design` vault note for the design rationale and the full detection matrix
+`detectors/registry.py`. See `AGENTS.md` and the `Agent-Ready Repository Design` vault note for the design rationale and the full detection matrix
 before adding scoring behavior.
 
 ## Regenerating pinned dependencies

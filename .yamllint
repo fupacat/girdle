@@ -1,0 +1,19 @@
+# Relaxed from yamllint's `default` ruleset to match this repo's actual
+# conventions rather than fight them: no `---` document-start requirement
+# for single-doc config files, `on:`/`off:` as bare GitHub Actions keys
+# (not boolean truthy values), and the same 100-char line length ruff
+# already uses for Python.
+extends: default
+
+ignore: |
+  .venv/
+  .git/
+
+rules:
+  document-start: disable
+  truthy:
+    check-keys: false
+  line-length:
+    max: 100
+  comments:
+    min-spaces-from-content: 1

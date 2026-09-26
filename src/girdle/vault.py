@@ -62,6 +62,18 @@ class Note:
     body: str = ""
 
 
+class _IndentedDumper(yaml.SafeDumper):
+    """PyYAML's default dumper writes `key:\\n- item`, not `key:\\n  - item`
+    - mdformat-frontmatter (and most other YAML tooling) indents block
+    sequences under their parent key. Matching that here means girdle's own
+    writes (ack/check reconcile) don't fight a markdown/YAML formatter's
+    output on every subsequent run.
+    """
+
+    def increase_indent(self, flow=False, indentless=False):
+        return super().increase_indent(flow, False)
+
+
 def _parse_frontmatter(text: str) -> tuple[dict, str]:
     match = _FRONTMATTER_PATTERN.match(text)
     if not match:
@@ -71,7 +83,7 @@ def _parse_frontmatter(text: str) -> tuple[dict, str]:
 
 
 def _render_frontmatter(data: dict, body: str) -> str:
-    yaml_text = yaml.safe_dump(data, sort_keys=False).rstrip("\n")
+    yaml_text = yaml.dump(data, Dumper=_IndentedDumper, sort_keys=False).rstrip("\n")
     return f"---\n{yaml_text}\n---\n{body}"
 
 
@@ -209,8 +221,11 @@ def ack(root: Path, note_path: Path) -> str:
 
 VAULT_INDEX_MARKER_START = "<!-- girdle:vault-index:start -->"
 VAULT_INDEX_MARKER_END = "<!-- girdle:vault-index:end -->"
+# The optional blank line after the start marker matches what a markdown
+# formatter (mdformat) naturally inserts before a fenced code block - see
+# the identical note on indexer.py's own _BLOCK_PATTERN.
 _VAULT_INDEX_BLOCK_PATTERN = re.compile(
-    re.escape(VAULT_INDEX_MARKER_START) + r"\n```\n(.*?)\n```\n"
+    re.escape(VAULT_INDEX_MARKER_START) + r"\n?\n```\n(.*?)\n```\n\n?"
     + re.escape(VAULT_INDEX_MARKER_END),
     re.DOTALL,
 )
@@ -228,7 +243,7 @@ def render_vault_index(root: Path, notes: list[Note]) -> str:
 
 
 def inject_vault_index(file_path: Path, index_text: str) -> str:
-    block = f"{VAULT_INDEX_MARKER_START}\n```\n{index_text}\n```\n{VAULT_INDEX_MARKER_END}"
+    block = f"{VAULT_INDEX_MARKER_START}\n\n```\n{index_text}\n```\n\n{VAULT_INDEX_MARKER_END}"
     content = file_path.read_text(encoding="utf-8") if file_path.exists() else ""
     if VAULT_INDEX_MARKER_START in content and VAULT_INDEX_MARKER_END in content:
         return _VAULT_INDEX_BLOCK_PATTERN.sub(lambda _m: block, content)
