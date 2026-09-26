@@ -1,0 +1,33 @@
+name: "Copilot Setup Steps"
+
+# Bootstraps the Copilot coding agent's sandbox before it starts working on
+# an assigned issue. Without this, the agent runs plain `git commit` with
+# no local hooks active at all - `pre-commit install` here gives it the
+# same enforcement (ruff, pytest, the structural-index freshness check,
+# vault notes staleness) any human contributor gets, so a stale index or
+# a lint violation is caught and can be self-corrected before the PR is
+# ever opened, instead of surfacing downstream in CI for the first time.
+#
+# The job name is load-bearing: GitHub only picks this workflow up for
+# Copilot's sandbox if the job is named exactly `copilot-setup-steps`.
+# `on:` is for manual verification only (`gh workflow run` / editing this
+# file) - it doesn't gate whether Copilot itself invokes it.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: pre-commit install
