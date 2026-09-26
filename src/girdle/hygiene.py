@@ -12,6 +12,8 @@ runs as part of every default scan with no opt-in flag.
 
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -102,6 +104,85 @@ def check_precommit(root: Path) -> CategoryResult:
     return CategoryResult(Tier.CONFIGURED, evidence=[".pre-commit-config.yaml"])
 
 
+COPILOT_SETUP_STEPS = ".github/workflows/copilot-setup-steps.yml"
+CLAUDE_SETTINGS = ".claude/settings.json"
+
+
+def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> CategoryResult:
+    """Whether an agent's isolated execution sandbox (GitHub Copilot coding
+    agent, Claude Code cloud/worktree sessions) gets wired into the same
+    local enforcement pre-commit gives a human contributor. Conditional on
+    pre-commit itself being configured - same shape as scan.py's coverage
+    gate check: nothing to bootstrap into an empty sandbox otherwise, so
+    checking this in isolation would be noise, not a finding.
+
+    OpenAI Codex's environment setup script is deliberately not checked -
+    it's configured through OpenAI's own web UI, not a repo-committed file,
+    so it's invisible to a local file scan and would be dishonest to score.
+    """
+    if precommit.tier != Tier.CONFIGURED:
+        return CategoryResult(
+            Tier.ABSENT,
+            reason=(
+                "no .pre-commit-config.yaml to bootstrap into an agent's sandbox "
+                "in the first place"
+            ),
+        )
+
+    evidence = []
+    copilot_setup = root / ".github" / "workflows" / "copilot-setup-steps.yml"
+    if copilot_setup.exists():
+        text = _read_text(copilot_setup) or ""
+        # A job KEY, not just the substring anywhere - a comment or doc
+        # mentioning "copilot-setup-steps" must not count as configured.
+        if re.search(r"(?m)^\s*copilot-setup-steps:", text):
+            evidence.append(COPILOT_SETUP_STEPS)
+
+    claude_settings = root / ".claude" / "settings.json"
+    if claude_settings.exists():
+        try:
+            data = json.loads(_read_text(claude_settings) or "{}")
+        except ValueError:
+            data = {}
+        # `hooks` in valid, parseable JSON can still be the wrong shape
+        # (null, a list, a string) - guard the type before .get()'ing into
+        # it, the same malformed-input tolerance the JSON-parse guard above
+        # already aims for, just one level deeper.
+        hooks = data.get("hooks") if isinstance(data, dict) else None
+        # SessionStart is the safe, additive match: it runs alongside
+        # Claude Code's default worktree creation, same as copilot-setup-
+        # steps.yml runs alongside a job. WorktreeCreate is NOT equivalent -
+        # per Claude Code's docs it *replaces* the default `git worktree`
+        # step entirely (the hook itself must create the worktree and print
+        # its path as stdout's last line), so it's still counted as
+        # evidence a custom creator could fold pre-commit setup into, but
+        # it must never be the thing we recommend adding.
+        if isinstance(hooks, dict) and (hooks.get("SessionStart") or hooks.get("WorktreeCreate")):
+            evidence.append(CLAUDE_SETTINGS)
+
+    if not evidence:
+        return CategoryResult(
+            Tier.ABSENT,
+            reason=(
+                "pre-commit is configured but not wired into any agent sandbox bootstrap - "
+                "no copilot-setup-steps job or Claude Code SessionStart/WorktreeCreate hook "
+                "found"
+            ),
+            recommendation=(
+                "Add .github/workflows/copilot-setup-steps.yml (job named "
+                "`copilot-setup-steps`) running your dependency install then "
+                "`pre-commit install`, or a `SessionStart` hook in .claude/settings.json "
+                "doing the same (a custom `WorktreeCreate` hook can also run it, but only "
+                "if it also creates the worktree itself and prints its path - that hook "
+                "replaces Claude Code's default worktree creation rather than running "
+                "alongside it, so don't add one just for this), so an agent's isolated "
+                "sandbox gets the same local enforcement a human contributor's "
+                "`pre-commit install` gives them."
+            ),
+        )
+    return CategoryResult(Tier.CONFIGURED, evidence=evidence)
+
+
 def check_gitignore(root: Path, languages: set[str]) -> CategoryResult:
     path = root / GITIGNORE
     if not path.exists():
@@ -173,11 +254,13 @@ def check_contributing(root: Path) -> CategoryResult:
 
 
 def build_hygiene(root: Path, languages: set[str]) -> HygieneResult:
+    precommit = check_precommit(root)
     return HygieneResult(
         checks={
             "editorconfig": check_editorconfig(root),
             "gitattributes": check_gitattributes(root),
-            "precommit": check_precommit(root),
+            "precommit": precommit,
+            "agent_sandbox_bootstrap": check_agent_sandbox_bootstrap(root, precommit),
             "gitignore": check_gitignore(root, languages),
             "codeowners": check_codeowners(root),
             "readme": check_readme(root),

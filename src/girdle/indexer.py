@@ -303,7 +303,11 @@ def build_index(repo_root: Path, budget_tokens: int = DEFAULT_BUDGET_TOKENS) -> 
             IndexEntry(
                 path=str(file_path.relative_to(repo_root)).replace("\\", "/"),
                 language=display_language,
-                lines=source.count(b"\n") + 1,
+                # `count(b"\n") + 1` overcounts by one for the (standard)
+                # case of a file ending in a trailing newline - splitlines()
+                # gives the intuitive count either way, matching what an
+                # editor shows and what `wc -l` reports for the common case.
+                lines=len(source.splitlines()),
                 symbols=symbols,
             )
         )
