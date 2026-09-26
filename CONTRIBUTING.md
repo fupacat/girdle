@@ -21,6 +21,14 @@ girdle index . --check AGENTS.md
 All three also run automatically on commit via `.pre-commit-config.yaml`
 (see the README's "Enforcement hooks" section) and again in CI on push/PR.
 
+## Branch protection
+
+`master` is protected, including for admins: changes land via a PR with at
+least 1 approving review and a passing `test` status check (which itself
+fails if `ruff`, `pytest`, the index-freshness check, or the SonarCloud
+Quality Gate fails). Direct `git push` to `master` will be rejected, even
+from the repo owner — open a branch and PR instead.
+
 ## Adding a new ecosystem detector
 
 New ecosystem support = a new file in `src/girdle/detectors/` implementing
