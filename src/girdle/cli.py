@@ -10,6 +10,18 @@ from girdle.align import apply_plan, build_align_plans
 from girdle.dashboard import render_dashboard
 from girdle.indexer import build_index, inject_into, is_stale, render_manifest
 from girdle.scan import run_scan
+from girdle.vault import (
+    VAULT_DIR,
+    inject_vault_index,
+    load_all_notes,
+    render_vault_index,
+)
+from girdle.vault import (
+    ack as vault_ack,
+)
+from girdle.vault import (
+    check as vault_check,
+)
 
 TIER_LABEL = {0: "absent", 1: "configured", 2: "verified"}
 
@@ -227,6 +239,49 @@ def _print_platform(platform: dict) -> None:
         click.echo(f"  required status checks  {named}")
     for rec in platform["recommendations"]:
         click.echo(f"  fix: {rec}")
+
+
+@main.group()
+def notes() -> None:
+    """Vault note staleness checks (`.agent-vault/`)."""
+
+
+@notes.command("check")
+@click.argument("path", default=".", type=click.Path(exists=True, file_okay=False))
+def notes_check(path: str) -> None:
+    """Pre-commit entry point: block if a watched file/symbol changed but
+    the note that watches it wasn't part of the same commit."""
+    result = vault_check(Path(path))
+    for rel in result.reconciled:
+        click.echo(f"reconciled: {rel}")
+    if result.blocking:
+        for msg in result.blocking:
+            click.echo(f"stale: {msg}")
+        sys.exit(1)
+
+
+@notes.command("ack")
+@click.argument("note", type=click.Path(exists=True, dir_okay=False))
+@click.option(
+    "--path", "root", default=".", type=click.Path(exists=True, file_okay=False),
+    help="Repo root (defaults to the current directory).",
+)
+def notes_ack(note: str, root: str) -> None:
+    """Confirm a note is still accurate without editing it - records the
+    current watched hash(es) and stages the note."""
+    rel = vault_ack(Path(root), Path(note))
+    click.echo(f"acknowledged: {rel}")
+
+
+@notes.command("index")
+@click.argument("path", default=".", type=click.Path(exists=True, file_okay=False))
+def notes_index(path: str) -> None:
+    """Regenerate `.agent-vault/index.md`'s mechanical catalog block."""
+    root = Path(path)
+    index_path = root / VAULT_DIR / "index.md"
+    text = render_vault_index(root, load_all_notes(root))
+    index_path.write_text(inject_vault_index(index_path, text), encoding="utf-8")
+    click.echo(f"updated {index_path.relative_to(root)}")
 
 
 if __name__ == "__main__":

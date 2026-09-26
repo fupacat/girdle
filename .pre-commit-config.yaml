@@ -24,3 +24,10 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+
+      - id: girdle-notes-check
+        name: vault notes staleness (.agent-vault)
+        entry: girdle notes check .
+        language: system
+        pass_filenames: false
+        always_run: true

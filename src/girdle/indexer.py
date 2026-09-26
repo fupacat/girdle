@@ -63,8 +63,8 @@ def _name_of(node: Node, source: bytes) -> str | None:
     return _text(name_node, source) if name_node else None
 
 
-def _defs_python(root: Node, source: bytes) -> list[str]:
-    names = []
+def _defs_python(root: Node, source: bytes) -> list[tuple[str, Node]]:
+    pairs = []
     for child in root.children:
         node = child
         if node.type == "decorated_definition":
@@ -74,8 +74,8 @@ def _defs_python(root: Node, source: bytes) -> list[str]:
         if node.type in ("function_definition", "class_definition"):
             name = _name_of(node, source)
             if name:
-                names.append(name)
-    return names
+                pairs.append((name, node))
+    return pairs
 
 
 _JS_DEF_TYPES = (
@@ -90,8 +90,8 @@ _JS_DEF_TYPES = (
 _JS_FUNCTION_VALUE_TYPES = ("arrow_function", "function", "function_expression")
 
 
-def _defs_lexical_declaration(node: Node, source: bytes) -> list[str]:
-    names = []
+def _defs_lexical_declaration(node: Node, source: bytes) -> list[tuple[str, Node]]:
+    pairs = []
     for declarator in node.children:
         if declarator.type != "variable_declarator":
             continue
@@ -99,8 +99,8 @@ def _defs_lexical_declaration(node: Node, source: bytes) -> list[str]:
         if value is not None and value.type in _JS_FUNCTION_VALUE_TYPES:
             name = _name_of(declarator, source)
             if name:
-                names.append(name)
-    return names
+                pairs.append((name, declarator))
+    return pairs
 
 
 def _unwrap_export(node: Node) -> Node | None:
@@ -109,8 +109,8 @@ def _unwrap_export(node: Node) -> Node | None:
     return node.child_by_field_name("declaration")
 
 
-def _defs_js_ts(root: Node, source: bytes) -> list[str]:
-    names = []
+def _defs_js_ts(root: Node, source: bytes) -> list[tuple[str, Node]]:
+    pairs = []
     for child in root.children:
         node = _unwrap_export(child)
         if node is None:
@@ -118,46 +118,46 @@ def _defs_js_ts(root: Node, source: bytes) -> list[str]:
         if node.type in _JS_DEF_TYPES:
             name = _name_of(node, source)
             if name:
-                names.append(name)
+                pairs.append((name, node))
         elif node.type == "lexical_declaration":
-            names.extend(_defs_lexical_declaration(node, source))
-    return names
+            pairs.extend(_defs_lexical_declaration(node, source))
+    return pairs
 
 
-def _defs_go_type_declaration(node: Node, source: bytes) -> list[str]:
-    names = []
+def _defs_go_type_declaration(node: Node, source: bytes) -> list[tuple[str, Node]]:
+    pairs = []
     for spec in node.children:
         if spec.type == "type_spec":
             name = _name_of(spec, source)
             if name:
-                names.append(name)
-    return names
+                pairs.append((name, spec))
+    return pairs
 
 
-def _defs_go(root: Node, source: bytes) -> list[str]:
-    names = []
+def _defs_go(root: Node, source: bytes) -> list[tuple[str, Node]]:
+    pairs = []
     for child in root.children:
         if child.type in ("function_declaration", "method_declaration"):
             name_node = child.child_by_field_name("name")
             if name_node is not None:
-                names.append(_text(name_node, source))
+                pairs.append((_text(name_node, source), child))
         elif child.type == "type_declaration":
-            names.extend(_defs_go_type_declaration(child, source))
-    return names
+            pairs.extend(_defs_go_type_declaration(child, source))
+    return pairs
 
 
-def _defs_rust(root: Node, source: bytes) -> list[str]:
-    names = []
+def _defs_rust(root: Node, source: bytes) -> list[tuple[str, Node]]:
+    pairs = []
     for child in root.children:
         if child.type in ("function_item", "struct_item", "enum_item", "trait_item"):
             name = _name_of(child, source)
             if name:
-                names.append(name)
+                pairs.append((name, child))
         elif child.type == "impl_item":
             type_node = child.child_by_field_name("type")
             if type_node is not None:
-                names.append(_text(type_node, source))
-    return names
+                pairs.append((_text(type_node, source), child))
+    return pairs
 
 
 _JAVA_DEF_TYPES = (
@@ -165,14 +165,14 @@ _JAVA_DEF_TYPES = (
 )
 
 
-def _defs_java(root: Node, source: bytes) -> list[str]:
-    names = []
+def _defs_java(root: Node, source: bytes) -> list[tuple[str, Node]]:
+    pairs = []
     for child in root.children:
         if child.type in _JAVA_DEF_TYPES:
             name = _name_of(child, source)
             if name:
-                names.append(name)
-    return names
+                pairs.append((name, child))
+    return pairs
 
 
 _CSHARP_DEF_TYPES = (
@@ -181,18 +181,18 @@ _CSHARP_DEF_TYPES = (
 )
 
 
-def _defs_csharp_from(node: Node, source: bytes) -> list[str]:
-    names = []
+def _defs_csharp_from(node: Node, source: bytes) -> list[tuple[str, Node]]:
+    pairs = []
     for child in node.children:
         if child.type in _CSHARP_DEF_TYPES:
             name = _name_of(child, source)
             if name:
-                names.append(name)
+                pairs.append((name, child))
         elif child.type == "namespace_declaration":
             body = child.child_by_field_name("body")
             if body is not None:
-                names.extend(_defs_csharp_from(body, source))
-    return names
+                pairs.extend(_defs_csharp_from(body, source))
+    return pairs
 
 
 _DEF_EXTRACTORS = {
@@ -245,12 +245,33 @@ def _iter_source_files(root: Path):
                 yield Path(dirpath) / name
 
 
-def _extract_symbols(source: bytes, display_language: str, grammar: str) -> list[str]:
+def _extract_symbol_pairs(
+    source: bytes, display_language: str, grammar: str
+) -> list[tuple[str, Node]]:
     extractor = _DEF_EXTRACTORS.get(display_language)
     if extractor is None:
         return []
     tree = _parser(grammar).parse(source)
     return extractor(tree.root_node, source)
+
+
+def _extract_symbols(source: bytes, display_language: str, grammar: str) -> list[str]:
+    return [name for name, _ in _extract_symbol_pairs(source, display_language, grammar)]
+
+
+def find_symbol_source(
+    source: bytes, display_language: str, grammar: str, name: str
+) -> str | None:
+    """Raw source text of a top-level symbol by name (first match), for the
+    vault's per-symbol staleness hashing - reuses the same extraction used
+    to build the structural index, just keeping the node instead of
+    discarding it. Returns None if the language isn't supported or no
+    top-level definition with that name exists.
+    """
+    for symbol_name, node in _extract_symbol_pairs(source, display_language, grammar):
+        if symbol_name == name:
+            return _text(node, source)
+    return None
 
 
 def build_index(repo_root: Path, budget_tokens: int = DEFAULT_BUDGET_TOKENS) -> RepoIndex:
