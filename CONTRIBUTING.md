@@ -22,9 +22,11 @@ girdle notes check .
 ```
 
 All six also run automatically on commit via `.pre-commit-config.yaml`
-(see the README's "Enforcement hooks" section); everything except the
-notes check also runs again in CI on push/PR (that one's commit-local
-only - see "The vault" below). `mdformat` (no `--check`) rewrites files
+(see the README's "Enforcement hooks" section) and again in CI on
+push/PR - though CI's notes check is read-only verification (no staged
+files in a clean checkout, so nothing auto-reconciles there), catching
+a `--no-verify` bypass of the local hook rather than re-running its
+auto-reconcile behavior. `mdformat` (no `--check`) rewrites files
 in place; the pre-commit hook does this for you, same as `ruff --fix`.
 
 ## Branch protection

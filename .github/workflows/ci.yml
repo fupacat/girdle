@@ -20,6 +20,14 @@ jobs:
       - run: yamllint .
       - run: pytest --cov --cov-report=xml
       - run: girdle index . --check AGENTS.md
+      - name: vault notes freshness (read-only)
+        # The pre-commit hook is the one place auto-reconcile makes sense
+        # (it can tell a note apart from the code it watches within a
+        # single commit being crafted); here there's no staged/unstaged
+        # distinction in a clean checkout, so this only ever verifies -
+        # closing the gap where a --no-verify bypass of the local hook
+        # would otherwise reach master with nothing checking it.
+        run: girdle notes check .
       - name: SonarQube Scan
         # SonarCloud's free plan only analyzes the default branch and PRs, not
         # arbitrary feature-branch pushes; with sonar.qualitygate.wait=true,
