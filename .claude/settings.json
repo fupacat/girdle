@@ -1,4 +1,14 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git merge-base:*)",
+      "Bash(git symbolic-ref:*)",
+      "Bash(git fetch:*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -10,6 +20,29 @@
           }
         ],
         "matcher": "Read"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PROJECT_DIR}/.claude/hooks/review-on-push/build-scripts/pretool-git-push-gate.ps1\"",
+            "if": "Bash(git push*)",
+            "timeout": 30
+          }
+        ],
+        "matcher": "Bash"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PROJECT_DIR}/.claude/hooks/review-on-push/build-scripts/posttool-mark-reviewed.ps1\"",
+            "timeout": 30
+          }
+        ],
+        "matcher": "ReportFindings"
       }
     ],
     "UserPromptSubmit": [
