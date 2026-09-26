@@ -150,13 +150,17 @@ def _codex_local_environment_configured(root: Path) -> bool:
     # say only that "Codex stores this configuration inside the .codex
     # folder at the root of your project" and that the generated file "can
     # [be] check[ed]... into your project's Git repository" - no exact
-    # filename is documented, so presence of the directory itself is the
-    # most specific claim this check can honestly make. This is the
-    # *local* desktop-app environment feature, distinct from Codex's cloud
+    # filename is documented, so this checks that the directory exists AND
+    # holds something, rather than trusting a bare/empty .codex/ (which
+    # could be a stale leftover or an unrelated tool reusing the name) the
+    # way the Copilot and Claude sub-checks trust an actual job key or
+    # hooks key, not just a file's mere existence. This is the *local*
+    # desktop-app environment feature, distinct from Codex's cloud
     # environments (chatgpt.com/codex/settings/environments), which are
     # configured entirely through OpenAI's web UI and stay invisible to a
     # local file scan - that cloud path is deliberately not checked here.
-    return (root / CODEX_DIR).is_dir()
+    codex_dir = root / CODEX_DIR
+    return codex_dir.is_dir() and any(codex_dir.iterdir())
 
 
 def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> CategoryResult:
