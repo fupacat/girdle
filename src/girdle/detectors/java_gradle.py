@@ -29,7 +29,7 @@ class JavaGradleDetector:
         build_text = read_text(root / build_file) or ""
         return {
             "tests": self._scan_tests(root, build_text),
-            "lint": self._scan_lint(root, build_text),
+            "lint": self._scan_lint(build_text),
             "coverage": self._scan_coverage(build_text),
             "reproducibility": self._scan_reproducibility(root, build_text),
             "ci_gating": self._scan_ci(root),
@@ -61,7 +61,7 @@ class JavaGradleDetector:
             evidence.append("junit/testng dependency in build script")
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
-    def _scan_lint(self, root: Path, build_text: str) -> CategoryResult:
+    def _scan_lint(self, build_text: str) -> CategoryResult:
         evidence = []
         if "checkstyle" in build_text.lower():
             evidence.append("checkstyle plugin")
@@ -113,14 +113,14 @@ class JavaGradleDetector:
         if wf_dir.exists():
             for wf in wf_dir.glob("*.y*ml"):
                 text = read_text(wf) or ""
-                if re.search(r"gradlew?\s+.*test\b", text) or re.search(r"\bgradle test\b", text):
+                if re.search(r"gradlew?\b.*test\b", text) or re.search(r"\bgradle test\b", text):
                     return CategoryResult(
                         Tier.CONFIGURED, evidence=[f".github/workflows/{wf.name}: runs gradle test"]
                     )
         for f in (".gitlab-ci.yml", "azure-pipelines.yml"):
             p = root / f
             text = read_text(p) or ""
-            if p.exists() and re.search(r"gradlew?\s+.*test\b", text):
+            if p.exists() and re.search(r"gradlew?\b.*test\b", text):
                 return CategoryResult(Tier.CONFIGURED, evidence=[f"{f}: runs gradle test"])
         return CategoryResult(
             Tier.ABSENT, reason="no CI config found running gradle test",

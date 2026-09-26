@@ -15,7 +15,7 @@ from girdle.detectors.base import Fingerprint
 from girdle.fsutil import rglob_excluding
 from girdle.schema import CategoryResult, Tier
 
-VERSION_RANGE_PATTERN = re.compile(r'Version="[^"]*[\*\[\(].*?"|Version="\d+\.\*"')
+VERSION_RANGE_PATTERN = re.compile(r'Version="[^"]*[\*\[\(][^"]*"|Version="\d+\.\*"')
 PACKAGE_REF_PATTERN = re.compile(r'<PackageReference\b')
 PINNED_VERSION_PATTERN = re.compile(r'Version="\d+(\.\d+){1,3}"')
 
