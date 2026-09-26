@@ -9,6 +9,8 @@ stale: false
 
 # Agent sandbox bootstrap detection design
 
+Raw source material: [[coding-agent-sandbox-bootstrap-conventions-2026-09-26]].
+
 ## Context
 
 `check_agent_sandbox_bootstrap` (conditional on `precommit` already being
