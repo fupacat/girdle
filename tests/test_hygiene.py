@@ -87,6 +87,15 @@ def test_agent_sandbox_bootstrap_configured_via_claude_session_start(tmp_path: P
     assert ".claude/settings.json" in cat.evidence
 
 
+def test_agent_sandbox_bootstrap_configured_via_codex_local_environment(tmp_path: Path):
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    (tmp_path / ".codex").mkdir()
+    result = build_hygiene(tmp_path, languages=set())
+    cat = result.checks["agent_sandbox_bootstrap"]
+    assert cat.tier == Tier.CONFIGURED
+    assert ".codex" in cat.evidence
+
+
 def test_agent_sandbox_bootstrap_ignores_malformed_claude_settings(tmp_path: Path):
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
     claude_dir = tmp_path / ".claude"

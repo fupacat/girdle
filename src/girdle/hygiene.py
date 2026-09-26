@@ -106,6 +106,7 @@ def check_precommit(root: Path) -> CategoryResult:
 
 COPILOT_SETUP_STEPS = ".github/workflows/copilot-setup-steps.yml"
 CLAUDE_SETTINGS = ".claude/settings.json"
+CODEX_DIR = ".codex"
 
 
 def _copilot_setup_steps_configured(root: Path) -> bool:
@@ -144,17 +145,34 @@ def _claude_sandbox_hook_configured(root: Path) -> bool:
     return bool(hooks.get("SessionStart") or hooks.get("WorktreeCreate"))
 
 
+def _codex_local_environment_configured(root: Path) -> bool:
+    # OpenAI's docs (learn.chatgpt.com/docs/environments/local-environment)
+    # say only that "Codex stores this configuration inside the .codex
+    # folder at the root of your project" and that the generated file "can
+    # [be] check[ed]... into your project's Git repository" - no exact
+    # filename is documented, so presence of the directory itself is the
+    # most specific claim this check can honestly make. This is the
+    # *local* desktop-app environment feature, distinct from Codex's cloud
+    # environments (chatgpt.com/codex/settings/environments), which are
+    # configured entirely through OpenAI's web UI and stay invisible to a
+    # local file scan - that cloud path is deliberately not checked here.
+    return (root / CODEX_DIR).is_dir()
+
+
 def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> CategoryResult:
     """Whether an agent's isolated execution sandbox (GitHub Copilot coding
-    agent, Claude Code cloud/worktree sessions) gets wired into the same
-    local enforcement pre-commit gives a human contributor. Conditional on
-    pre-commit itself being configured - same shape as scan.py's coverage
-    gate check: nothing to bootstrap into an empty sandbox otherwise, so
-    checking this in isolation would be noise, not a finding.
+    agent, Claude Code cloud/worktree sessions, OpenAI Codex's local
+    desktop environment) gets wired into the same local enforcement
+    pre-commit gives a human contributor. Conditional on pre-commit itself
+    being configured - same shape as scan.py's coverage gate check: nothing
+    to bootstrap into an empty sandbox otherwise, so checking this in
+    isolation would be noise, not a finding.
 
-    OpenAI Codex's environment setup script is deliberately not checked -
-    it's configured through OpenAI's own web UI, not a repo-committed file,
+    Codex's *cloud* environment setup script is deliberately not checked -
+    it's configured through OpenAI's own web UI
+    (chatgpt.com/codex/settings/environments), not a repo-committed file,
     so it's invisible to a local file scan and would be dishonest to score.
+    The local desktop environment (.codex/) is different and is checked.
     """
     if precommit.tier != Tier.CONFIGURED:
         return CategoryResult(
@@ -170,25 +188,29 @@ def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> Cate
         evidence.append(COPILOT_SETUP_STEPS)
     if _claude_sandbox_hook_configured(root):
         evidence.append(CLAUDE_SETTINGS)
+    if _codex_local_environment_configured(root):
+        evidence.append(CODEX_DIR)
 
     if not evidence:
         return CategoryResult(
             Tier.ABSENT,
             reason=(
                 "pre-commit is configured but not wired into any agent sandbox bootstrap - "
-                "no copilot-setup-steps job or Claude Code SessionStart/WorktreeCreate hook "
-                "found"
+                "no copilot-setup-steps job, Claude Code SessionStart/WorktreeCreate hook, "
+                "or .codex/ local environment found"
             ),
             recommendation=(
                 "Add .github/workflows/copilot-setup-steps.yml (job named "
                 "`copilot-setup-steps`) running your dependency install then "
-                "`pre-commit install`, or a `SessionStart` hook in .claude/settings.json "
+                "`pre-commit install`, a `SessionStart` hook in .claude/settings.json "
                 "doing the same (a custom `WorktreeCreate` hook can also run it, but only "
                 "if it also creates the worktree itself and prints its path - that hook "
                 "replaces Claude Code's default worktree creation rather than running "
-                "alongside it, so don't add one just for this), so an agent's isolated "
-                "sandbox gets the same local enforcement a human contributor's "
-                "`pre-commit install` gives them."
+                "alongside it, so don't add one just for this), or a Codex local "
+                "environment (ChatGPT desktop app settings -> .codex/) with a setup script "
+                "that runs `pre-commit install`, so an agent's isolated sandbox gets the "
+                "same local enforcement a human contributor's `pre-commit install` gives "
+                "them."
             ),
         )
     return CategoryResult(Tier.CONFIGURED, evidence=evidence)
