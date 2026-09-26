@@ -12,6 +12,7 @@ from girdle.indexer import build_index, inject_into, is_stale, render_manifest
 from girdle.scan import run_scan
 from girdle.vault import (
     VAULT_DIR,
+    DanglingWatchError,
     inject_vault_index,
     load_all_notes,
     render_vault_index,
@@ -251,7 +252,11 @@ def notes() -> None:
 def notes_check(path: str) -> None:
     """Pre-commit entry point: block if a watched file/symbol changed but
     the note that watches it wasn't part of the same commit."""
-    result = vault_check(Path(path))
+    try:
+        result = vault_check(Path(path))
+    except DanglingWatchError as exc:
+        click.echo(f"error: {exc}")
+        sys.exit(1)
     for rel in result.reconciled:
         click.echo(f"reconciled: {rel}")
     if result.blocking:
@@ -269,7 +274,11 @@ def notes_check(path: str) -> None:
 def notes_ack(note: str, root: str) -> None:
     """Confirm a note is still accurate without editing it - records the
     current watched hash(es) and stages the note."""
-    rel = vault_ack(Path(root), Path(note))
+    try:
+        rel = vault_ack(Path(root), Path(note))
+    except DanglingWatchError as exc:
+        click.echo(f"error: {exc}")
+        sys.exit(1)
     click.echo(f"acknowledged: {rel}")
 
 

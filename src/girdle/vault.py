@@ -1,24 +1,33 @@
 """The repo-scoped knowledge vault (`.agent-vault/`): notes for decisions,
-design context, research, brainstorming, data models, diagrams, CI, and
+context, research, brainstorming, data models, diagrams, CI, and
 environment/deployment concerns - separate from AGENTS.md (which is
 operational instructions) and the structural index (which is mechanically
 derived from code, never hand-written).
 
-Only some notes describe something that can drift out of sync with the
-code: a `context`/`design`/`data-model`/`ci` note may declare `watches`
-entries (a file, optionally scoped to one named top-level symbol via the
-same tree-sitter extraction the structural index uses). Point-in-time notes
-(`decision`, `research`, `brainstorm`) never do - they're a historical
-record, not living documentation, so nothing here enforces freshness on
-them.
+Freshness enforcement is keyed on whether a note declares `watches`
+entries, not on its `type` - a note may watch a file, optionally scoped to
+one named top-level symbol via the same tree-sitter extraction the
+structural index uses. Point-in-time types (`decision`, `research`,
+`brainstorm`, see POINT_IN_TIME_TYPES) are historical record rather than
+living documentation, so `watches` on one of those is a configuration
+error `check()` reports rather than something to enforce.
 
 Staleness is a hash comparison, not a git diff: each watch entry records
 the hash of what it watched as of the last time a human/agent reviewed it.
+A missing/unresolvable watch target (file deleted, symbol renamed) is a
+dangling reference, not a "matches nothing so nothing to report" case -
+`current_hash` returning None always counts as needing attention, and
+`reconcile`/`ack` refuse to silently record a null hash for it.
+
 `check()` (the pre-commit entry point) recomputes the current hash and
-compares - if it's now part of the same commit as the note itself, it's
-auto-reconciled (recompute, rewrite, re-stage); if the note wasn't touched
-at all, the commit blocks and the note is marked `stale: true` so a later
-session discovers the gap even if the block is never manually cleared.
+compares - if the note is part of the same commit AND its content beyond
+mechanical hash/stale bookkeeping actually changed since HEAD, it's
+auto-reconciled (recompute, rewrite, re-stage). A `stale: true` write the
+hook itself made, later swept up by an unrelated `git add -A`, does not
+count as that deliberate edit - otherwise a plain retry would silently
+re-approve a note nobody reviewed. If neither condition holds, the commit
+blocks and the note is marked `stale: true` so a later session discovers
+the gap even if the block is never manually cleared.
 """
 
 from __future__ import annotations
@@ -40,6 +49,28 @@ NOTE_TYPES = (
     "decision", "context", "research", "brainstorm",
     "data-model", "diagram", "ci", "environment", "deployment",
 )
+
+# These are historical record, not living documentation - `watches` on one
+# of these is a configuration error, not something check() should enforce.
+POINT_IN_TIME_TYPES = ("decision", "research", "brainstorm")
+
+
+class DanglingWatchError(Exception):
+    """Raised by reconcile()/ack() when asked to record a hash for a watch
+    entry whose target (file or symbol) can't currently be resolved -
+    refusing rather than silently writing `hash: null`, which would look
+    identical to "matches" on every future check() and never surface again.
+    """
+
+    def __init__(self, note_rel: str, dangling: list[WatchEntry]):
+        targets = ", ".join(_describe_watch(w) for w in dangling)
+        super().__init__(f"{note_rel}: dangling watch(es) - target not found ({targets})")
+        self.note_rel = note_rel
+        self.dangling = dangling
+
+
+def _describe_watch(w: WatchEntry) -> str:
+    return f"{w.path}#{w.symbol}" if w.symbol else w.path
 
 _FRONTMATTER_PATTERN = re.compile(r"\A---\n(.*?)\n---\n?", re.DOTALL)
 
@@ -163,13 +194,54 @@ def _staged_files(root: Path) -> set[str]:
     return set(result.stdout.splitlines())
 
 
+def _content_signature(data: dict, body: str) -> tuple[dict, str]:
+    """Everything about a note EXCEPT the mechanical hash/stale bookkeeping
+    fields check()/reconcile() themselves write - so comparing two
+    signatures answers "did a human/agent actually edit this note", not
+    "did any byte of this file change".
+    """
+    scrubbed = {k: v for k, v in data.items() if k != "stale"}
+    watches = scrubbed.get("watches")
+    if watches:
+        scrubbed["watches"] = [{k: v for k, v in w.items() if k != "hash"} for w in watches]
+    return scrubbed, body
+
+
+def _head_signature(root: Path, rel: str) -> tuple[dict, str] | None:
+    """The note's content signature as of HEAD, or None if it doesn't exist
+    there yet (a brand-new note, or no commits at all) - in which case
+    authoring it in this commit already IS the deliberate review, so
+    there's nothing to compare against.
+    """
+    result = subprocess.run(
+        ["git", "show", f"HEAD:{rel}"], cwd=root, capture_output=True, text=True, check=False,
+    )
+    if result.returncode != 0:
+        return None
+    data, body = _parse_frontmatter(result.stdout)
+    return _content_signature(data, body)
+
+
+def _meaningfully_edited(root: Path, note: Note, rel: str) -> bool:
+    head_sig = _head_signature(root, rel)
+    if head_sig is None:
+        return True
+    return _content_signature(note.raw_frontmatter, note.body) != head_sig
+
+
 def reconcile(root: Path, note: Note) -> None:
     """Recompute and record the current hash for every watch entry and
     clear `stale` - the shared step behind both auto-reconcile (note edited
     in the same commit) and an explicit `ack` (note confirmed unchanged).
+    Raises DanglingWatchError, without writing anything, if any watch
+    target can't currently be resolved - there's no valid hash to record.
     """
+    current = {id(w): current_hash(root, w) for w in note.watches}
+    dangling = [w for w in note.watches if current[id(w)] is None]
+    if dangling:
+        raise DanglingWatchError(_note_rel(root, note), dangling)
     for watch in note.watches:
-        watch.hash = current_hash(root, watch)
+        watch.hash = current[id(watch)]
     note.stale = False
     _write_note(note)
 
@@ -182,36 +254,63 @@ class CheckResult:
 
 def check(root: Path) -> CheckResult:
     """Pre-commit entry point. A note whose watched hash no longer matches
-    is either auto-reconciled (it's part of this same commit - someone
-    already touched it) or reported as blocking (it wasn't, so the commit
-    would otherwise ship a code change with a now-unverified note).
+    is either auto-reconciled (it's part of this same commit AND its
+    content beyond hash/stale bookkeeping actually changed since HEAD) or
+    reported as blocking. A dangling watch (target no longer resolvable)
+    always blocks, regardless of staging - there's no valid hash to
+    reconcile to. A point-in-time note (decision/research/brainstorm)
+    declaring `watches` at all is a configuration error, reported
+    unconditionally.
     """
+    root = root.resolve()
     staged = _staged_files(root)
     result = CheckResult()
     for note in load_all_notes(root):
+        rel = _note_rel(root, note)
+
+        if note.type in POINT_IN_TIME_TYPES and note.watches:
+            result.blocking.append(
+                f"{rel}: type '{note.type}' is point-in-time and must not declare "
+                "watches (only context/data-model/diagram/ci/environment/deployment can)"
+            )
+            continue
+
         if not note.watches:
             continue
+
+        dangling = [w for w in note.watches if current_hash(root, w) is None]
+        if dangling:
+            note.stale = True
+            _write_note(note)
+            result.blocking.append(
+                f"{rel}: dangling watch(es) - target not found "
+                f"({', '.join(_describe_watch(w) for w in dangling)})"
+            )
+            continue
+
         mismatched = [w for w in note.watches if current_hash(root, w) != w.hash]
         if not mismatched:
             continue
-        rel = _note_rel(root, note)
-        if rel in staged:
+
+        if rel in staged and _meaningfully_edited(root, note, rel):
             reconcile(root, note)
             _git_add(root, rel)
             result.reconciled.append(rel)
         else:
             note.stale = True
             _write_note(note)
-            targets = ", ".join(
-                f"{w.path}#{w.symbol}" if w.symbol else w.path for w in mismatched
-            )
+            targets = ", ".join(_describe_watch(w) for w in mismatched)
             result.blocking.append(f"{rel}: watches changed ({targets})")
     return result
 
 
 def ack(root: Path, note_path: Path) -> str:
     """Confirm a note is still accurate without editing its prose: records
-    the current watched hash(es), clears `stale`, and stages the note."""
+    the current watched hash(es), clears `stale`, and stages the note.
+    Raises DanglingWatchError if a watch target can't currently be
+    resolved - fix or remove that watch entry first."""
+    root = root.resolve()
+    note_path = note_path.resolve()
     note = load_note(note_path)
     reconcile(root, note)
     rel = _note_rel(root, note)
@@ -235,9 +334,7 @@ def render_vault_index(root: Path, notes: list[Note]) -> str:
     lines = []
     for note in notes:
         rel = _note_rel(root, note)
-        watches = "; ".join(
-            f"{w.path}#{w.symbol}" if w.symbol else w.path for w in note.watches
-        ) or "-"
+        watches = "; ".join(_describe_watch(w) for w in note.watches) or "-"
         lines.append(f"{rel} | {note.type or '?'} | stale={note.stale} | watches: {watches}")
     return "\n".join(lines)
 

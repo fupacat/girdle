@@ -2,6 +2,7 @@ from pathlib import Path
 
 from girdle.indexer import (
     build_index,
+    find_symbol_source,
     inject_into,
     is_stale,
     render_block,
@@ -94,3 +95,23 @@ def test_is_stale_true_when_drifted(tmp_path: Path):
     target = tmp_path / "AGENTS.md"
     target.write_text(render_block("old-manifest"))
     assert is_stale(target, "new-manifest") is True
+
+
+def test_find_symbol_source_python_includes_decorator():
+    # A decorator change is a real code change and must show up in the
+    # hashed span, not just the unwrapped function body.
+    source = b"@decorator\ndef greet():\n    pass\n"
+    text = find_symbol_source(source, "python", "python", "greet")
+    assert text.startswith("@decorator")
+
+
+def test_find_symbol_source_js_includes_export():
+    source = b"export function greet() {}\n"
+    text = find_symbol_source(source, "javascript", "javascript", "greet")
+    assert text.startswith("export")
+
+
+def test_find_symbol_source_js_const_arrow_includes_export():
+    source = b"export const greet = () => {}\n"
+    text = find_symbol_source(source, "javascript", "javascript", "greet")
+    assert text.startswith("export")

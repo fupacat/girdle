@@ -64,6 +64,11 @@ def _name_of(node: Node, source: bytes) -> str | None:
 
 
 def _defs_python(root: Node, source: bytes) -> list[tuple[str, Node]]:
+    # The paired node is the OUTER node (the decorated_definition wrapper,
+    # when present) rather than the unwrapped inner definition - the name
+    # only needs the inner node, but a symbol-hash consumer needs the full
+    # span, since a decorator change is a real code change that must not
+    # be silently invisible to per-symbol staleness hashing.
     pairs = []
     for child in root.children:
         node = child
@@ -74,7 +79,7 @@ def _defs_python(root: Node, source: bytes) -> list[tuple[str, Node]]:
         if node.type in ("function_definition", "class_definition"):
             name = _name_of(node, source)
             if name:
-                pairs.append((name, node))
+                pairs.append((name, child))
     return pairs
 
 
@@ -90,7 +95,13 @@ _JS_DEF_TYPES = (
 _JS_FUNCTION_VALUE_TYPES = ("arrow_function", "function", "function_expression")
 
 
-def _defs_lexical_declaration(node: Node, source: bytes) -> list[tuple[str, Node]]:
+def _defs_lexical_declaration(
+    node: Node, source: bytes, outer: Node | None = None
+) -> list[tuple[str, Node]]:
+    # Paired with `outer` (the export_statement wrapper, when present)
+    # rather than the individual declarator - same reasoning as the
+    # decorator/export cases above.
+    outer = outer if outer is not None else node
     pairs = []
     for declarator in node.children:
         if declarator.type != "variable_declarator":
@@ -99,7 +110,7 @@ def _defs_lexical_declaration(node: Node, source: bytes) -> list[tuple[str, Node
         if value is not None and value.type in _JS_FUNCTION_VALUE_TYPES:
             name = _name_of(declarator, source)
             if name:
-                pairs.append((name, declarator))
+                pairs.append((name, outer))
     return pairs
 
 
@@ -110,6 +121,9 @@ def _unwrap_export(node: Node) -> Node | None:
 
 
 def _defs_js_ts(root: Node, source: bytes) -> list[tuple[str, Node]]:
+    # Same reasoning as _defs_python's decorator case: pair with the outer
+    # export_statement (when present), not the unwrapped inner declaration,
+    # so adding/removing `export` is a visible change to symbol hashing.
     pairs = []
     for child in root.children:
         node = _unwrap_export(child)
@@ -118,9 +132,9 @@ def _defs_js_ts(root: Node, source: bytes) -> list[tuple[str, Node]]:
         if node.type in _JS_DEF_TYPES:
             name = _name_of(node, source)
             if name:
-                pairs.append((name, node))
+                pairs.append((name, child))
         elif node.type == "lexical_declaration":
-            pairs.extend(_defs_lexical_declaration(node, source))
+            pairs.extend(_defs_lexical_declaration(node, source, outer=child))
     return pairs
 
 

@@ -1,5 +1,5 @@
 ---
-type: decision
+type: context
 watches:
   - path: src/girdle/scan.py
     symbol: _check_coverage_gate
