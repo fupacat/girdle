@@ -149,12 +149,15 @@ def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> Cate
         # it, the same malformed-input tolerance the JSON-parse guard above
         # already aims for, just one level deeper.
         hooks = data.get("hooks") if isinstance(data, dict) else None
-        # WorktreeCreate is the precise match (fires specifically when a
-        # worktree is created, same lifecycle scope as copilot-setup-steps);
-        # SessionStart is a looser but still valid fallback - it runs setup
-        # before an agent starts working too, just on every session rather
-        # than only worktree creation.
-        if isinstance(hooks, dict) and (hooks.get("WorktreeCreate") or hooks.get("SessionStart")):
+        # SessionStart is the safe, additive match: it runs alongside
+        # Claude Code's default worktree creation, same as copilot-setup-
+        # steps.yml runs alongside a job. WorktreeCreate is NOT equivalent -
+        # per Claude Code's docs it *replaces* the default `git worktree`
+        # step entirely (the hook itself must create the worktree and print
+        # its path as stdout's last line), so it's still counted as
+        # evidence a custom creator could fold pre-commit setup into, but
+        # it must never be the thing we recommend adding.
+        if isinstance(hooks, dict) and (hooks.get("SessionStart") or hooks.get("WorktreeCreate")):
             evidence.append(CLAUDE_SETTINGS)
 
     if not evidence:
@@ -162,15 +165,19 @@ def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> Cate
             Tier.ABSENT,
             reason=(
                 "pre-commit is configured but not wired into any agent sandbox bootstrap - "
-                "no copilot-setup-steps job or Claude Code WorktreeCreate/SessionStart hook "
+                "no copilot-setup-steps job or Claude Code SessionStart/WorktreeCreate hook "
                 "found"
             ),
             recommendation=(
                 "Add .github/workflows/copilot-setup-steps.yml (job named "
                 "`copilot-setup-steps`) running your dependency install then "
-                "`pre-commit install`, or a `WorktreeCreate` (or `SessionStart`) hook in "
-                ".claude/settings.json, so an agent's isolated sandbox gets the same "
-                "local enforcement a human contributor's `pre-commit install` gives them."
+                "`pre-commit install`, or a `SessionStart` hook in .claude/settings.json "
+                "doing the same (a custom `WorktreeCreate` hook can also run it, but only "
+                "if it also creates the worktree itself and prints its path - that hook "
+                "replaces Claude Code's default worktree creation rather than running "
+                "alongside it, so don't add one just for this), so an agent's isolated "
+                "sandbox gets the same local enforcement a human contributor's "
+                "`pre-commit install` gives them."
             ),
         )
     return CategoryResult(Tier.CONFIGURED, evidence=evidence)
