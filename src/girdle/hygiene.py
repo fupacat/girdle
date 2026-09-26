@@ -13,6 +13,7 @@ runs as part of every default scan with no opt-in flag.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -132,7 +133,9 @@ def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> Cate
     copilot_setup = root / ".github" / "workflows" / "copilot-setup-steps.yml"
     if copilot_setup.exists():
         text = _read_text(copilot_setup) or ""
-        if "copilot-setup-steps" in text:
+        # A job KEY, not just the substring anywhere - a comment or doc
+        # mentioning "copilot-setup-steps" must not count as configured.
+        if re.search(r"(?m)^\s*copilot-setup-steps:", text):
             evidence.append(COPILOT_SETUP_STEPS)
 
     claude_settings = root / ".claude" / "settings.json"
@@ -141,13 +144,17 @@ def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> Cate
             data = json.loads(_read_text(claude_settings) or "{}")
         except ValueError:
             data = {}
-        hooks = data.get("hooks", {}) if isinstance(data, dict) else {}
+        # `hooks` in valid, parseable JSON can still be the wrong shape
+        # (null, a list, a string) - guard the type before .get()'ing into
+        # it, the same malformed-input tolerance the JSON-parse guard above
+        # already aims for, just one level deeper.
+        hooks = data.get("hooks") if isinstance(data, dict) else None
         # WorktreeCreate is the precise match (fires specifically when a
         # worktree is created, same lifecycle scope as copilot-setup-steps);
         # SessionStart is a looser but still valid fallback - it runs setup
         # before an agent starts working too, just on every session rather
         # than only worktree creation.
-        if hooks.get("WorktreeCreate") or hooks.get("SessionStart"):
+        if isinstance(hooks, dict) and (hooks.get("WorktreeCreate") or hooks.get("SessionStart")):
             evidence.append(CLAUDE_SETTINGS)
 
     if not evidence:

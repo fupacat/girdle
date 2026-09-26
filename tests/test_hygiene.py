@@ -96,6 +96,36 @@ def test_agent_sandbox_bootstrap_ignores_malformed_claude_settings(tmp_path: Pat
     assert result.checks["agent_sandbox_bootstrap"].tier == Tier.ABSENT
 
 
+def test_agent_sandbox_bootstrap_tolerates_non_dict_hooks_value(tmp_path: Path):
+    # Valid JSON, but "hooks" is the wrong shape (null/list/string) - must
+    # not crash with AttributeError trying to .get() into it.
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "settings.json").write_text('{"hooks": null}\n')
+    result = build_hygiene(tmp_path, languages=set())
+    assert result.checks["agent_sandbox_bootstrap"].tier == Tier.ABSENT
+
+    (claude_dir / "settings.json").write_text('{"hooks": ["not", "a", "dict"]}\n')
+    result = build_hygiene(tmp_path, languages=set())
+    assert result.checks["agent_sandbox_bootstrap"].tier == Tier.ABSENT
+
+
+def test_agent_sandbox_bootstrap_copilot_mention_without_job_key_is_absent(tmp_path: Path):
+    # A comment/doc referencing "copilot-setup-steps" must not count -
+    # only an actual job key does.
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "copilot-setup-steps.yml").write_text(
+        "# TODO: consider adding a copilot-setup-steps job later\njobs:\n  build:\n"
+        "    runs-on: ubuntu-latest\n"
+    )
+    result = build_hygiene(tmp_path, languages=set())
+    cat = result.checks["agent_sandbox_bootstrap"]
+    assert cat.tier == Tier.ABSENT
+
+
 def test_gitignore_missing_is_absent(tmp_path: Path):
     result = build_hygiene(tmp_path, languages={"python"})
     assert result.checks["gitignore"].tier == Tier.ABSENT
