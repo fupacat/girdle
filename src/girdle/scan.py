@@ -90,6 +90,29 @@ def _check_coverage_gate(fp: Fingerprint, categories: dict[str, CategoryResult])
         )
 
 
+def _mark_static_hint(result: CategoryResult) -> None:
+    if result.recommendation is None:
+        result.recommendation = "Run `girdle scan --run` to verify this actually passes (tier 2)."
+
+
+def _run_and_record(
+    result: CategoryResult, category: str, command: list[str], root: Path, language: str
+) -> None:
+    outcome = run_check(command, root)
+    if outcome.passed:
+        result.tier = Tier.VERIFIED
+        evidence_line = f"verified: `{' '.join(command)}` exited 0"
+        if category == "coverage":
+            pct = parse_percentage(language, outcome.stdout)
+            if pct:
+                evidence_line += f" ({pct} coverage)"
+        result.evidence = [*result.evidence, evidence_line]
+    elif outcome.ran:
+        result.reason = outcome.reason
+    else:
+        result.evidence = [*result.evidence, f"not verified: {outcome.reason}"]
+
+
 def _verify(
     detector: Detector, fp: Fingerprint, categories: dict[str, CategoryResult], mode: str
 ) -> None:
@@ -111,21 +134,6 @@ def _verify(
         if result is None or result.tier != Tier.CONFIGURED:
             continue
         if mode == "static":
-            if result.recommendation is None:
-                result.recommendation = (
-                    "Run `girdle scan --run` to verify this actually passes (tier 2)."
-                )
-            continue
-        outcome = run_check(command, fp.root)
-        if outcome.passed:
-            result.tier = Tier.VERIFIED
-            evidence_line = f"verified: `{' '.join(command)}` exited 0"
-            if category == "coverage":
-                pct = parse_percentage(fp.language, outcome.stdout)
-                if pct:
-                    evidence_line += f" ({pct} coverage)"
-            result.evidence = [*result.evidence, evidence_line]
-        elif outcome.ran:
-            result.reason = outcome.reason
+            _mark_static_hint(result)
         else:
-            result.evidence = [*result.evidence, f"not verified: {outcome.reason}"]
+            _run_and_record(result, category, command, fp.root, fp.language)
