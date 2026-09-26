@@ -207,12 +207,23 @@ def _content_signature(data: dict, body: str) -> tuple[dict, str]:
     return scrubbed, body
 
 
-def _head_signature(root: Path, rel: str) -> tuple[dict, str] | None:
-    """The note's content signature as of HEAD, or None if it doesn't exist
-    there yet (a brand-new note, or no commits at all) - in which case
-    authoring it in this commit already IS the deliberate review, so
-    there's nothing to compare against.
+def _rename_source(root: Path, rel: str) -> str | None:
+    """The staged rename's source path, if `rel` is the destination of a
+    detected `git mv` in this commit - so a pure rename isn't mistaken for
+    a brand-new note with no HEAD baseline to compare against.
     """
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--name-status", "-M"],
+        cwd=root, capture_output=True, text=True, check=False,
+    )
+    for line in result.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) == 3 and parts[0].startswith("R") and parts[2] == rel:
+            return parts[1]
+    return None
+
+
+def _show_at_head(root: Path, rel: str) -> tuple[dict, str] | None:
     result = subprocess.run(
         ["git", "show", f"HEAD:{rel}"], cwd=root, capture_output=True, text=True, check=False,
     )
@@ -220,6 +231,23 @@ def _head_signature(root: Path, rel: str) -> tuple[dict, str] | None:
         return None
     data, body = _parse_frontmatter(result.stdout)
     return _content_signature(data, body)
+
+
+def _head_signature(root: Path, rel: str) -> tuple[dict, str] | None:
+    """The note's content signature as of HEAD, or None if there's truly no
+    prior baseline to compare against (a brand-new note, or no commits at
+    all) - in which case authoring it in this commit already IS the
+    deliberate review. A note that was only `git mv`'d resolves against its
+    old path's HEAD content instead of being treated as brand-new, so a
+    pure rename with no actual edit doesn't count as one.
+    """
+    sig = _show_at_head(root, rel)
+    if sig is not None:
+        return sig
+    source_rel = _rename_source(root, rel)
+    if source_rel is not None:
+        return _show_at_head(root, source_rel)
+    return None
 
 
 def _meaningfully_edited(root: Path, note: Note, rel: str) -> bool:

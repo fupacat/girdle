@@ -317,6 +317,58 @@ def test_current_hash_unsupported_extension_with_symbol(tmp_path: Path):
     assert current_hash(tmp_path, watch) is None
 
 
+def test_check_blocks_pure_rename_with_no_content_edit(tmp_path: Path):
+    # A `git mv` with zero content change must not be mistaken for a
+    # brand-new note (which would wrongly count as the deliberate review).
+    _init_repo(tmp_path)
+    _write_example(tmp_path)
+    note_path = _write_note(tmp_path)
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "init")
+    ack(tmp_path, note_path)
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "baseline hash")
+
+    _write_example(tmp_path, 'def greet(name):\n    return f"HELLO {name}!!!"\n')
+    _git(tmp_path, "add", "src/example.py")
+
+    new_dir = tmp_path / ".agent-vault" / "data-models"
+    new_dir.mkdir(parents=True)
+    new_path = new_dir / "greet-note.md"
+    _git(tmp_path, "mv", str(note_path), str(new_path))
+
+    result = check(tmp_path)
+    assert result.reconciled == []
+    assert len(result.blocking) == 1
+    assert "greet-note.md" in result.blocking[0]
+
+
+def test_check_auto_reconciles_rename_with_real_content_edit(tmp_path: Path):
+    _init_repo(tmp_path)
+    _write_example(tmp_path)
+    note_path = _write_note(tmp_path)
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "init")
+    ack(tmp_path, note_path)
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "baseline hash")
+
+    _write_example(tmp_path, 'def greet(name):\n    return f"HELLO {name}!!!"\n')
+    _git(tmp_path, "add", "src/example.py")
+
+    new_dir = tmp_path / ".agent-vault" / "data-models"
+    new_dir.mkdir(parents=True)
+    new_path = new_dir / "greet-note.md"
+    _git(tmp_path, "mv", str(note_path), str(new_path))
+    with new_path.open("a", encoding="utf-8") as f:
+        f.write("\nReclassified and updated: now shouts.\n")
+    _git(tmp_path, "add", "-A")
+
+    result = check(tmp_path)
+    assert result.blocking == []
+    assert len(result.reconciled) == 1
+
+
 def test_check_leaves_unchanged_notes_alone(tmp_path: Path):
     _init_repo(tmp_path)
     _write_example(tmp_path)
