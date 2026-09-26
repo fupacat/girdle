@@ -48,7 +48,7 @@ src/girdle/detectors/python_uv.py | python | 49L | PythonUvDetector
 src/girdle/detectors/registry.py | python | 33L | 
 src/girdle/detectors/rust.py | python | 146L | RustDetector
 src/girdle/fsutil.py | python | 34L | walk_excluding, rglob_excluding
-src/girdle/hygiene.py | python | 269L | _read_text, HygieneResult, _first_existing, check_editorconfig, check_gitattributes, check_precommit, check_agent_sandbox_bootstrap, check_gitignore, check_codeowners, check_readme, check_contributing, build_hygiene
+src/girdle/hygiene.py | python | 280L | _read_text, HygieneResult, _first_existing, check_editorconfig, check_gitattributes, check_precommit, _copilot_setup_steps_configured, _claude_sandbox_hook_configured, check_agent_sandbox_bootstrap, check_gitignore, check_codeowners, check_readme, check_contributing, build_hygiene
 src/girdle/indexer.py | python | 413L | _parser, _text, _name_of, _defs_python, _defs_lexical_declaration, _unwrap_export, _defs_js_ts, _defs_go_type_declaration, _defs_go, _defs_rust, _defs_java, _defs_csharp_from, IndexEntry, RepoIndex, _iter_source_files, _extract_symbol_pairs, _extract_symbols, find_symbol_source, build_index, _estimate_tokens, _render_entry, render_manifest, render_block, inject_into, is_stale
 src/girdle/platform.py | python | 167L | PlatformResult, compute_recommendations, _run, extract_protection_facts, check_platform
 src/girdle/runner.py | python | 57L | RunOutcome, run_check
