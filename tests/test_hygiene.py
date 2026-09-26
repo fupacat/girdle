@@ -89,6 +89,27 @@ def test_readme_with_real_content_is_configured(tmp_path: Path):
     assert result.checks["readme"].tier == Tier.CONFIGURED
 
 
+def test_agent_instructions_absent(tmp_path: Path):
+    result = build_hygiene(tmp_path, languages=set())
+    assert result.checks["agent_instructions"].tier == Tier.ABSENT
+
+
+def test_agent_instructions_present_as_agents_md(tmp_path: Path):
+    (tmp_path / "AGENTS.md").write_text("# Agents\n")
+    result = build_hygiene(tmp_path, languages=set())
+    cat = result.checks["agent_instructions"]
+    assert cat.tier == Tier.CONFIGURED
+    assert cat.evidence[0] == "AGENTS.md"
+
+
+def test_agent_instructions_present_as_claude_md(tmp_path: Path):
+    (tmp_path / "CLAUDE.md").write_text("# Claude\n")
+    result = build_hygiene(tmp_path, languages=set())
+    cat = result.checks["agent_instructions"]
+    assert cat.tier == Tier.CONFIGURED
+    assert cat.evidence[0] == "CLAUDE.md"
+
+
 def test_contributing_absent(tmp_path: Path):
     result = build_hygiene(tmp_path, languages=set())
     assert result.checks["contributing"].tier == Tier.ABSENT
@@ -106,7 +127,7 @@ def test_to_dict_shape(tmp_path: Path):
     result = build_hygiene(tmp_path, languages=set())
     d = result.to_dict()
     assert set(d.keys()) == {
-        "editorconfig", "gitattributes", "precommit", "gitignore", "codeowners", "readme",
-        "contributing",
+        "editorconfig", "gitattributes", "precommit", "gitignore", "codeowners",
+        "agent_instructions", "readme", "contributing",
     }
     assert "tier" in d["editorconfig"]
