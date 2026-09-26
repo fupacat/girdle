@@ -23,11 +23,13 @@ All three also run automatically on commit via `.pre-commit-config.yaml`
 
 ## Branch protection
 
-`master` is protected, including for admins: changes land via a PR with at
-least 1 approving review and a passing `test` status check (which itself
-fails if `ruff`, `pytest`, the index-freshness check, or the SonarCloud
-Quality Gate fails). Direct `git push` to `master` will be rejected, even
-from the repo owner — open a branch and PR instead.
+`master` is protected, including for admins: changes land via a PR with a
+passing `test` status check (which itself fails if `ruff`, `pytest`, the
+index-freshness check, or the SonarCloud Quality Gate fails). There's no
+required-approving-review rule — GitHub always blocks self-approval, which
+makes that rule unsatisfiable on a repo with one author. Direct `git push`
+to `master` will be rejected, even from the repo owner — open a branch and
+PR instead.
 
 ## Adding a new ecosystem detector
 
