@@ -6,8 +6,8 @@ type: research
 
 Point-in-time findings from each vendor's own docs, gathered while building
 `check_agent_sandbox_bootstrap` (`src/girdle/hygiene.py`). See
-\[[agent-sandbox-bootstrap-design]\] for the resulting design decisions - this
-note is the raw source material, not kept in sync with it.
+`context/agent-sandbox-bootstrap-design.md` for the resulting design
+decisions - this note is the raw source material, not kept in sync with it.
 
 ## GitHub Copilot coding agent
 
