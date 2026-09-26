@@ -71,55 +71,71 @@ def _ci_texts(root: Path) -> list[tuple[str, str]]:
     return texts
 
 
+def _first_existing_name(root: Path, names: tuple[str, ...]) -> str | None:
+    for name in names:
+        if (root / name).exists():
+            return name
+    return None
+
+
+def _codecov_gate(root: Path, codecov_cfg: str | None, label: str, text: str) -> str | None:
+    if not codecov_cfg or not CODECOV_UPLOAD_PATTERN.search(text):
+        return None
+    cfg_text = read_text(root / codecov_cfg) or ""
+    if re.search(r"patch\s*:", cfg_text):
+        return f"Codecov patch-coverage gate ({codecov_cfg} + {label})"
+    return f"Codecov coverage tracking ({codecov_cfg} + {label}), patch status not confirmed"
+
+
+def _sonar_gate(root: Path, sonar_cfg: str | None, label: str, text: str) -> str | None:
+    if not sonar_cfg or not SONAR_CI_PATTERN.search(text):
+        return None
+    cfg_text = read_text(root / sonar_cfg) or ""
+    if SONAR_REPORT_PATH_PATTERN.search(cfg_text):
+        return (
+            f"SonarCloud/SonarQube with a coverage report configured "
+            f"({sonar_cfg} + {label}); 'Coverage on New Code' is Sonar's "
+            "default quality gate but its current on/off state isn't "
+            "visible in repo files"
+        )
+    return (
+        f"SonarCloud/SonarQube scan found ({sonar_cfg} + {label}), but no "
+        "coverage report path configured - coverage likely isn't being "
+        "analyzed at all"
+    )
+
+
+def _diff_cover_gate(label: str, text: str) -> str | None:
+    match = DIFF_COVER_PATTERN.search(text)
+    if not match:
+        return None
+    fail_under = FAIL_UNDER_PATTERN.search(match.group(0))
+    if fail_under:
+        return f"diff-cover gate, --fail-under={fail_under.group(1)} ({label})"
+    return f"diff-cover invoked without --fail-under ({label}) - not actually enforcing anything"
+
+
+def _gate_in_text(
+    root: Path, codecov_cfg: str | None, sonar_cfg: str | None, label: str, text: str
+) -> str | None:
+    return (
+        _codecov_gate(root, codecov_cfg, label, text)
+        or (f"Coveralls coverage tracking ({label})" if COVERALLS_PATTERN.search(text) else None)
+        or _sonar_gate(root, sonar_cfg, label, text)
+        or _diff_cover_gate(label, text)
+    )
+
+
 def detect_gate(root: Path) -> str | None:
     """Returns an evidence string describing the detected gate mechanism,
     or None if no known gate signature was found in CI config.
     """
-    ci_texts = _ci_texts(root)
-    codecov_cfg = None
-    for name in ("codecov.yml", ".codecov.yml"):
-        if (root / name).exists():
-            codecov_cfg = name
-            break
-    sonar_cfg = None
-    for name in SONAR_CONFIG_NAMES:
-        if (root / name).exists():
-            sonar_cfg = name
-            break
+    codecov_cfg = _first_existing_name(root, ("codecov.yml", ".codecov.yml"))
+    sonar_cfg = _first_existing_name(root, SONAR_CONFIG_NAMES)
 
-    for label, text in ci_texts:
-        if codecov_cfg and CODECOV_UPLOAD_PATTERN.search(text):
-            cfg_text = read_text(root / codecov_cfg) or ""
-            if re.search(r"patch\s*:", cfg_text):
-                return f"Codecov patch-coverage gate ({codecov_cfg} + {label})"
-            return (
-                f"Codecov coverage tracking ({codecov_cfg} + {label}), "
-                "patch status not confirmed"
-            )
-        if COVERALLS_PATTERN.search(text):
-            return f"Coveralls coverage tracking ({label})"
-        if sonar_cfg and SONAR_CI_PATTERN.search(text):
-            cfg_text = read_text(root / sonar_cfg) or ""
-            if SONAR_REPORT_PATH_PATTERN.search(cfg_text):
-                return (
-                    f"SonarCloud/SonarQube with a coverage report configured "
-                    f"({sonar_cfg} + {label}); 'Coverage on New Code' is Sonar's "
-                    "default quality gate but its current on/off state isn't "
-                    "visible in repo files"
-                )
-            return (
-                f"SonarCloud/SonarQube scan found ({sonar_cfg} + {label}), but no "
-                "coverage report path configured - coverage likely isn't being "
-                "analyzed at all"
-            )
-        match = DIFF_COVER_PATTERN.search(text)
-        if match:
-            fail_under = FAIL_UNDER_PATTERN.search(match.group(0))
-            if fail_under:
-                return f"diff-cover gate, --fail-under={fail_under.group(1)} ({label})"
-            return (
-                f"diff-cover invoked without --fail-under ({label}) - not actually "
-                "enforcing anything"
-            )
+    for label, text in _ci_texts(root):
+        gate = _gate_in_text(root, codecov_cfg, sonar_cfg, label, text)
+        if gate:
+            return gate
 
     return None

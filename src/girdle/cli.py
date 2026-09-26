@@ -153,33 +153,41 @@ def align(path: str, write: bool) -> None:
         click.echo("(dry run - pass --write to apply)")
 
 
-def _print_human(data: dict) -> None:
-    click.echo(f"girdle scan  {data['repo_root']}  ({data['mode']})")
+def _print_category(cat_name: str, cat: dict, applicable: list[str]) -> None:
+    marker = TIER_LABEL[cat["tier"]] if cat_name in applicable else "n/a"
+    click.echo(f"  {cat_name:<18} {marker}")
+    if cat["evidence"]:
+        click.echo(f"    evidence: {'; '.join(cat['evidence'])}")
+    if cat["reason"]:
+        click.echo(f"    reason: {cat['reason']}")
+    if cat["recommendation"]:
+        click.echo(f"    fix: {cat['recommendation']}")
+
+
+def _print_ecosystem(eco: dict) -> None:
+    click.echo(f"[{eco['id']}]  {eco['language']}/{eco['toolchain']}  root={eco['root']}")
+    for cat_name, cat in eco["categories"].items():
+        _print_category(cat_name, cat, eco["applicable_categories"])
     click.echo("")
-    for eco in data["ecosystems"]:
-        click.echo(f"[{eco['id']}]  {eco['language']}/{eco['toolchain']}  root={eco['root']}")
-        for cat_name, cat in eco["categories"].items():
-            if cat_name not in eco["applicable_categories"]:
-                marker = "n/a"
-            else:
-                marker = TIER_LABEL[cat["tier"]]
-            click.echo(f"  {cat_name:<18} {marker}")
-            if cat["evidence"]:
-                click.echo(f"    evidence: {'; '.join(cat['evidence'])}")
-            if cat["reason"]:
-                click.echo(f"    reason: {cat['reason']}")
-            if cat["recommendation"]:
-                click.echo(f"    fix: {cat['recommendation']}")
-        click.echo("")
+
+
+def _print_summary(data: dict) -> None:
     summary = data["summary"]
     click.echo(
         f"summary: {summary['ecosystem_count']} ecosystem(s), "
         f"overall_min={TIER_LABEL[summary['overall_min']]}, "
         f"weakest={summary['weakest_category']}"
     )
-    if data["warnings"]:
-        for w in data["warnings"]:
-            click.echo(f"warning: {w}")
+    for w in data["warnings"]:
+        click.echo(f"warning: {w}")
+
+
+def _print_human(data: dict) -> None:
+    click.echo(f"girdle scan  {data['repo_root']}  ({data['mode']})")
+    click.echo("")
+    for eco in data["ecosystems"]:
+        _print_ecosystem(eco)
+    _print_summary(data)
     hygiene = data.get("hygiene")
     if hygiene is not None:
         click.echo("")

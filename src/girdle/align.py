@@ -147,6 +147,37 @@ def _rust_formatter(root: Path) -> tuple[dict, str] | None:
     return None
 
 
+def _detect_python(root: Path, languages: set[str], detections: dict) -> None:
+    if "python" not in languages:
+        return
+    result = _python_formatter(root)
+    if result:
+        detections[LANGUAGE_GLOBS["python"]] = result
+
+
+def _detect_js(root: Path, languages: set[str], detections: dict, skip_notes: list[str]) -> None:
+    if "javascript" not in languages and "typescript" not in languages:
+        return
+    result = _js_formatter(root)
+    if not result:
+        note = _js_formatter_skip_note(root)
+        if note:
+            skip_notes.append(note)
+        return
+    settings, source = result
+    for lang in ("javascript", "typescript"):
+        if lang in languages:
+            detections[LANGUAGE_GLOBS[lang]] = (settings, source)
+
+
+def _detect_rust(root: Path, languages: set[str], detections: dict) -> None:
+    if "rust" not in languages:
+        return
+    result = _rust_formatter(root)
+    if result:
+        detections[LANGUAGE_GLOBS["rust"]] = result
+
+
 def detect_formatters(
     root: Path, languages: set[str]
 ) -> tuple[dict[str, tuple[dict, str]], list[str]]:
@@ -157,27 +188,9 @@ def detect_formatters(
     detections: dict[str, tuple[dict, str]] = {}
     skip_notes: list[str] = []
 
-    if "python" in languages:
-        result = _python_formatter(root)
-        if result:
-            detections[LANGUAGE_GLOBS["python"]] = result
-
-    if "javascript" in languages or "typescript" in languages:
-        result = _js_formatter(root)
-        if result:
-            settings, source = result
-            for lang in ("javascript", "typescript"):
-                if lang in languages:
-                    detections[LANGUAGE_GLOBS[lang]] = (settings, source)
-        else:
-            note = _js_formatter_skip_note(root)
-            if note:
-                skip_notes.append(note)
-
-    if "rust" in languages:
-        result = _rust_formatter(root)
-        if result:
-            detections[LANGUAGE_GLOBS["rust"]] = result
+    _detect_python(root, languages, detections)
+    _detect_js(root, languages, detections, skip_notes)
+    _detect_rust(root, languages, detections)
 
     return detections, skip_notes
 

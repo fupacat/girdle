@@ -87,30 +87,50 @@ _JS_DEF_TYPES = (
 )
 
 
+_JS_FUNCTION_VALUE_TYPES = ("arrow_function", "function", "function_expression")
+
+
+def _defs_lexical_declaration(node: Node, source: bytes) -> list[str]:
+    names = []
+    for declarator in node.children:
+        if declarator.type != "variable_declarator":
+            continue
+        value = declarator.child_by_field_name("value")
+        if value is not None and value.type in _JS_FUNCTION_VALUE_TYPES:
+            name = _name_of(declarator, source)
+            if name:
+                names.append(name)
+    return names
+
+
+def _unwrap_export(node: Node) -> Node | None:
+    if node.type != "export_statement":
+        return node
+    return node.child_by_field_name("declaration")
+
+
 def _defs_js_ts(root: Node, source: bytes) -> list[str]:
     names = []
     for child in root.children:
-        node = child
-        if node.type == "export_statement":
-            inner = node.child_by_field_name("declaration")
-            if inner is None:
-                continue
-            node = inner
+        node = _unwrap_export(child)
+        if node is None:
+            continue
         if node.type in _JS_DEF_TYPES:
             name = _name_of(node, source)
             if name:
                 names.append(name)
         elif node.type == "lexical_declaration":
-            for declarator in node.children:
-                if declarator.type != "variable_declarator":
-                    continue
-                value = declarator.child_by_field_name("value")
-                if value is not None and value.type in (
-                    "arrow_function", "function", "function_expression",
-                ):
-                    name = _name_of(declarator, source)
-                    if name:
-                        names.append(name)
+            names.extend(_defs_lexical_declaration(node, source))
+    return names
+
+
+def _defs_go_type_declaration(node: Node, source: bytes) -> list[str]:
+    names = []
+    for spec in node.children:
+        if spec.type == "type_spec":
+            name = _name_of(spec, source)
+            if name:
+                names.append(name)
     return names
 
 
@@ -119,15 +139,10 @@ def _defs_go(root: Node, source: bytes) -> list[str]:
     for child in root.children:
         if child.type in ("function_declaration", "method_declaration"):
             name_node = child.child_by_field_name("name")
-            if name_node is None:
-                continue
-            names.append(_text(name_node, source))
+            if name_node is not None:
+                names.append(_text(name_node, source))
         elif child.type == "type_declaration":
-            for spec in child.children:
-                if spec.type == "type_spec":
-                    name = _name_of(spec, source)
-                    if name:
-                        names.append(name)
+            names.extend(_defs_go_type_declaration(child, source))
     return names
 
 

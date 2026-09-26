@@ -17,31 +17,34 @@ from girdle.runner import run_check
 from girdle.schema import CategoryResult, EcosystemResult, ScanResult, Tier
 
 
+def _run_detector(detector: Detector, repo_root: Path, mode: str) -> EcosystemResult | None:
+    fp = detector.detect(repo_root)
+    if fp is None:
+        return None
+    categories = detector.scan(fp, mode)
+    _verify(detector, fp, categories, mode)
+    _check_coverage_gate(fp, categories)
+    return EcosystemResult(
+        id=fp.id,
+        language=fp.language,
+        toolchain=fp.toolchain,
+        root=str(fp.root.relative_to(repo_root)) if fp.root != repo_root else ".",
+        variants=fp.variants,
+        categories=categories,
+        applicable_categories=detector.applicable_categories(fp),
+    )
+
+
 def run_scan(
     repo_root: Path, mode: str = "static", check_platform_enforcement: bool = False
 ) -> ScanResult:
     repo_root = repo_root.resolve()
-    ecosystems: list[EcosystemResult] = []
+    ecosystems = [
+        eco
+        for detector in ALL_DETECTORS
+        if (eco := _run_detector(detector, repo_root, mode)) is not None
+    ]
     warnings: list[str] = []
-
-    for detector in ALL_DETECTORS:
-        fp = detector.detect(repo_root)
-        if fp is None:
-            continue
-        categories = detector.scan(fp, mode)
-        _verify(detector, fp, categories, mode)
-        _check_coverage_gate(fp, categories)
-        ecosystems.append(
-            EcosystemResult(
-                id=fp.id,
-                language=fp.language,
-                toolchain=fp.toolchain,
-                root=str(fp.root.relative_to(repo_root)) if fp.root != repo_root else ".",
-                variants=fp.variants,
-                categories=categories,
-                applicable_categories=detector.applicable_categories(fp),
-            )
-        )
 
     if not ecosystems:
         warnings.append("no known ecosystem detected at repo root")
