@@ -18,6 +18,14 @@ Scoped honestly to what's pattern-matchable:
 - Coveralls: a coveralls action/package invocation in CI.
 - diff-cover: a `diff-cover` invocation in CI, with --fail-under extracted
   if present.
+- SonarCloud/SonarQube: a sonar-project.properties (or .sonarcloud.properties)
+  file plus a Sonar scan step/CLI invocation in CI. Weaker confirmation than
+  Codecov's patch section by nature, not by laziness: "Coverage on New Code"
+  is Sonar's *default* quality-gate condition, not something declared in the
+  repo's own files - presence of Sonar plus a coverage report-path key
+  (`...reportPaths`) is the strongest signal obtainable from static files
+  alone; whether that gate condition is still enabled is Sonar-side state
+  this module can't see.
 
 Not attempted: a fully bespoke, homegrown diff-coverage script has no
 stable signature to match against - reported as not found rather than
@@ -35,6 +43,13 @@ CODECOV_UPLOAD_PATTERN = re.compile(r"codecov/codecov-action|codecov\.io/bash|\b
 COVERALLS_PATTERN = re.compile(r"coverallsapp/github-action|\bcoveralls\b")
 DIFF_COVER_PATTERN = re.compile(r"diff-cover\b[^\n]*")
 FAIL_UNDER_PATTERN = re.compile(r"--fail-under[=\s](\d+)")
+SONAR_CI_PATTERN = re.compile(
+    r"sonarcloud-github-action|sonarqube-scan-action|sonarsource/sonar-scan-action|"
+    r"\bsonar-scanner\b",
+    re.IGNORECASE,
+)
+SONAR_CONFIG_NAMES = ("sonar-project.properties", ".sonarcloud.properties")
+SONAR_REPORT_PATH_PATTERN = re.compile(r"reportPaths", re.IGNORECASE)
 
 CI_FILE_CANDIDATES = ("*.yml", "*.yaml")
 
@@ -66,6 +81,11 @@ def detect_gate(root: Path) -> str | None:
         if (root / name).exists():
             codecov_cfg = name
             break
+    sonar_cfg = None
+    for name in SONAR_CONFIG_NAMES:
+        if (root / name).exists():
+            sonar_cfg = name
+            break
 
     for label, text in ci_texts:
         if codecov_cfg and CODECOV_UPLOAD_PATTERN.search(text):
@@ -78,6 +98,20 @@ def detect_gate(root: Path) -> str | None:
             )
         if COVERALLS_PATTERN.search(text):
             return f"Coveralls coverage tracking ({label})"
+        if sonar_cfg and SONAR_CI_PATTERN.search(text):
+            cfg_text = read_text(root / sonar_cfg) or ""
+            if SONAR_REPORT_PATH_PATTERN.search(cfg_text):
+                return (
+                    f"SonarCloud/SonarQube with a coverage report configured "
+                    f"({sonar_cfg} + {label}); 'Coverage on New Code' is Sonar's "
+                    "default quality gate but its current on/off state isn't "
+                    "visible in repo files"
+                )
+            return (
+                f"SonarCloud/SonarQube scan found ({sonar_cfg} + {label}), but no "
+                "coverage report path configured - coverage likely isn't being "
+                "analyzed at all"
+            )
         match = DIFF_COVER_PATTERN.search(text)
         if match:
             fail_under = FAIL_UNDER_PATTERN.search(match.group(0))

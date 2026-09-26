@@ -60,6 +60,37 @@ def test_diff_cover_without_fail_under_flagged_as_not_enforcing(tmp_path: Path):
     assert "not actually enforcing" in gate
 
 
+def test_sonar_without_config_file_not_detected(tmp_path: Path):
+    _wf(tmp_path, "uses: SonarSource/sonarcloud-github-action@master\n")
+    assert detect_gate(tmp_path) is None
+
+
+def test_sonar_with_report_path_configured(tmp_path: Path):
+    (tmp_path / "sonar-project.properties").write_text(
+        "sonar.organization=x\nsonar.python.coverage.reportPaths=coverage.xml\n"
+    )
+    _wf(tmp_path, "uses: SonarSource/sonarcloud-github-action@master\n")
+    gate = detect_gate(tmp_path)
+    assert gate is not None
+    assert "coverage report configured" in gate
+
+
+def test_sonar_without_report_path_flags_coverage_not_analyzed(tmp_path: Path):
+    (tmp_path / "sonar-project.properties").write_text("sonar.organization=x\n")
+    _wf(tmp_path, "uses: SonarSource/sonarcloud-github-action@master\n")
+    gate = detect_gate(tmp_path)
+    assert gate is not None
+    assert "no coverage report path configured" in gate
+
+
+def test_sonarqube_scan_action_also_detected(tmp_path: Path):
+    (tmp_path / ".sonarcloud.properties").write_text("sonar.coverageReportPaths=coverage.xml\n")
+    _wf(tmp_path, "uses: SonarSource/sonarqube-scan-action@v4\n")
+    gate = detect_gate(tmp_path)
+    assert gate is not None
+    assert "coverage report configured" in gate
+
+
 # --- integration with scan._check_coverage_gate ---
 
 def _fp(tmp_path: Path) -> Fingerprint:
