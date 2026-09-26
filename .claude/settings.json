@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PROJECT_DIR}/.claude/hooks/sonar-secrets/build-scripts/pretool-secrets.ps1\"",
+            "timeout": 60
+          }
+        ],
+        "matcher": "Read"
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PROJECT_DIR}/.claude/hooks/sonar-secrets/build-scripts/prompt-secrets.ps1\"",
+            "timeout": 60
+          }
+        ],
+        "matcher": "*"
+      }
+    ]
+  }
+}
