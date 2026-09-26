@@ -61,6 +61,19 @@ def test_agent_sandbox_bootstrap_configured_via_copilot_setup_steps(tmp_path: Pa
     assert ".github/workflows/copilot-setup-steps.yml" in cat.evidence
 
 
+def test_agent_sandbox_bootstrap_configured_via_claude_worktree_create(tmp_path: Path):
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "settings.json").write_text(
+        '{"hooks": {"WorktreeCreate": [{"hooks": [{"type": "command", "command": "true"}]}]}}\n'
+    )
+    result = build_hygiene(tmp_path, languages=set())
+    cat = result.checks["agent_sandbox_bootstrap"]
+    assert cat.tier == Tier.CONFIGURED
+    assert ".claude/settings.json" in cat.evidence
+
+
 def test_agent_sandbox_bootstrap_configured_via_claude_session_start(tmp_path: Path):
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
     claude_dir = tmp_path / ".claude"

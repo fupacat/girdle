@@ -141,7 +141,13 @@ def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> Cate
             data = json.loads(_read_text(claude_settings) or "{}")
         except ValueError:
             data = {}
-        if isinstance(data, dict) and data.get("hooks", {}).get("SessionStart"):
+        hooks = data.get("hooks", {}) if isinstance(data, dict) else {}
+        # WorktreeCreate is the precise match (fires specifically when a
+        # worktree is created, same lifecycle scope as copilot-setup-steps);
+        # SessionStart is a looser but still valid fallback - it runs setup
+        # before an agent starts working too, just on every session rather
+        # than only worktree creation.
+        if hooks.get("WorktreeCreate") or hooks.get("SessionStart"):
             evidence.append(CLAUDE_SETTINGS)
 
     if not evidence:
@@ -149,12 +155,13 @@ def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> Cate
             Tier.ABSENT,
             reason=(
                 "pre-commit is configured but not wired into any agent sandbox bootstrap - "
-                "no copilot-setup-steps job or Claude Code SessionStart hook found"
+                "no copilot-setup-steps job or Claude Code WorktreeCreate/SessionStart hook "
+                "found"
             ),
             recommendation=(
                 "Add .github/workflows/copilot-setup-steps.yml (job named "
                 "`copilot-setup-steps`) running your dependency install then "
-                "`pre-commit install`, or an equivalent `SessionStart` hook in "
+                "`pre-commit install`, or a `WorktreeCreate` (or `SessionStart`) hook in "
                 ".claude/settings.json, so an agent's isolated sandbox gets the same "
                 "local enforcement a human contributor's `pre-commit install` gives them."
             ),
