@@ -90,6 +90,18 @@ def check_gitattributes(root: Path) -> CategoryResult:
     return CategoryResult(Tier.CONFIGURED, evidence=[".gitattributes"])
 
 
+def check_precommit(root: Path) -> CategoryResult:
+    path = root / ".pre-commit-config.yaml"
+    if not path.exists():
+        return CategoryResult(
+            Tier.ABSENT, reason="no .pre-commit-config.yaml found",
+            recommendation=(
+                "Add a .pre-commit-config.yaml to run fast local checks before commits."
+            ),
+        )
+    return CategoryResult(Tier.CONFIGURED, evidence=[".pre-commit-config.yaml"])
+
+
 def check_gitignore(root: Path, languages: set[str]) -> CategoryResult:
     path = root / GITIGNORE
     if not path.exists():
@@ -165,6 +177,7 @@ def build_hygiene(root: Path, languages: set[str]) -> HygieneResult:
         checks={
             "editorconfig": check_editorconfig(root),
             "gitattributes": check_gitattributes(root),
+            "precommit": check_precommit(root),
             "gitignore": check_gitignore(root, languages),
             "codeowners": check_codeowners(root),
             "readme": check_readme(root),

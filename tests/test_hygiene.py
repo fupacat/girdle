@@ -22,6 +22,17 @@ def test_gitattributes_present(tmp_path: Path):
     assert result.checks["gitattributes"].tier == Tier.CONFIGURED
 
 
+def test_precommit_absent(tmp_path: Path):
+    result = build_hygiene(tmp_path, languages=set())
+    assert result.checks["precommit"].tier == Tier.ABSENT
+
+
+def test_precommit_present(tmp_path: Path):
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    result = build_hygiene(tmp_path, languages=set())
+    assert result.checks["precommit"].tier == Tier.CONFIGURED
+
+
 def test_gitignore_missing_is_absent(tmp_path: Path):
     result = build_hygiene(tmp_path, languages={"python"})
     assert result.checks["gitignore"].tier == Tier.ABSENT
@@ -95,6 +106,7 @@ def test_to_dict_shape(tmp_path: Path):
     result = build_hygiene(tmp_path, languages=set())
     d = result.to_dict()
     assert set(d.keys()) == {
-        "editorconfig", "gitattributes", "gitignore", "codeowners", "readme", "contributing",
+        "editorconfig", "gitattributes", "precommit", "gitignore", "codeowners", "readme",
+        "contributing",
     }
     assert "tier" in d["editorconfig"]
