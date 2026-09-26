@@ -110,6 +110,16 @@ def test_agent_instructions_present_as_claude_md(tmp_path: Path):
     assert cat.evidence[0] == "CLAUDE.md"
 
 
+def test_agent_instructions_present_as_copilot_instructions(tmp_path: Path):
+    github_dir = tmp_path / ".github"
+    github_dir.mkdir()
+    (github_dir / "copilot-instructions.md").write_text("# Copilot\n")
+    result = build_hygiene(tmp_path, languages=set())
+    cat = result.checks["agent_instructions"]
+    assert cat.tier == Tier.CONFIGURED
+    assert cat.evidence[0] == ".github/copilot-instructions.md"
+
+
 def test_contributing_absent(tmp_path: Path):
     result = build_hygiene(tmp_path, languages=set())
     assert result.checks["contributing"].tier == Tier.ABSENT
