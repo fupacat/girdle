@@ -14,12 +14,18 @@ pre-commit install
 
 ```bash
 ruff check .
+mdformat --check --wrap keep $(git ls-files '*.md')
+yamllint .
 pytest
 girdle index . --check AGENTS.md
+girdle notes check .
 ```
 
-All three also run automatically on commit via `.pre-commit-config.yaml`
-(see the README's "Enforcement hooks" section) and again in CI on push/PR.
+All six also run automatically on commit via `.pre-commit-config.yaml`
+(see the README's "Enforcement hooks" section); everything except the
+notes check also runs again in CI on push/PR (that one's commit-local
+only - see "The vault" below). `mdformat` (no `--check`) rewrites files
+in place; the pre-commit hook does this for you, same as `ruff --fix`.
 
 ## Branch protection
 
@@ -35,8 +41,7 @@ PR instead.
 
 New ecosystem support = a new file in `src/girdle/detectors/` implementing
 the `Detector` protocol (`detectors/base.py`), registered in
-`detectors/registry.py`. See `AGENTS.md` and the `Agent-Ready Repository
-Design` vault note for the design rationale and the full detection matrix
+`detectors/registry.py`. See `AGENTS.md` and the `Agent-Ready Repository Design` vault note for the design rationale and the full detection matrix
 before adding scoring behavior.
 
 ## Regenerating pinned dependencies
@@ -57,3 +62,26 @@ girdle index . --inject AGENTS.md
 ```
 
 CI and the pre-commit hook both fail if this drifts from source.
+
+## The vault (`.agent-vault/`)
+
+Repo-scoped design rationale, decisions, research, and reference notes -
+separate from AGENTS.md (operational instructions) and the structural index
+(mechanically derived from code). Schema and note-type conventions:
+`.agent-vault/SCHEMA.md`.
+
+A note can declare `watches` entries (a file, optionally scoped to one
+named top-level symbol) if it documents something that can drift out of
+sync with the code - most notes (decisions, research, brainstorming) don't
+need this at all. The pre-commit hook (`girdle notes check .`) blocks a
+commit that changes a watched file/symbol without also updating the note
+that watches it in the *same* commit; if the note's already part of the
+commit, it auto-reconciles the recorded hash instead of blocking. To
+confirm a note is still accurate without editing its prose, run
+`girdle notes ack path/to/note.md` before committing.
+
+Regenerate the vault's own catalog after adding/editing a note:
+
+```bash
+girdle notes index .
+```
