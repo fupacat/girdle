@@ -22,6 +22,15 @@ def test_python_symbols_extracted(tmp_path: Path):
     assert "method" not in entry.symbols  # nested methods excluded, flat index only
 
 
+def test_line_count_matches_trailing_newline_convention(tmp_path: Path):
+    # 3 lines of content, standard trailing newline - `wc -l` and any
+    # editor report 3, not 4 (count(b"\n") + 1 overcounts this case).
+    (tmp_path / "three_lines.py").write_text("a = 1\nb = 2\nc = 3\n")
+    index = build_index(tmp_path)
+    entry = next(e for e in index.entries if e.path == "three_lines.py")
+    assert entry.lines == 3
+
+
 def test_excluded_dirs_are_skipped(tmp_path: Path):
     vendor = tmp_path / "node_modules" / "pkg"
     vendor.mkdir(parents=True)
