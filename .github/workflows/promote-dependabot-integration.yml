@@ -1,0 +1,38 @@
+name: Promote dependabot-integration to master
+
+# Dependabot bumps land on dependabot-integration (see auto-merge-dependabot.yml
+# and .github/dependabot.yml), not master - master's ruleset requires
+# SonarCloud Code Analysis and Gitar, neither of which run on Dependabot's
+# own PRs. This workflow opens (or reuses) a single promotion PR from
+# dependabot-integration into master, authored by github-actions[bot] rather
+# than dependabot[bot], so those checks actually run and the PR goes through
+# master's full ruleset normally. New Dependabot merges just add commits to
+# this same open PR - deliberately left for manual approval/merge rather
+# than auto-merged, since it's a batched change landing on master.
+
+on:
+  push:
+    branches: [dependabot-integration]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Open promotion PR if none exists
+        run: |
+          existing=$(gh pr list --base master --head dependabot-integration \
+            --state open --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            echo "promotion PR #$existing already open, nothing to do"
+          else
+            gh pr create --base master --head dependabot-integration \
+              --title "Promote dependency updates (dependabot-integration)" \
+              --body "Batches Dependabot bumps through master's full ruleset."
+          fi

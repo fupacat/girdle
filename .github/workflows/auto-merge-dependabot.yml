@@ -1,0 +1,35 @@
+name: Auto-merge Dependabot PRs (into integration branch)
+
+# Dependabot PRs target dependabot-integration (see .github/dependabot.yml),
+# not master directly - master's ruleset requires SonarCloud Code Analysis
+# and Gitar, and neither app runs on Dependabot-authored PRs (GitHub also
+# withholds repo secrets from Dependabot-triggered runs, which is why the
+# CI workflow's SonarQube Scan step explicitly skips for this actor). The
+# dependabot-integration branch has its own, lighter ruleset requiring only
+# the `test` check, so this workflow can safely auto-merge into it; a
+# separate workflow (promote-dependabot-integration.yml) then opens the
+# real, fully-gated PR from dependabot-integration into master.
+#
+# Same shape as auto-merge-copilot.yml: arm GitHub's native auto-merge and
+# get out of the way - the ruleset does the actual gating.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  auto-merge:
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.base.ref == 'dependabot-integration'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Enable auto-merge (squash)
+        run: gh pr merge "${{ github.event.pull_request.number }}" --auto --squash
