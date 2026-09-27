@@ -1,18 +1,17 @@
 name: Auto-merge Copilot PRs
 
-# Promotes Copilot coding agent PRs out of draft and arms GitHub's native
-# auto-merge, then gets out of the way - all real gating (required checks,
-# required review) is enforced by branch protection on the default branch
-# and GitHub's own auto-merge mechanism, not by this workflow's own logic.
+# Promotes Copilot coding agent PRs out of draft so Mergify can queue them.
+# Required checks and review are enforced by the default branch ruleset;
+# Mergify handles merging once its queue conditions are met.
 # Safe to call repeatedly (idempotent): re-running just re-asserts the same
-# two states.
+# ready-for-review state.
 #
 # Triggers on review_requested/ready_for_review, NOT opened/synchronize:
 # opened fires on Copilot's very first, often-empty "Initial plan" commit,
 # and synchronize fires on every intermediate push while it's still
-# mid-task - arming auto-merge that early risks a premature merge if an
-# unfinished commit happens to pass checks and get approved before Copilot
-# pushes more work. review_requested is the signal Copilot's coding agent
+# mid-task - promoting to ready that early risks queueing an unfinished PR
+# if a commit happens to pass checks and get approved before Copilot pushes
+# more work. review_requested is the signal Copilot's coding agent
 # itself emits once it considers a round of work actually done (confirmed
 # against this repo's own PR history - Copilot always fires
 # review_requested itself; it never fires ready_for_review, which stays a
@@ -46,5 +45,3 @@ jobs:
       - name: Mark ready for review
         if: github.event.pull_request.draft == true
         run: gh pr ready "${{ github.event.pull_request.number }}"
-      - name: Enable auto-merge (squash)
-        run: gh pr merge "${{ github.event.pull_request.number }}" --auto --squash

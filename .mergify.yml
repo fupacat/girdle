@@ -72,6 +72,24 @@ pull_request_rules:
       label:
         add:
           - dependency-major-review
+
+  - name: queue development PRs
+    # Non-Dependabot PRs (human-authored, or agent-authored like this
+    # session's own ci/* branches) already get Gitar/SonarCloud checks
+    # natively on their own branch - confirmed repeatedly tonight (#37,
+    # #39, #47 all showed both checks directly, no draft-PR workaround
+    # needed). So this queue uses default branch_protection_injection_mode
+    # (queue) rather than the Dependabot queue's none/merge_bot_account/
+    # max_checks_retries setup - master's full ruleset auto-injects into
+    # both queue_conditions and merge_conditions, no special-casing
+    # needed. Excludes dependabot[bot] (has its own queue above).
+    conditions:
+      - author!=dependabot[bot]
+      - -conflict
+      - -draft
+    actions:
+      queue:
+        name: default
 queue_rules:
   - name: Dependabot
     # branch_protection_injection_mode: merge - the default ("queue")
@@ -94,10 +112,21 @@ queue_rules:
           - dependabot-update-type=version-update:semver-patch
           - dependabot-update-type=version-update:semver-minor
           - dependabot-update-type=security
-  - name: Development
-    branch_protection_injection_mode: none
+    merge_conditions:
+      - check-success=test
+      - check-success=SonarCloud Code Analysis
+      - check-success=Gitar
+      - "#approved-reviews-by>=1"
+
+  - name: default
+    # Default branch_protection_injection_mode (queue): master's full
+    # ruleset auto-injects into both queue_conditions and
+    # merge_conditions, no explicit list or merge_bot_account needed -
+    # unlike the Dependabot queue, checks genuinely run on these PRs'
+    # own branches, so there's no in-place/trusted-vs-draft distinction
+    # to work around.
     queue_conditions:
-      - label = default
-      - check-success = @github-actions/test
+      - author!=dependabot[bot]
+      - author!=Copilot
 merge_queue:
   max_parallel_checks: 7
