@@ -206,6 +206,39 @@ def _merge_facts(classic: dict, ruleset: dict) -> dict:
     }
 
 
+def _fetch_classic_protection(
+    name_with_owner: str, default_branch: str, repo_root: Path
+) -> tuple[dict, bool, str | None]:
+    """Returns (facts, protected, error). error is set only on a genuine API
+    failure - an unprotected branch's expected 404 is not an error.
+    """
+    ok, out = _run(
+        ["api", f"repos/{name_with_owner}/branches/{default_branch}/protection"], repo_root
+    )
+    if ok:
+        return extract_protection_facts(json.loads(out)), True, None
+    if "404" in out or "Branch not protected" in out:
+        return {}, False, None
+    return {}, False, f"gh api call failed: {out}"
+
+
+def _fetch_ruleset_facts(name_with_owner: str, default_branch: str, repo_root: Path) -> dict:
+    """Via the branch-rules endpoint (already resolves org-level rulesets and
+    ref targeting for this specific branch - see extract_ruleset_facts's
+    docstring for why not the list-rulesets one). Best-effort: any failure
+    here just means no ruleset-derived facts, not a hard error - classic
+    protection alone is still a valid result.
+    """
+    ok, out = _run(["api", f"repos/{name_with_owner}/rules/branches/{default_branch}"], repo_root)
+    if not ok:
+        return {}
+    try:
+        rules = json.loads(out)
+    except json.JSONDecodeError:
+        return {}
+    return extract_ruleset_facts(rules) if isinstance(rules, list) else {}
+
+
 def check_platform(repo_root: Path) -> PlatformResult:
     if shutil.which("gh") is None:
         return PlatformResult(available=False, reason="gh CLI not found on PATH")
@@ -225,30 +258,13 @@ def check_platform(repo_root: Path) -> PlatformResult:
     name_with_owner = repo_data["nameWithOwner"]
     default_branch = (repo_data.get("defaultBranchRef") or {}).get("name") or "main"
 
-    # --- Classic branch-protection ---
-    classic_facts: dict = {}
-    classic_protected = False
-    ok, out = _run(
-        ["api", f"repos/{name_with_owner}/branches/{default_branch}/protection"], repo_root
+    classic_facts, classic_protected, error = _fetch_classic_protection(
+        name_with_owner, default_branch, repo_root
     )
-    if ok:
-        classic_facts = extract_protection_facts(json.loads(out))
-        classic_protected = True
-    elif "404" not in out and "Branch not protected" not in out:
-        return PlatformResult(available=False, reason=f"gh api call failed: {out}")
+    if error is not None:
+        return PlatformResult(available=False, reason=error)
 
-    # --- Rulesets, via the branch-rules endpoint (already resolves org-level
-    # rulesets and ref targeting for this specific branch - see
-    # extract_ruleset_facts's docstring for why not the list-rulesets one) ---
-    ruleset_facts: dict = {}
-    ok, out = _run(["api", f"repos/{name_with_owner}/rules/branches/{default_branch}"], repo_root)
-    if ok:
-        try:
-            rules = json.loads(out)
-            if isinstance(rules, list):
-                ruleset_facts = extract_ruleset_facts(rules)
-        except json.JSONDecodeError:
-            pass  # best-effort; fall through to classic-only result
+    ruleset_facts = _fetch_ruleset_facts(name_with_owner, default_branch, repo_root)
 
     protected = classic_protected or bool(ruleset_facts)
     merged = _merge_facts(classic_facts, ruleset_facts)
