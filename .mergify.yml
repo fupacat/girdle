@@ -89,10 +89,17 @@ queue_rules:
     # merge_conditions below deliberately excludes Gitar - the one
     # requirement genuinely unsatisfiable through this queue - while
     # keeping test/SonarCloud/review, which are all confirmed working.
-    # Needs merge_bot_account since injection_mode is none; now viable
-    # because Mergify (app id 10562) has ruleset bypass permission.
+    # No merge_bot_account set: per Mergify's docs, omitting it means
+    # "Mergify merges the pull request itself" - i.e. as the app (id
+    # 10562), which already holds ruleset bypass. merge_bot_account is
+    # for impersonating a real GitHub *user* who has logged into the
+    # Mergify dashboard and holds bypass/write access themselves -
+    # `mergify[bot]` isn't that (it's the app's own identity, can't log
+    # into the dashboard or hold a user token), so setting it to that
+    # would have failed at the actual merge step despite passing
+    # `config validate`/`simulate`, which only check schema and
+    # conditions, not this kind of semantic mismatch.
     branch_protection_injection_mode: none
-    merge_bot_account: mergify[bot]
     queue_conditions:
       - author=dependabot[bot]
       - or:
