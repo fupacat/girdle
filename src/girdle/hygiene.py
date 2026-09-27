@@ -46,6 +46,7 @@ CONTRIBUTING_LOCATIONS = (
     "CONTRIBUTING.md", ".github/CONTRIBUTING.md", "docs/CONTRIBUTING.md",
 )
 CODEOWNERS_LOCATIONS = ("CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS")
+AGENT_INSTRUCTIONS_LOCATIONS = ("AGENTS.md", "CLAUDE.md", ".github/copilot-instructions.md")
 
 MIN_NONTRIVIAL_CHARS = 40
 
@@ -240,6 +241,20 @@ def check_readme(root: Path) -> CategoryResult:
     return CategoryResult(Tier.CONFIGURED, evidence=[str(found.relative_to(root))])
 
 
+def check_agent_instructions(root: Path) -> CategoryResult:
+    found = _first_existing(root, AGENT_INSTRUCTIONS_LOCATIONS)
+    if found is None:
+        return CategoryResult(
+            Tier.ABSENT, reason="no agent instructions file found",
+            recommendation=(
+                "Add an AGENTS.md describing build/test commands and code-style "
+                "conventions so agentic tools (Claude Code, Copilot, Codex, Cursor, "
+                "and others) can operate effectively in this repo."
+            ),
+        )
+    return CategoryResult(Tier.CONFIGURED, evidence=[str(found.relative_to(root))])
+
+
 def check_contributing(root: Path) -> CategoryResult:
     found = _first_existing(root, CONTRIBUTING_LOCATIONS)
     if found is None:
@@ -263,6 +278,7 @@ def build_hygiene(root: Path, languages: set[str]) -> HygieneResult:
             "agent_sandbox_bootstrap": check_agent_sandbox_bootstrap(root, precommit),
             "gitignore": check_gitignore(root, languages),
             "codeowners": check_codeowners(root),
+            "agent_instructions": check_agent_instructions(root),
             "readme": check_readme(root),
             "contributing": check_contributing(root),
         }
