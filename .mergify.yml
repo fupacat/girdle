@@ -43,12 +43,10 @@ pull_request_rules:
     # unapproved (matching the queue) until any reviewer approves it for
     # any reason during review, at which point the queue would silently
     # auto-merge it with no explicit merge step, undermining "label major
-    # bumps for manual review". Master's full ruleset (test, SonarCloud,
-    # Gitar, 1 approving review) is what actually gates the merge, via
-    # the queue rule's branch_protection_injection_mode: merge - not a
-    # hand-picked subset duplicated here, and not something blocking
-    # queue entry either. Uses Mergify's own bot identity to merge (a
-    # real actor, not GITHUB_TOKEN), so downstream workflows and
+    # bumps for manual review". test/SonarCloud/review gate the actual
+    # merge (see the queue rule's merge_conditions for why Gitar is
+    # deliberately excluded there). Uses Mergify's own bot identity to
+    # merge (a real actor, not GITHUB_TOKEN), so downstream workflows and
     # required-status-check events fire normally on the commit it
     # produces.
     conditions:
@@ -74,25 +72,36 @@ pull_request_rules:
           - dependency-major-review
 queue_rules:
   - name: Dependabot
-    # branch_protection_injection_mode: merge - the default ("queue")
-    # injects master's ruleset into BOTH queue entry and the merge gate,
-    # which meant a Dependabot PR couldn't even enter the queue until
-    # Gitar/SonarCloud/review were satisfied (confirmed live: "Waiting
-    # for queue conditions" listed all three, stuck at the "Enter queue"
-    # step). "merge" injects the ruleset only at the merge gate, so entry
-    # stays governed purely by queue_conditions below - and once queued,
-    # Mergify tests the PR on its own mergify/merge-queue/* branch under
-    # its own identity, which may get Gitar/SonarCloud to actually run
-    # where they don't on the PR's own branch (untested until now - see
-    # PR history for what actually happened). This also means no
-    # merge_bot_account is needed - Mergify merges under its own identity
-    # once the real ruleset is satisfied.
-    branch_protection_injection_mode: merge
+    # Confirmed live (PR #23 -> speculative PR #38): Mergify's queue tests
+    # each Dependabot PR on its own mergify/merge-queue/* branch, authored
+    # as `mergify` rather than `dependabot[bot]` - and SonarCloud Code
+    # Analysis and test both actually ran and passed there, where they
+    # never do on the PR's own branch. Gitar still didn't fire even after
+    # several minutes (everything else landed within ~2) - PR #38 is a
+    # draft PR, and Gitar likely skips draft PRs specifically, separate
+    # from any dependabot[bot]-author exclusion. Auto-injecting Gitar into
+    # merge_conditions (branch_protection_injection_mode: merge, the
+    # previous setup) therefore left the queue permanently stuck at 3/4
+    # conditions - ruleset bypass_actors doesn't help here either, since
+    # Mergify's own queue engine waits for its internal copy of each
+    # condition regardless of whether it could bypass the final merge
+    # call. branch_protection_injection_mode: none plus explicit
+    # merge_conditions below deliberately excludes Gitar - the one
+    # requirement genuinely unsatisfiable through this queue - while
+    # keeping test/SonarCloud/review, which are all confirmed working.
+    # Needs merge_bot_account since injection_mode is none; now viable
+    # because Mergify (app id 10562) has ruleset bypass permission.
+    branch_protection_injection_mode: none
+    merge_bot_account: mergify[bot]
     queue_conditions:
       - author=dependabot[bot]
       - or:
           - dependabot-update-type=version-update:semver-patch
           - dependabot-update-type=version-update:semver-minor
           - dependabot-update-type=security
+    merge_conditions:
+      - check-success=test
+      - check-success=SonarCloud Code Analysis
+      - "#approved-reviews-by>=1"
 merge_queue:
   max_parallel_checks: 7
