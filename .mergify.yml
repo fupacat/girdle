@@ -1,19 +1,4 @@
 pull_request_rules:
-  - name: TEMP diagnostic - label any open PR
-    # Temporary: verifies the rule engine executes actions at all
-    # (independent of Dependabot-specific conditions), since Dependabot PRs
-    # haven't shown any automatic rule action despite repeated refreshes.
-    # Must be merged to master to actually run - Mergify reads .mergify.yml
-    # from the default branch, not a PR's own head branch, so this can't
-    # be tested from within the PR that adds it. Remove once diagnosed.
-    conditions:
-      - -closed
-      - label!=mergify-engine-test
-    actions:
-      label:
-        add:
-          - mergify-engine-test
-
   - name: keep safe Dependabot PRs up to date with master
     # master's ruleset requires strict status checks (branch must be
     # current before merge), so a Dependabot PR that sits for a while
@@ -52,20 +37,22 @@ pull_request_rules:
       review:
         type: APPROVE
 
-  - name: auto-merge safe Dependabot updates
-    # Patch/minor/security bumps are low-risk; queue them once the test job
-    # passes. Uses Mergify's own bot identity to merge (a real actor, not
-    # GITHUB_TOKEN), so downstream workflows and required-status-check
-    # events fire normally on the commit it produces - unlike a
-    # hand-rolled GITHUB_TOKEN-based auto-merge, which GitHub silently
-    # won't chain. Requires commits-behind=0 so this doesn't repeatedly
-    # attempt (and fail) merges while the rule above is still waiting on
-    # Dependabot's rebase.
+  - name: queue Dependabot updates
+    # Entry stays scoped to patch/minor/security - not just author is
+    # dependabot - since without this filter, a major bump could sit
+    # unapproved (matching the queue) until any reviewer approves it for
+    # any reason during review, at which point the queue would silently
+    # auto-merge it with no explicit merge step, undermining "label major
+    # bumps for manual review". The queue rule below still uses default
+    # branch_protection_injection_mode, so master's full ruleset (test,
+    # SonarCloud, Gitar, 1 approving review) is what actually gates the
+    # merge - not a hand-picked subset duplicated here. Uses Mergify's own
+    # bot identity to merge (a real actor, not GITHUB_TOKEN), so
+    # downstream workflows and required-status-check events fire normally
+    # on the commit it produces.
     conditions:
       - author=dependabot[bot]
       - -conflict
-      - check-success=test
-      - "#commits-behind=0"
       - or:
           - dependabot-update-type=version-update:semver-patch
           - dependabot-update-type=version-update:semver-minor
@@ -86,24 +73,23 @@ pull_request_rules:
           - dependency-major-review
 queue_rules:
   - name: Dependabot
-    # branch_protection_injection_mode: none means this queue's own
-    # merge_conditions are authoritative instead of auto-inheriting every
-    # check master's ruleset requires - listed explicitly below instead.
-    # github-review-approved/github-code-owner-review-satisfied are
-    # rejected as direct conditions ("evaluated internally, cannot be
-    # used in conditions") - #approved-reviews-by is the documented
-    # equivalent. The "auto-approve safe Dependabot updates"
-    # pull_request_rule above is what actually posts that approval.
-    branch_protection_injection_mode: none
+    # Default branch_protection_injection_mode (not "none"): master's full
+    # ruleset (test, SonarCloud, Gitar, 1 approving review) is injected
+    # automatically as this queue's real merge requirement, instead of a
+    # hand-picked subset. This also means no merge_bot_account is needed -
+    # Mergify merges under its own identity once the actual ruleset is
+    # satisfied. Note Gitar and SonarCloud don't run on Dependabot-authored
+    # PRs at all (confirmed separately), so as configured this queue will
+    # wait indefinitely on those two checks for a genuine Dependabot PR -
+    # a real gap, not something this config alone resolves. Scoped to
+    # patch/minor/security to match the "queue Dependabot updates" rule
+    # that's the only thing invoking this queue - see that rule's comment
+    # for why majors are excluded here too, not just at entry.
     queue_conditions:
       - author=dependabot[bot]
       - or:
           - dependabot-update-type=version-update:semver-patch
           - dependabot-update-type=version-update:semver-minor
           - dependabot-update-type=security
-    merge_conditions:
-      - check-success=test
-      - check-success=SonarCloud Code Analysis
-      - "#approved-reviews-by>=1"
 merge_queue:
   max_parallel_checks: 7
