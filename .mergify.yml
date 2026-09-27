@@ -76,7 +76,7 @@ pull_request_rules:
     conditions:
       - -draft
       - "#commits-behind >= 1"
-      - author != dependabot
+      - author!=dependabot[bot]
     actions:
       update: null
 queue_rules:
