@@ -38,17 +38,25 @@ pull_request_rules:
         type: APPROVE
 
   - name: queue Dependabot updates
-    # Entry to the queue is deliberately simple (author is dependabot);
-    # the queue rule below uses default branch_protection_injection_mode,
-    # so master's full ruleset (test, SonarCloud, Gitar, 1 approving
-    # review) is what actually gates the merge - not a hand-picked subset
-    # duplicated here. Uses Mergify's own bot identity to merge (a real
-    # actor, not GITHUB_TOKEN), so downstream workflows and
-    # required-status-check events fire normally on the commit it
-    # produces.
+    # Entry stays scoped to patch/minor/security - not just author is
+    # dependabot - since without this filter, a major bump could sit
+    # unapproved (matching the queue) until any reviewer approves it for
+    # any reason during review, at which point the queue would silently
+    # auto-merge it with no explicit merge step, undermining "label major
+    # bumps for manual review". The queue rule below still uses default
+    # branch_protection_injection_mode, so master's full ruleset (test,
+    # SonarCloud, Gitar, 1 approving review) is what actually gates the
+    # merge - not a hand-picked subset duplicated here. Uses Mergify's own
+    # bot identity to merge (a real actor, not GITHUB_TOKEN), so
+    # downstream workflows and required-status-check events fire normally
+    # on the commit it produces.
     conditions:
       - author=dependabot[bot]
       - -conflict
+      - or:
+          - dependabot-update-type=version-update:semver-patch
+          - dependabot-update-type=version-update:semver-minor
+          - dependabot-update-type=security
     actions:
       queue:
         name: Dependabot
@@ -73,8 +81,15 @@ queue_rules:
     # satisfied. Note Gitar and SonarCloud don't run on Dependabot-authored
     # PRs at all (confirmed separately), so as configured this queue will
     # wait indefinitely on those two checks for a genuine Dependabot PR -
-    # a real gap, not something this config alone resolves.
+    # a real gap, not something this config alone resolves. Scoped to
+    # patch/minor/security to match the "queue Dependabot updates" rule
+    # that's the only thing invoking this queue - see that rule's comment
+    # for why majors are excluded here too, not just at entry.
     queue_conditions:
       - author=dependabot[bot]
+      - or:
+          - dependabot-update-type=version-update:semver-patch
+          - dependabot-update-type=version-update:semver-minor
+          - dependabot-update-type=security
 merge_queue:
   max_parallel_checks: 7
