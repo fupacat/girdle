@@ -1,5 +1,9 @@
 # girdle
 
+[![CI](https://github.com/fupacat/girdle/actions/workflows/ci.yml/badge.svg)](https://github.com/fupacat/girdle/actions/workflows/ci.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=fupacat_girdle&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=fupacat_girdle)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=fupacat_girdle&metric=coverage)](https://sonarcloud.io/summary/new_code?id=fupacat_girdle)
+
 Scores a repository's agent-readiness verification infrastructure — tests,
 lint/type-checking, reproducible builds, and CI gating — across common
 language ecosystems (JS/TS, Python, Go, .NET, Rust, Java, and their major
