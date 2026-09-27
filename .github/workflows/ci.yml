@@ -22,7 +22,16 @@ jobs:
       - name: pytest
         env:
           MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
-        run: pytest --cov --cov-report=xml
+        # secrets.MERGIFY_TOKEN resolves to an empty string, not truly
+        # unset, when the secret doesn't exist (forks/Dependabot/not yet
+        # configured) - unset it here so pytest-mergify sees the same
+        # "no token" state verified locally, not an empty one that might
+        # be handled differently.
+        run: |
+          if [ -z "$MERGIFY_TOKEN" ]; then
+            unset MERGIFY_TOKEN
+          fi
+          pytest --cov --cov-report=xml
       - run: girdle index . --check AGENTS.md
       - name: vault notes freshness (read-only)
         # The pre-commit hook is the one place auto-reconcile makes sense
