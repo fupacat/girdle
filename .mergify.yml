@@ -62,8 +62,11 @@ pull_request_rules:
         name: Dependabot
 
   - name: label major Dependabot updates for manual review
-    # Major bumps carry real breaking-change risk - leave them for a human
-    # to look at and merge explicitly, rather than auto-merging.
+    # Major bumps carry real breaking-change risk - flag them for a
+    # reviewer to actually read the release notes and weigh them against
+    # how the dependency is used here, rather than a blanket
+    # auto-approve. See "queue major Dependabot updates pending review"
+    # below for how they merge once that real review lands.
     conditions:
       - author=dependabot[bot]
       - dependabot-update-type=version-update:semver-major
@@ -71,6 +74,26 @@ pull_request_rules:
       label:
         add:
           - dependency-major-review
+
+  - name: queue major Dependabot updates pending review
+    # Unlike the patch/minor/security rule above, this does NOT
+    # auto-approve - #approved-reviews-by>=1 in the queue's
+    # merge_conditions has to come from an actual reviewer (Gitar,
+    # Copilot, or a human) reading the major version's release notes
+    # against this repo's actual usage, not Mergify rubber-stamping it.
+    # Uses a separate queue (Dependabot-major, below) rather than this
+    # same one, specifically so it isn't bound by the Dependabot queue's
+    # 30m checks_timeout - that bound exists to catch Gitar/CI genuinely
+    # never posting, not to time out a PR that's legitimately still
+    # waiting on a human/Gitar/Copilot to actually read the release
+    # notes, which could reasonably take much longer.
+    conditions:
+      - author=dependabot[bot]
+      - -conflict
+      - dependabot-update-type=version-update:semver-major
+    actions:
+      queue:
+        name: Dependabot-major
 
   - name: queue development PRs
     # Non-Dependabot PRs (human-authored, or agent-authored like this
@@ -147,6 +170,28 @@ queue_rules:
           - dependabot-update-type=version-update:semver-patch
           - dependabot-update-type=version-update:semver-minor
           - dependabot-update-type=security
+    merge_conditions:
+      - check-success=test
+      - check-success=SonarCloud Code Analysis
+      - check-success=Gitar
+      - "#approved-reviews-by>=1"
+
+  - name: Dependabot-major
+    # Same draft_pr/merge_bot_account setup as the Dependabot queue
+    # above (major bumps have the same Gitar/SonarCloud-don't-run-on-
+    # Dependabot's-own-branch problem), but no checks_timeout - these
+    # wait on a genuine review, not just CI, and shouldn't get dequeued
+    # just because that review hasn't landed within some CI-scaled
+    # window. No auto-approve rule feeds #approved-reviews-by here (see
+    # "queue major Dependabot updates pending review"), so this queue
+    # only ever proceeds once a real reviewer has actually looked at
+    # the major version's release notes.
+    branch_protection_injection_mode: none
+    merge_bot_account: fupacat
+    max_checks_retries: 1
+    queue_conditions:
+      - author=dependabot[bot]
+      - dependabot-update-type=version-update:semver-major
     merge_conditions:
       - check-success=test
       - check-success=SonarCloud Code Analysis
