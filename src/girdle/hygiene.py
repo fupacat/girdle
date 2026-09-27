@@ -47,6 +47,16 @@ CONTRIBUTING_LOCATIONS = (
 )
 CODEOWNERS_LOCATIONS = ("CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS")
 AGENT_INSTRUCTIONS_LOCATIONS = ("AGENTS.md", "CLAUDE.md", ".github/copilot-instructions.md")
+DEPENDENCY_MONITORING_LOCATIONS = (
+    ".github/dependabot.yml",
+    ".github/dependabot.yaml",
+    ".renovaterc",
+    ".renovaterc.json",
+    ".renovaterc.js",
+    ".renovaterc.mjs",
+    "renovate.json",
+    "renovate.json5",
+)
 
 MIN_NONTRIVIAL_CHARS = 40
 
@@ -305,6 +315,19 @@ def check_contributing(root: Path) -> CategoryResult:
     return CategoryResult(Tier.CONFIGURED, evidence=[found.relative_to(root).as_posix()])
 
 
+def check_dependency_monitoring(root: Path) -> CategoryResult:
+    found = _first_existing(root, DEPENDENCY_MONITORING_LOCATIONS)
+    if found is None:
+        return CategoryResult(
+            Tier.ABSENT, reason="no dependency monitoring config found",
+            recommendation=(
+                "Configure automated dependency updates (e.g. GitHub Dependabot or "
+                "Renovate) to keep dependencies fresh and reduce security risk."
+            ),
+        )
+    return CategoryResult(Tier.CONFIGURED, evidence=[found.relative_to(root).as_posix()])
+
+
 def build_hygiene(root: Path, languages: set[str]) -> HygieneResult:
     precommit = check_precommit(root)
     return HygieneResult(
@@ -318,5 +341,6 @@ def build_hygiene(root: Path, languages: set[str]) -> HygieneResult:
             "agent_instructions": check_agent_instructions(root),
             "readme": check_readme(root),
             "contributing": check_contributing(root),
+            "dependency_monitoring": check_dependency_monitoring(root),
         }
     )
