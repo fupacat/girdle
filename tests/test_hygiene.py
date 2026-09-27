@@ -230,7 +230,7 @@ def test_to_dict_shape(tmp_path: Path):
     result = build_hygiene(tmp_path, languages=set())
     d = result.to_dict()
     assert set(d.keys()) == {
-"editorconfig", "gitattributes", "precommit", "agent_sandbox_bootstrap", "gitignore",
+        "editorconfig", "gitattributes", "precommit", "agent_sandbox_bootstrap", "gitignore",
         "codeowners", "agent_instructions", "readme", "contributing",
     }
     assert "tier" in d["editorconfig"]
