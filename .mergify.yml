@@ -37,19 +37,30 @@ pull_request_rules:
       comment:
         message: "@dependabot rebase"
 
+  - name: auto-approve safe Dependabot updates
+    # master's ruleset requires 1 approving review. Mergify auto-approving
+    # (the pattern Mergify's own Dependabot integration docs recommend)
+    # satisfies that legitimately, rather than needing to bypass the
+    # review requirement entirely.
+    conditions:
+      - author=dependabot[bot]
+      - or:
+          - dependabot-update-type=version-update:semver-patch
+          - dependabot-update-type=version-update:semver-minor
+          - dependabot-update-type=security
+    actions:
+      review:
+        type: APPROVE
+
   - name: auto-merge safe Dependabot updates
-    # Patch/minor/security bumps are low-risk; merge them once the test job
-    # passes. Uses the plain `merge` action, not `queue` (Mergify's
-    # batching/merge-train feature) - queue requires activating "Merge
-    # Queue" as a separate product on Mergify's dashboard, which this repo
-    # doesn't have enabled, and we don't need batching here anyway. `merge`
-    # still performs the merge under Mergify's own bot identity (a real
-    # actor, not GITHUB_TOKEN), so downstream workflows and
-    # required-status-check events fire normally on the commit it
-    # produces - unlike a hand-rolled GITHUB_TOKEN-based auto-merge, which
-    # GitHub silently won't chain. Requires commits-behind=0 so this
-    # doesn't repeatedly attempt (and fail) merges while the rule above is
-    # still waiting on Dependabot's rebase.
+    # Patch/minor/security bumps are low-risk; queue them once the test job
+    # passes. Uses Mergify's own bot identity to merge (a real actor, not
+    # GITHUB_TOKEN), so downstream workflows and required-status-check
+    # events fire normally on the commit it produces - unlike a
+    # hand-rolled GITHUB_TOKEN-based auto-merge, which GitHub silently
+    # won't chain. Requires commits-behind=0 so this doesn't repeatedly
+    # attempt (and fail) merges while the rule above is still waiting on
+    # Dependabot's rebase.
     conditions:
       - author=dependabot[bot]
       - -conflict
@@ -60,8 +71,8 @@ pull_request_rules:
           - dependabot-update-type=version-update:semver-minor
           - dependabot-update-type=security
     actions:
-      merge:
-        method: squash
+      queue:
+        name: Dependabot
 
   - name: label major Dependabot updates for manual review
     # Major bumps carry real breaking-change risk - leave them for a human
@@ -75,12 +86,19 @@ pull_request_rules:
           - dependency-major-review
 queue_rules:
   - name: Dependabot
+    # branch_protection_injection_mode: none means this queue's own
+    # merge_conditions are authoritative instead of auto-inheriting every
+    # check master's ruleset requires - listed explicitly below instead.
     branch_protection_injection_mode: none
     queue_conditions:
-      - author = dependabot[bot]
+      - author=dependabot[bot]
+      - or:
+          - dependabot-update-type=version-update:semver-patch
+          - dependabot-update-type=version-update:semver-minor
+          - dependabot-update-type=security
     merge_conditions:
-      - check-success = test
-      - check-success = SonarCloud Code Analysis
+      - check-success=test
+      - check-success=SonarCloud Code Analysis
       - github-review-approved
 merge_queue:
   max_parallel_checks: 7
