@@ -73,3 +73,5 @@ pull_request_rules:
       label:
         add:
           - dependency-major-review
+merge_protections_settings:
+  auto_merge_conditions: true
