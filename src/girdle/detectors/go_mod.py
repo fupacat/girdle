@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from girdle.detectors._util import read_text
+from girdle.detectors._util import read_text, scan_ci
 from girdle.detectors.base import Fingerprint
 from girdle.fsutil import rglob_excluding
 from girdle.schema import CategoryResult, Tier
@@ -93,22 +93,4 @@ class GoModDetector:
         return CategoryResult(Tier.CONFIGURED, evidence=present)
 
     def _scan_ci(self, root: Path) -> CategoryResult:
-        wf_dir = root / ".github" / "workflows"
-        if wf_dir.exists():
-            for wf in wf_dir.glob("*.y*ml"):
-                text = read_text(wf) or ""
-                if re.search(r"\bgo test\b", text):
-                    return CategoryResult(
-                        Tier.CONFIGURED, evidence=[f".github/workflows/{wf.name}: runs go test"]
-                    )
-        for f in (".gitlab-ci.yml", "azure-pipelines.yml"):
-            p = root / f
-            if p.exists() and re.search(r"\bgo test\b", read_text(p) or ""):
-                return CategoryResult(Tier.CONFIGURED, evidence=[f"{f}: runs go test"])
-        return CategoryResult(
-            Tier.ABSENT, reason="no CI config found running go test",
-            recommendation=(
-                "Add a GitHub Actions workflow (.github/workflows/ci.yml) that runs "
-                "`go test ./...`."
-            ),
-        )
+        return scan_ci(root, r"\bgo test\b", "go test ./...")

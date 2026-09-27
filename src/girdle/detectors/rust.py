@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from girdle.detectors._util import read_text, read_toml
+from girdle.detectors._util import read_text, read_toml, scan_ci
 from girdle.detectors.base import Fingerprint
 from girdle.fsutil import rglob_excluding
 from girdle.schema import CategoryResult, Tier
@@ -126,21 +126,4 @@ class RustDetector:
         return CategoryResult(Tier.CONFIGURED, evidence=[CARGO_LOCK])
 
     def _scan_ci(self, root: Path) -> CategoryResult:
-        wf_dir = root / ".github" / "workflows"
-        if wf_dir.exists():
-            for wf in wf_dir.glob("*.y*ml"):
-                if re.search(r"\bcargo test\b", read_text(wf) or ""):
-                    return CategoryResult(
-                        Tier.CONFIGURED, evidence=[f".github/workflows/{wf.name}: runs cargo test"]
-                    )
-        for f in (".gitlab-ci.yml", "azure-pipelines.yml"):
-            p = root / f
-            if p.exists() and re.search(r"\bcargo test\b", read_text(p) or ""):
-                return CategoryResult(Tier.CONFIGURED, evidence=[f"{f}: runs cargo test"])
-        return CategoryResult(
-            Tier.ABSENT, reason="no CI config found running cargo test",
-            recommendation=(
-                "Add a GitHub Actions workflow (.github/workflows/ci.yml) that runs "
-                "`cargo test`."
-            ),
-        )
+        return scan_ci(root, r"\bcargo test\b", "cargo test")
