@@ -1,4 +1,27 @@
 pull_request_rules:
+  - name: keep safe Dependabot PRs up to date with master
+    # master's ruleset requires strict status checks (branch must be
+    # current before merge), so a Dependabot PR that sits for a while
+    # behind other merges needs updating or the merge rule below can never
+    # actually complete. Ask Dependabot to rebase its own branch rather
+    # than using Mergify's `update` action (which pushes a merge commit
+    # authored by Mergify) - Dependabot stops managing a branch once it
+    # sees a commit from someone else, losing its own auto-rebase/
+    # conflict-resolution/version-refresh behavior. Scoped to the same
+    # patch/minor/security types the merge rule covers, so major bumps
+    # held for manual review aren't churned with pointless rebases/CI runs.
+    conditions:
+      - author=dependabot[bot]
+      - -conflict
+      - "#commits-behind>=1"
+      - or:
+          - dependabot-update-type=version-update:semver-patch
+          - dependabot-update-type=version-update:semver-minor
+          - dependabot-update-type=security
+    actions:
+      comment:
+        message: "@dependabot rebase"
+
   - name: auto-merge safe Dependabot updates
     # Patch/minor/security bumps are low-risk; merge them once the test job
     # passes. Uses the plain `merge` action, not `queue` (Mergify's
@@ -9,11 +32,14 @@ pull_request_rules:
     # actor, not GITHUB_TOKEN), so downstream workflows and
     # required-status-check events fire normally on the commit it
     # produces - unlike a hand-rolled GITHUB_TOKEN-based auto-merge, which
-    # GitHub silently won't chain.
+    # GitHub silently won't chain. Requires commits-behind=0 so this
+    # doesn't repeatedly attempt (and fail) merges while the rule above is
+    # still waiting on Dependabot's rebase.
     conditions:
       - author=dependabot[bot]
       - -conflict
       - check-success=test
+      - "#commits-behind=0"
       - or:
           - dependabot-update-type=version-update:semver-patch
           - dependabot-update-type=version-update:semver-minor
