@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import shlex
 import sys
 from pathlib import Path
 
 import click
 
+from girdle import audit
 from girdle.align import apply_plan, build_align_plans
 from girdle.dashboard import render_dashboard
 from girdle.indexer import build_index, inject_into, is_stale, render_manifest
@@ -164,6 +166,74 @@ def align(path: str, write: bool) -> None:
 
     if not write:
         click.echo("(dry run - pass --write to apply)")
+
+
+@main.command("audit")
+@click.argument("path", default=".", type=click.Path(exists=True, file_okay=False))
+@click.option(
+    "--file", "files", multiple=True, type=click.Path(exists=False),
+    help="Audit this file instead of auto-discovering instruction files. Repeatable.",
+)
+@click.option(
+    "--agent-cmd", default=None,
+    help="Override the agent CLI invocation, e.g. 'codex exec --json'. "
+         "Split with shlex; the prompt is piped via stdin.",
+)
+@click.option(
+    "--timeout", type=int, default=audit.DEFAULT_TIMEOUT,
+    help="Seconds to wait for the agent subprocess.",
+)
+@click.option(
+    "--json", "as_json", is_flag=True, help="Emit structured JSON instead of a human report.",
+)
+def audit_cmd(path: str, files: tuple[str, ...], agent_cmd: str | None,
+              timeout: int, as_json: bool) -> None:
+    """Fresh-subagent prose audit of AGENTS.md-style instruction files.
+
+    Classifies each instruction into one of three buckets (deterministic
+    tool exists / agent hook fits / stays in prose) via an external agent
+    CLI (default: `claude -p`), reusing whatever session is already
+    authenticated. Opt-in, degrades to unavailable if the CLI is missing or
+    fails - never applies anything, always a proposal to review.
+    """
+    repo_root = Path(path)
+    explicit = [repo_root / f for f in files] if files else None
+    try:
+        cmd = shlex.split(agent_cmd) if agent_cmd else None
+    except ValueError as e:
+        raise click.BadParameter(
+            f"could not parse --agent-cmd: {e}", param_hint="--agent-cmd"
+        ) from e
+    results = audit.run_audit(repo_root, files=explicit, agent_cmd=cmd, timeout=timeout)
+    if as_json:
+        click.echo(json.dumps([r.to_dict() for r in results], indent=2))
+    else:
+        _print_audit_human(results)
+
+
+def _print_audit_human(results: list[audit.AuditResult]) -> None:
+    bucket_labels = {1: "deterministic tool exists", 2: "agent hook fits", 3: "stays in prose"}
+    for result in results:
+        if not result.available:
+            click.echo(f"audit: {result.target}: not checked ({result.reason})")
+            continue
+        click.echo(f"audit: {result.target}")
+        counts = {1: 0, 2: 0, 3: 0}
+        for bucket in (1, 2, 3):
+            findings = [f for f in result.findings if f.bucket == bucket]
+            counts[bucket] = len(findings)
+            if not findings:
+                continue
+            click.echo(f"  [{bucket_labels[bucket]}]")
+            for f in findings:
+                click.echo(f'    "{f.excerpt}"')
+                click.echo(f"      {f.rationale}")
+                if f.citation:
+                    click.echo(f"      ({f.citation})")
+        click.echo(
+            f"  {result.target}: {counts[1]} bucket-1, {counts[2]} bucket-2, "
+            f"{counts[3]} bucket-3"
+        )
 
 
 def _print_category(cat_name: str, cat: dict, applicable: list[str]) -> None:

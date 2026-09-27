@@ -49,5 +49,6 @@ dev = [
     "mdformat>=0.7",
     "mdformat-frontmatter>=2.0",
     "mdformat-gfm>=0.3",
+    "mdformat-wikilink>=0.3",
     "yamllint>=1.35",
 ]

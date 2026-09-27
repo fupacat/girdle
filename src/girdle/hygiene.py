@@ -107,19 +107,77 @@ def check_precommit(root: Path) -> CategoryResult:
 
 COPILOT_SETUP_STEPS = ".github/workflows/copilot-setup-steps.yml"
 CLAUDE_SETTINGS = ".claude/settings.json"
+CODEX_DIR = ".codex"
+
+
+def _copilot_setup_steps_configured(root: Path) -> bool:
+    copilot_setup = root / ".github" / "workflows" / "copilot-setup-steps.yml"
+    if not copilot_setup.exists():
+        return False
+    text = _read_text(copilot_setup) or ""
+    # A job KEY, not just the substring anywhere - a comment or doc
+    # mentioning "copilot-setup-steps" must not count as configured.
+    return bool(re.search(r"(?m)^\s*copilot-setup-steps:", text))
+
+
+def _claude_sandbox_hook_configured(root: Path) -> bool:
+    claude_settings = root / ".claude" / "settings.json"
+    if not claude_settings.exists():
+        return False
+    try:
+        data = json.loads(_read_text(claude_settings) or "{}")
+    except ValueError:
+        data = {}
+    # `hooks` in valid, parseable JSON can still be the wrong shape
+    # (null, a list, a string) - guard the type before .get()'ing into
+    # it, the same malformed-input tolerance the JSON-parse guard above
+    # already aims for, just one level deeper.
+    hooks = data.get("hooks") if isinstance(data, dict) else None
+    if not isinstance(hooks, dict):
+        return False
+    # SessionStart is the safe, additive match: it runs alongside
+    # Claude Code's default worktree creation, same as copilot-setup-
+    # steps.yml runs alongside a job. WorktreeCreate is NOT equivalent -
+    # per Claude Code's docs it *replaces* the default `git worktree`
+    # step entirely (the hook itself must create the worktree and print
+    # its path as stdout's last line), so it's still counted as
+    # evidence a custom creator could fold pre-commit setup into, but
+    # it must never be the thing we recommend adding.
+    return bool(hooks.get("SessionStart") or hooks.get("WorktreeCreate"))
+
+
+def _codex_local_environment_configured(root: Path) -> bool:
+    # OpenAI's docs (learn.chatgpt.com/docs/environments/local-environment)
+    # say only that "Codex stores this configuration inside the .codex
+    # folder at the root of your project" and that the generated file "can
+    # [be] check[ed]... into your project's Git repository" - no exact
+    # filename is documented, so this checks that the directory exists AND
+    # holds something, rather than trusting a bare/empty .codex/ (which
+    # could be a stale leftover or an unrelated tool reusing the name) the
+    # way the Copilot and Claude sub-checks trust an actual job key or
+    # hooks key, not just a file's mere existence. This is the *local*
+    # desktop-app environment feature, distinct from Codex's cloud
+    # environments (chatgpt.com/codex/settings/environments), which are
+    # configured entirely through OpenAI's web UI and stay invisible to a
+    # local file scan - that cloud path is deliberately not checked here.
+    codex_dir = root / CODEX_DIR
+    return codex_dir.is_dir() and any(codex_dir.iterdir())
 
 
 def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> CategoryResult:
     """Whether an agent's isolated execution sandbox (GitHub Copilot coding
-    agent, Claude Code cloud/worktree sessions) gets wired into the same
-    local enforcement pre-commit gives a human contributor. Conditional on
-    pre-commit itself being configured - same shape as scan.py's coverage
-    gate check: nothing to bootstrap into an empty sandbox otherwise, so
-    checking this in isolation would be noise, not a finding.
+    agent, Claude Code cloud/worktree sessions, OpenAI Codex's local
+    desktop environment) gets wired into the same local enforcement
+    pre-commit gives a human contributor. Conditional on pre-commit itself
+    being configured - same shape as scan.py's coverage gate check: nothing
+    to bootstrap into an empty sandbox otherwise, so checking this in
+    isolation would be noise, not a finding.
 
-    OpenAI Codex's environment setup script is deliberately not checked -
-    it's configured through OpenAI's own web UI, not a repo-committed file,
+    Codex's *cloud* environment setup script is deliberately not checked -
+    it's configured through OpenAI's own web UI
+    (chatgpt.com/codex/settings/environments), not a repo-committed file,
     so it's invisible to a local file scan and would be dishonest to score.
+    The local desktop environment (.codex/) is different and is checked.
     """
     if precommit.tier != Tier.CONFIGURED:
         return CategoryResult(
@@ -131,54 +189,33 @@ def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> Cate
         )
 
     evidence = []
-    copilot_setup = root / ".github" / "workflows" / "copilot-setup-steps.yml"
-    if copilot_setup.exists():
-        text = _read_text(copilot_setup) or ""
-        # A job KEY, not just the substring anywhere - a comment or doc
-        # mentioning "copilot-setup-steps" must not count as configured.
-        if re.search(r"(?m)^\s*copilot-setup-steps:", text):
-            evidence.append(COPILOT_SETUP_STEPS)
-
-    claude_settings = root / ".claude" / "settings.json"
-    if claude_settings.exists():
-        try:
-            data = json.loads(_read_text(claude_settings) or "{}")
-        except ValueError:
-            data = {}
-        # `hooks` in valid, parseable JSON can still be the wrong shape
-        # (null, a list, a string) - guard the type before .get()'ing into
-        # it, the same malformed-input tolerance the JSON-parse guard above
-        # already aims for, just one level deeper.
-        hooks = data.get("hooks") if isinstance(data, dict) else None
-        # SessionStart is the safe, additive match: it runs alongside
-        # Claude Code's default worktree creation, same as copilot-setup-
-        # steps.yml runs alongside a job. WorktreeCreate is NOT equivalent -
-        # per Claude Code's docs it *replaces* the default `git worktree`
-        # step entirely (the hook itself must create the worktree and print
-        # its path as stdout's last line), so it's still counted as
-        # evidence a custom creator could fold pre-commit setup into, but
-        # it must never be the thing we recommend adding.
-        if isinstance(hooks, dict) and (hooks.get("SessionStart") or hooks.get("WorktreeCreate")):
-            evidence.append(CLAUDE_SETTINGS)
+    if _copilot_setup_steps_configured(root):
+        evidence.append(COPILOT_SETUP_STEPS)
+    if _claude_sandbox_hook_configured(root):
+        evidence.append(CLAUDE_SETTINGS)
+    if _codex_local_environment_configured(root):
+        evidence.append(CODEX_DIR)
 
     if not evidence:
         return CategoryResult(
             Tier.ABSENT,
             reason=(
                 "pre-commit is configured but not wired into any agent sandbox bootstrap - "
-                "no copilot-setup-steps job or Claude Code SessionStart/WorktreeCreate hook "
-                "found"
+                "no copilot-setup-steps job, Claude Code SessionStart/WorktreeCreate hook, "
+                "or .codex/ local environment found"
             ),
             recommendation=(
                 "Add .github/workflows/copilot-setup-steps.yml (job named "
                 "`copilot-setup-steps`) running your dependency install then "
-                "`pre-commit install`, or a `SessionStart` hook in .claude/settings.json "
+                "`pre-commit install`, a `SessionStart` hook in .claude/settings.json "
                 "doing the same (a custom `WorktreeCreate` hook can also run it, but only "
                 "if it also creates the worktree itself and prints its path - that hook "
                 "replaces Claude Code's default worktree creation rather than running "
-                "alongside it, so don't add one just for this), so an agent's isolated "
-                "sandbox gets the same local enforcement a human contributor's "
-                "`pre-commit install` gives them."
+                "alongside it, so don't add one just for this), or a Codex local "
+                "environment (ChatGPT desktop app settings -> .codex/) with a setup script "
+                "that runs `pre-commit install`, so an agent's isolated sandbox gets the "
+                "same local enforcement a human contributor's `pre-commit install` gives "
+                "them."
             ),
         )
     return CategoryResult(Tier.CONFIGURED, evidence=evidence)

@@ -28,7 +28,10 @@ class RunOutcome:
     stderr: str = ""
 
 
-def run_check(command: list[str], cwd: Path, timeout: int = DEFAULT_TIMEOUT) -> RunOutcome:
+def run_check(
+    command: list[str], cwd: Path, timeout: int = DEFAULT_TIMEOUT,
+    input: str | None = None,
+) -> RunOutcome:
     exe = command[0]
     resolved = shutil.which(exe, path=None) or shutil.which(exe, path=str(cwd))
     if resolved is None and not (cwd / exe).exists():
@@ -41,6 +44,7 @@ def run_check(command: list[str], cwd: Path, timeout: int = DEFAULT_TIMEOUT) -> 
             text=True,
             timeout=timeout,
             shell=False,
+            input=input,
         )
     except subprocess.TimeoutExpired:
         return RunOutcome(ran=True, passed=False, reason=f"timed out after {timeout}s")
