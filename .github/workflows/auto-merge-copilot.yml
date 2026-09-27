@@ -4,12 +4,28 @@ name: Auto-merge Copilot PRs
 # auto-merge, then gets out of the way - all real gating (required checks,
 # required review) is enforced by branch protection on the default branch
 # and GitHub's own auto-merge mechanism, not by this workflow's own logic.
-# Safe to call repeatedly (idempotent): re-running on a new push just
-# re-asserts the same two states.
+# Safe to call repeatedly (idempotent): re-running just re-asserts the same
+# two states.
+#
+# Triggers on review_requested/ready_for_review, NOT opened/synchronize:
+# opened fires on Copilot's very first, often-empty "Initial plan" commit,
+# and synchronize fires on every intermediate push while it's still
+# mid-task - arming auto-merge that early risks a premature merge if an
+# unfinished commit happens to pass checks and get approved before Copilot
+# pushes more work. review_requested is the signal Copilot's coding agent
+# itself emits once it considers a round of work actually done (confirmed
+# against this repo's own PR history - Copilot always fires
+# review_requested itself; it never fires ready_for_review, which stays a
+# human/this-workflow action). ready_for_review is also handled so a
+# manually-promoted PR still gets auto-merge armed.
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [review_requested, ready_for_review, reopened]
+
+concurrency:
+  group: auto-merge-copilot-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
 
 permissions:
   pull-requests: write
@@ -20,7 +36,8 @@ jobs:
     if: >-
       github.event.pull_request.user.login == 'Copilot' &&
       startsWith(github.event.pull_request.head.ref, 'copilot/') &&
-      github.event.pull_request.base.ref == github.event.repository.default_branch
+      github.event.pull_request.base.ref == github.event.repository.default_branch &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
