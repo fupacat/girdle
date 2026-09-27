@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from girdle.detectors._util import read_text
+from girdle.detectors._util import read_text, scan_ci
 from girdle.detectors.base import Fingerprint
 from girdle.schema import CategoryResult, Tier
 
@@ -107,21 +107,4 @@ class JavaMavenDetector:
         )
 
     def _scan_ci(self, root: Path) -> CategoryResult:
-        wf_dir = root / ".github" / "workflows"
-        if wf_dir.exists():
-            for wf in wf_dir.glob("*.y*ml"):
-                if re.search(r"\bmvn\b.*\btest\b", read_text(wf) or ""):
-                    return CategoryResult(
-                        Tier.CONFIGURED, evidence=[f".github/workflows/{wf.name}: runs mvn test"]
-                    )
-        for f in (".gitlab-ci.yml", "azure-pipelines.yml"):
-            p = root / f
-            if p.exists() and re.search(r"\bmvn\b.*\btest\b", read_text(p) or ""):
-                return CategoryResult(Tier.CONFIGURED, evidence=[f"{f}: runs mvn test"])
-        return CategoryResult(
-            Tier.ABSENT, reason="no CI config found running mvn test",
-            recommendation=(
-                "Add a GitHub Actions workflow (.github/workflows/ci.yml) that runs "
-                "`mvn test`."
-            ),
-        )
+        return scan_ci(root, r"\bmvn\b.*\btest\b", "mvn test")

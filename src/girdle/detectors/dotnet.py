@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from girdle.detectors._util import read_text
+from girdle.detectors._util import read_text, scan_ci
 from girdle.detectors.base import Fingerprint
 from girdle.fsutil import rglob_excluding
 from girdle.schema import CategoryResult, Tier
@@ -154,21 +154,4 @@ class DotNetDetector:
         )
 
     def _scan_ci(self, root: Path) -> CategoryResult:
-        wf_dir = root / ".github" / "workflows"
-        if wf_dir.exists():
-            for wf in wf_dir.glob("*.y*ml"):
-                if re.search(r"\bdotnet test\b", read_text(wf) or ""):
-                    return CategoryResult(
-                        Tier.CONFIGURED, evidence=[f".github/workflows/{wf.name}: runs dotnet test"]
-                    )
-        for f in (".gitlab-ci.yml", "azure-pipelines.yml"):
-            p = root / f
-            if p.exists() and re.search(r"\bdotnet test\b", read_text(p) or ""):
-                return CategoryResult(Tier.CONFIGURED, evidence=[f"{f}: runs dotnet test"])
-        return CategoryResult(
-            Tier.ABSENT, reason="no CI config found running dotnet test",
-            recommendation=(
-                "Add a GitHub Actions workflow (.github/workflows/ci.yml) that runs "
-                "`dotnet test`."
-            ),
-        )
+        return scan_ci(root, r"\bdotnet test\b", "dotnet test")

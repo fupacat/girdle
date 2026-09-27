@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
 
-from girdle.detectors._util import read_text
+from girdle.detectors._util import read_text, scan_ci
 from girdle.detectors.base import Fingerprint
 from girdle.schema import CategoryResult, Tier
 
@@ -112,23 +111,4 @@ class JavaGradleDetector:
         )
 
     def _scan_ci(self, root: Path) -> CategoryResult:
-        wf_dir = root / ".github" / "workflows"
-        if wf_dir.exists():
-            for wf in wf_dir.glob("*.y*ml"):
-                text = read_text(wf) or ""
-                if re.search(r"gradlew?\b.*test\b", text) or re.search(r"\bgradle test\b", text):
-                    return CategoryResult(
-                        Tier.CONFIGURED, evidence=[f".github/workflows/{wf.name}: runs gradle test"]
-                    )
-        for f in (".gitlab-ci.yml", "azure-pipelines.yml"):
-            p = root / f
-            text = read_text(p) or ""
-            if p.exists() and re.search(r"gradlew?\b.*test\b", text):
-                return CategoryResult(Tier.CONFIGURED, evidence=[f"{f}: runs gradle test"])
-        return CategoryResult(
-            Tier.ABSENT, reason="no CI config found running gradle test",
-            recommendation=(
-                "Add a GitHub Actions workflow (.github/workflows/ci.yml) that runs "
-                "`./gradlew test`."
-            ),
-        )
+        return scan_ci(root, r"gradlew?\b.*\btest\b", "./gradlew test")
