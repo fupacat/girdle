@@ -123,6 +123,39 @@ def extract_protection_facts(protection_json: dict) -> dict:
     }
 
 
+def _apply_pull_request_rule(params: dict, facts: dict) -> None:
+    count = params.get("required_approving_review_count", 0)
+    if count > facts["required_approving_review_count"]:
+        facts["required_approving_review_count"] = count
+    if params.get("require_code_owner_review"):
+        facts["require_code_owner_reviews"] = True
+
+
+def _apply_status_checks_rule(params: dict, facts: dict) -> None:
+    for check in params.get("required_status_checks") or []:
+        ctx = check.get("context") or check.get("integrationId") or str(check)
+        if ctx and ctx not in facts["required_status_check_contexts"]:
+            facts["required_status_check_contexts"].append(ctx)
+
+
+def _apply_non_fast_forward_rule(params: dict, facts: dict) -> None:
+    facts["allow_force_pushes"] = False
+
+
+def _apply_deletion_rule(params: dict, facts: dict) -> None:
+    pass  # noted but not surfaced in PlatformResult yet
+
+
+# Dispatch table, not an if/elif chain - keeps extract_ruleset_facts itself
+# to a single flat loop regardless of how many rule types are handled.
+_RULESET_RULE_HANDLERS = {
+    "pull_request": _apply_pull_request_rule,
+    "required_status_checks": _apply_status_checks_rule,
+    "non_fast_forward": _apply_non_fast_forward_rule,
+    "deletion": _apply_deletion_rule,
+}
+
+
 def extract_ruleset_facts(rules_json: list[dict]) -> dict:
     """Fold a branch's active rules into a facts dict with the same shape as
     :func:`extract_protection_facts`.
@@ -135,44 +168,28 @@ def extract_ruleset_facts(rules_json: list[dict]) -> dict:
     org-level rulesets, `~DEFAULT_BRANCH`/`~ALL` targeting, and ref-pattern
     excludes server-side - no client-side ref matching needed here.
     """
-    required_approving_review_count = 0
-    require_code_owner_reviews = False
-    allow_force_pushes = True   # a rule *restricts* force-push via non_fast_forward
-    required_status_check_contexts: list[str] = []
+    facts = {
+        "required_approving_review_count": 0,
+        "require_code_owner_reviews": False,
+        "allow_force_pushes": True,  # a rule *restricts* this via non_fast_forward
+        "required_status_check_contexts": [],
+    }
     matched = False
 
     for rule in rules_json:
-        rtype = rule.get("type")
-        params = rule.get("parameters") or {}
-        if rtype == "pull_request":
-            matched = True
-            count = params.get("required_approving_review_count", 0)
-            if count > required_approving_review_count:
-                required_approving_review_count = count
-            if params.get("require_code_owner_review"):
-                require_code_owner_reviews = True
-        elif rtype == "required_status_checks":
-            matched = True
-            for check in params.get("required_status_checks") or []:
-                ctx = check.get("context") or check.get("integrationId") or str(check)
-                if ctx and ctx not in required_status_check_contexts:
-                    required_status_check_contexts.append(ctx)
-        elif rtype == "non_fast_forward":
-            matched = True
-            allow_force_pushes = False
-        elif rtype == "deletion":
-            matched = True  # noted but not surfaced in PlatformResult yet
+        handler = _RULESET_RULE_HANDLERS.get(rule.get("type"))
+        if handler is None:
+            continue
+        matched = True
+        handler(rule.get("parameters") or {}, facts)
 
     if not matched:
         return {}
 
     return {
-        "required_approving_review_count": required_approving_review_count,
-        "require_code_owner_reviews": require_code_owner_reviews,
+        **facts,
         "enforce_admins": False,  # rulesets don't have an enforce_admins concept
-        "allow_force_pushes": allow_force_pushes,
         "required_signatures": False,
-        "required_status_check_contexts": required_status_check_contexts,
     }
 
 
