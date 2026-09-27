@@ -123,6 +123,139 @@ def extract_protection_facts(protection_json: dict) -> dict:
     }
 
 
+def _apply_pull_request_rule(params: dict, facts: dict) -> None:
+    count = params.get("required_approving_review_count", 0)
+    if count > facts["required_approving_review_count"]:
+        facts["required_approving_review_count"] = count
+    if params.get("require_code_owner_review"):
+        facts["require_code_owner_reviews"] = True
+
+
+def _apply_status_checks_rule(params: dict, facts: dict) -> None:
+    for check in params.get("required_status_checks") or []:
+        ctx = check.get("context") or check.get("integrationId") or str(check)
+        if ctx and ctx not in facts["required_status_check_contexts"]:
+            facts["required_status_check_contexts"].append(ctx)
+
+
+def _apply_non_fast_forward_rule(params: dict, facts: dict) -> None:
+    facts["allow_force_pushes"] = False
+
+
+def _apply_deletion_rule(params: dict, facts: dict) -> None:
+    pass  # noted but not surfaced in PlatformResult yet
+
+
+# Dispatch table, not an if/elif chain - keeps extract_ruleset_facts itself
+# to a single flat loop regardless of how many rule types are handled.
+_RULESET_RULE_HANDLERS = {
+    "pull_request": _apply_pull_request_rule,
+    "required_status_checks": _apply_status_checks_rule,
+    "non_fast_forward": _apply_non_fast_forward_rule,
+    "deletion": _apply_deletion_rule,
+}
+
+
+def extract_ruleset_facts(rules_json: list[dict]) -> dict:
+    """Fold a branch's active rules into a facts dict with the same shape as
+    :func:`extract_protection_facts`.
+
+    *rules_json* is the response from `GET repos/{owner}/{repo}/rules/branches/{branch}`
+    - a flat list of ``{type, parameters}`` objects for the rules already
+    active on that specific branch. Unlike the list-rulesets endpoint
+    (`GET repos/{owner}/{repo}/rulesets`), which returns only ruleset
+    summaries without `conditions`/`rules`, this endpoint has GitHub resolve
+    org-level rulesets, `~DEFAULT_BRANCH`/`~ALL` targeting, and ref-pattern
+    excludes server-side - no client-side ref matching needed here.
+    """
+    facts = {
+        "required_approving_review_count": 0,
+        "require_code_owner_reviews": False,
+        "allow_force_pushes": True,  # a rule *restricts* this via non_fast_forward
+        "required_status_check_contexts": [],
+    }
+    matched = False
+
+    for rule in rules_json:
+        handler = _RULESET_RULE_HANDLERS.get(rule.get("type"))
+        if handler is None:
+            continue
+        matched = True
+        handler(rule.get("parameters") or {}, facts)
+
+    if not matched:
+        return {}
+
+    return {
+        **facts,
+        "enforce_admins": False,  # rulesets don't have an enforce_admins concept
+        "required_signatures": False,
+    }
+
+
+def _merge_facts(classic: dict, ruleset: dict) -> dict:
+    """Union protection facts from classic branch protection and rulesets."""
+    if not ruleset:
+        return classic
+    if not classic:
+        return ruleset
+    return {
+        "required_approving_review_count": max(
+            classic.get("required_approving_review_count", 0),
+            ruleset.get("required_approving_review_count", 0),
+        ),
+        "require_code_owner_reviews": (
+            classic.get("require_code_owner_reviews", False)
+            or ruleset.get("require_code_owner_reviews", False)
+        ),
+        "enforce_admins": classic.get("enforce_admins", False),
+        "allow_force_pushes": (
+            classic.get("allow_force_pushes", False)
+            and ruleset.get("allow_force_pushes", False)
+        ),
+        "required_signatures": classic.get("required_signatures", False),
+        "required_status_check_contexts": list(
+            dict.fromkeys(
+                classic.get("required_status_check_contexts", [])
+                + ruleset.get("required_status_check_contexts", [])
+            )
+        ),
+    }
+
+
+def _fetch_classic_protection(
+    name_with_owner: str, default_branch: str, repo_root: Path
+) -> tuple[dict, bool, str | None]:
+    """Returns (facts, protected, error). error is set only on a genuine API
+    failure - an unprotected branch's expected 404 is not an error.
+    """
+    ok, out = _run(
+        ["api", f"repos/{name_with_owner}/branches/{default_branch}/protection"], repo_root
+    )
+    if ok:
+        return extract_protection_facts(json.loads(out)), True, None
+    if "404" in out or "Branch not protected" in out:
+        return {}, False, None
+    return {}, False, f"gh api call failed: {out}"
+
+
+def _fetch_ruleset_facts(name_with_owner: str, default_branch: str, repo_root: Path) -> dict:
+    """Via the branch-rules endpoint (already resolves org-level rulesets and
+    ref targeting for this specific branch - see extract_ruleset_facts's
+    docstring for why not the list-rulesets one). Best-effort: any failure
+    here just means no ruleset-derived facts, not a hard error - classic
+    protection alone is still a valid result.
+    """
+    ok, out = _run(["api", f"repos/{name_with_owner}/rules/branches/{default_branch}"], repo_root)
+    if not ok:
+        return {}
+    try:
+        rules = json.loads(out)
+    except json.JSONDecodeError:
+        return {}
+    return extract_ruleset_facts(rules) if isinstance(rules, list) else {}
+
+
 def check_platform(repo_root: Path) -> PlatformResult:
     if shutil.which("gh") is None:
         return PlatformResult(available=False, reason="gh CLI not found on PATH")
@@ -142,26 +275,23 @@ def check_platform(repo_root: Path) -> PlatformResult:
     name_with_owner = repo_data["nameWithOwner"]
     default_branch = (repo_data.get("defaultBranchRef") or {}).get("name") or "main"
 
-    ok, out = _run(
-        ["api", f"repos/{name_with_owner}/branches/{default_branch}/protection"], repo_root
+    classic_facts, classic_protected, error = _fetch_classic_protection(
+        name_with_owner, default_branch, repo_root
     )
-    if not ok:
-        if "404" in out or "Branch not protected" in out:
-            result = PlatformResult(
-                available=True, repo=name_with_owner, default_branch=default_branch,
-                protected=False,
-            )
-            result.recommendations = compute_recommendations(result)
-            return result
-        return PlatformResult(available=False, reason=f"gh api call failed: {out}")
+    if error is not None:
+        return PlatformResult(available=False, reason=error)
 
-    facts = extract_protection_facts(json.loads(out))
+    ruleset_facts = _fetch_ruleset_facts(name_with_owner, default_branch, repo_root)
+
+    protected = classic_protected or bool(ruleset_facts)
+    merged = _merge_facts(classic_facts, ruleset_facts)
+
     result = PlatformResult(
         available=True,
         repo=name_with_owner,
         default_branch=default_branch,
-        protected=True,
-        **facts,
+        protected=protected,
+        **merged,
     )
     result.recommendations = compute_recommendations(result)
     return result
