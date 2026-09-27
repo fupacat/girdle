@@ -7,6 +7,7 @@ from click.testing import CliRunner
 from girdle.audit import (
     AGENT_INSTRUCTIONS_LOCATIONS,
     AuditFinding,
+    AuditResult,
     audit_file,
     discover_instruction_files,
     parse_agent_output,
@@ -14,6 +15,17 @@ from girdle.audit import (
 )
 from girdle.cli import main
 from girdle.runner import RunOutcome
+
+
+def test_invoke_agent_delegates_to_run_check(tmp_path: Path):
+    from girdle.audit import _invoke_agent
+
+    with patch("girdle.audit.run_check") as mock_run_check:
+        mock_run_check.return_value = RunOutcome(ran=True, passed=True, reason=None, stdout="[]")
+        _invoke_agent("prompt text", ["claude", "-p"], tmp_path, 300)
+    mock_run_check.assert_called_once_with(
+        ["claude", "-p"], cwd=tmp_path, timeout=300, input="prompt text"
+    )
 
 
 def test_audit_binary_not_found(tmp_path: Path):
@@ -69,6 +81,65 @@ def test_audit_inner_result_not_json():
     assert "ignored format instruction" in error
 
 
+def test_audit_result_to_dict_unavailable():
+    result = AuditResult(available=False, reason="claude not found on PATH", target="AGENTS.md")
+    assert result.to_dict() == {
+        "available": False, "reason": "claude not found on PATH", "target": "AGENTS.md",
+    }
+
+
+def test_audit_result_to_dict_available():
+    result = AuditResult(
+        available=True, target="AGENTS.md",
+        findings=[AuditFinding(excerpt="x", bucket=3, rationale="r", citation="")],
+    )
+    d = result.to_dict()
+    assert d["available"] is True
+    assert d["findings"][0]["bucket"] == 3
+
+
+def test_parse_agent_output_inner_json_not_a_list():
+    stdout = json.dumps({"result": json.dumps({"not": "a list"})})
+    findings, error = parse_agent_output(stdout)
+    assert findings is None
+    assert "not a list" in error
+
+
+def test_audit_file_read_error_is_unavailable_not_a_crash(tmp_path: Path):
+    (tmp_path / "AGENTS.md").write_text("x\n")
+    with (
+        patch("girdle.audit.shutil.which", return_value="/usr/bin/claude"),
+        patch("pathlib.Path.read_text", side_effect=OSError("permission denied")),
+    ):
+        result = audit_file(tmp_path / "AGENTS.md", tmp_path, ["claude", "-p"], 300)
+    assert result.available is False
+    assert "failed to read" in result.reason
+
+
+def test_audit_file_process_did_not_run_is_unavailable(tmp_path: Path):
+    (tmp_path / "AGENTS.md").write_text("x\n")
+    outcome = RunOutcome(ran=False, passed=False, reason="'claude' not found on PATH, skipped")
+    with (
+        patch("girdle.audit.shutil.which", return_value="/usr/bin/claude"),
+        patch("girdle.audit._invoke_agent", return_value=outcome),
+    ):
+        result = audit_file(tmp_path / "AGENTS.md", tmp_path, ["claude", "-p"], 300)
+    assert result.available is False
+    assert result.reason == "'claude' not found on PATH, skipped"
+
+
+def test_audit_file_parse_error_propagates(tmp_path: Path):
+    (tmp_path / "AGENTS.md").write_text("x\n")
+    outcome = RunOutcome(ran=True, passed=True, reason=None, stdout="not json")
+    with (
+        patch("girdle.audit.shutil.which", return_value="/usr/bin/claude"),
+        patch("girdle.audit._invoke_agent", return_value=outcome),
+    ):
+        result = audit_file(tmp_path / "AGENTS.md", tmp_path, ["claude", "-p"], 300)
+    assert result.available is False
+    assert "not valid JSON" in result.reason
+
+
 def test_audit_result_field_not_a_string():
     # A non-conforming agent CLI (or --agent-cmd override) could return a
     # "result" that's an object/list/number instead of a string - must
@@ -114,6 +185,49 @@ def test_run_audit_explicit_files_override_discovery(tmp_path: Path):
     assert len(results) == 1
     assert results[0].target == "README.md"
     mock_invoke.assert_called_once()
+
+
+def test_audit_cmd_human_output_unavailable(tmp_path: Path):
+    (tmp_path / "AGENTS.md").write_text("x\n")
+    runner = CliRunner()
+    with patch("girdle.audit.shutil.which", return_value=None):
+        result = runner.invoke(main, ["audit", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "not checked" in result.output
+
+
+def test_audit_cmd_human_output_with_findings(tmp_path: Path):
+    (tmp_path / "AGENTS.md").write_text("x\n")
+    inner = [
+        {"excerpt": "Run ruff.", "bucket": "1", "rationale": "r1", "citation": "ruff"},
+        {"excerpt": "Use a hook.", "bucket": "2", "rationale": "r2", "citation": "PostToolUse"},
+    ]
+    stdout = json.dumps({"result": json.dumps(inner)})
+    outcome = RunOutcome(ran=True, passed=True, reason=None, stdout=stdout)
+    runner = CliRunner()
+    with (
+        patch("girdle.audit.shutil.which", return_value="/usr/bin/claude"),
+        patch("girdle.audit._invoke_agent", return_value=outcome),
+    ):
+        result = runner.invoke(main, ["audit", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "deterministic tool exists" in result.output
+    assert "agent hook fits" in result.output
+    assert "stays in prose" not in result.output  # bucket 3 empty here, header skipped
+
+
+def test_audit_cmd_json_output(tmp_path: Path):
+    (tmp_path / "AGENTS.md").write_text("x\n")
+    outcome = RunOutcome(ran=True, passed=True, reason=None, stdout=json.dumps({"result": "[]"}))
+    runner = CliRunner()
+    with (
+        patch("girdle.audit.shutil.which", return_value="/usr/bin/claude"),
+        patch("girdle.audit._invoke_agent", return_value=outcome),
+    ):
+        result = runner.invoke(main, ["audit", str(tmp_path), "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload[0]["available"] is True
 
 
 def test_audit_cmd_bad_agent_cmd_quoting_is_usage_error(tmp_path: Path):
