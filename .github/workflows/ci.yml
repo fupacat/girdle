@@ -19,7 +19,10 @@ jobs:
       - run: ruff check .
       - run: mdformat --check --wrap keep $(git ls-files '*.md')
       - run: yamllint .
-      - run: pytest --cov --cov-report=xml
+      - name: pytest
+        env:
+          MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
+        run: pytest --cov --cov-report=xml
       - run: girdle index . --check AGENTS.md
       - name: vault notes freshness (read-only)
         # The pre-commit hook is the one place auto-reconcile makes sense
