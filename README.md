@@ -27,6 +27,35 @@ girdle align .                          # dry-run: show what would be added to .
 girdle align . --write                  # apply it
 ```
 
+## When to run what
+
+girdle isn't one usage mode — different subcommands map to different
+lifecycles:
+
+- **Bootstrap (one-time, per repo)**: `girdle align --write` seeds
+  `.editorconfig`/`.gitattributes`/`.gitignore` from whatever formatter
+  config already exists; `girdle index --inject AGENTS.md` establishes the
+  structural index once. An initial `girdle scan` here is mostly
+  diagnostic — it reports what's missing (tests, lint, coverage gate,
+  hygiene), but never writes CI configs or test suites for you; you act on
+  the recommendations by hand.
+- **Continuous drift prevention (every commit/PR)**: `girdle scan` itself
+  is designed to live as a CI gate — it's exit-code driven (`--fail-under`,
+  default tier "configured"), so wiring it into CI or a pre-commit hook
+  catches regression the moment it happens. `girdle index --check AGENTS.md`
+  and `girdle notes check` are the same shape — cheap, deterministic, meant
+  to run on every commit, exactly how this repo's own
+  `.pre-commit-config.yaml`/`.github/workflows/ci.yml` already use them.
+- **Periodic/occasional (not per-commit)**: `girdle scan --run` (tier-2,
+  actually executes the repo's own tests/lint) runs arbitrary repo code -
+  fine as a CI step since the toolchain's already there, but not something
+  to run in a tight local loop. `girdle scan --platform` is a live
+  authenticated GitHub API call, unrelated to code changes (branch
+  protection doesn't drift per-commit) - better suited to a scheduled/cron
+  check than per-PR. `girdle audit` (not yet on `master` - landing via #16)
+  is periodic by design, not continuous - it costs a real LLM call and its
+  output is a review proposal for a human, not a pass/fail gate.
+
 `girdle index` is a separate, mechanically-generated structural index — not
 part of the verification score. It's a flat, budget-capped (`--budget-tokens`,
 default 4000) path -> {language, line count, top-level symbols} manifest,
