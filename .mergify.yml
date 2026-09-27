@@ -1,4 +1,17 @@
 pull_request_rules:
+  - name: keep Dependabot PRs up to date with master
+    # master's ruleset requires strict status checks (branch must be
+    # current before merge), so a Dependabot PR that sits for a while
+    # behind other merges needs updating or the merge rule below can never
+    # actually complete - do it automatically instead of relying on a
+    # manual @dependabot rebase each time.
+    conditions:
+      - author=dependabot[bot]
+      - -conflict
+      - "#commits-behind>=1"
+    actions:
+      update:
+
   - name: auto-merge safe Dependabot updates
     # Patch/minor/security bumps are low-risk; merge them once the test job
     # passes. Uses the plain `merge` action, not `queue` (Mergify's
