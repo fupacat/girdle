@@ -34,9 +34,16 @@ jobs:
         # arbitrary feature-branch pushes; with sonar.qualitygate.wait=true,
         # attempting the latter fails hard ("Not authorized or project not
         # found") instead of silently no-op'ing, so skip it here.
+        #
+        # GitHub also withholds repo secrets (SONAR_TOKEN included) from
+        # workflow runs triggered by Dependabot PRs as a security measure -
+        # the token would be blank there regardless of the branch/event
+        # check above, so skip explicitly rather than fail on bad auth.
         if: >-
-          github.event_name == 'pull_request' ||
-          github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+          github.actor != 'dependabot[bot]' && (
+            github.event_name == 'pull_request' ||
+            github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+          )
         uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
