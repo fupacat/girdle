@@ -71,7 +71,7 @@ jobs:
       - run: mkdir -p public
       - run: girdle dashboard . -o public/index.html
       - run: girdle badge . --json -o public/girdle.json
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: public
       - id: deployment
