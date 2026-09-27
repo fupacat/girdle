@@ -95,7 +95,7 @@ queue_rules:
           - dependabot-update-type=version-update:semver-minor
           - dependabot-update-type=security
   - name: Development
-    branch_protection_injection_mode: none
+    branch_protection_injection_mode: merge
     queue_conditions:
       - label = default
 merge_queue:
