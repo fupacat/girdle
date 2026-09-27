@@ -43,13 +43,14 @@ pull_request_rules:
     # unapproved (matching the queue) until any reviewer approves it for
     # any reason during review, at which point the queue would silently
     # auto-merge it with no explicit merge step, undermining "label major
-    # bumps for manual review". The queue rule below still uses default
-    # branch_protection_injection_mode, so master's full ruleset (test,
-    # SonarCloud, Gitar, 1 approving review) is what actually gates the
-    # merge - not a hand-picked subset duplicated here. Uses Mergify's own
-    # bot identity to merge (a real actor, not GITHUB_TOKEN), so
-    # downstream workflows and required-status-check events fire normally
-    # on the commit it produces.
+    # bumps for manual review". Master's full ruleset (test, SonarCloud,
+    # Gitar, 1 approving review) is what actually gates the merge, via
+    # the queue rule's branch_protection_injection_mode: merge - not a
+    # hand-picked subset duplicated here, and not something blocking
+    # queue entry either. Uses Mergify's own bot identity to merge (a
+    # real actor, not GITHUB_TOKEN), so downstream workflows and
+    # required-status-check events fire normally on the commit it
+    # produces.
     conditions:
       - author=dependabot[bot]
       - -conflict
@@ -73,18 +74,20 @@ pull_request_rules:
           - dependency-major-review
 queue_rules:
   - name: Dependabot
-    # Default branch_protection_injection_mode (not "none"): master's full
-    # ruleset (test, SonarCloud, Gitar, 1 approving review) is injected
-    # automatically as this queue's real merge requirement, instead of a
-    # hand-picked subset. This also means no merge_bot_account is needed -
-    # Mergify merges under its own identity once the actual ruleset is
-    # satisfied. Note Gitar and SonarCloud don't run on Dependabot-authored
-    # PRs at all (confirmed separately), so as configured this queue will
-    # wait indefinitely on those two checks for a genuine Dependabot PR -
-    # a real gap, not something this config alone resolves. Scoped to
-    # patch/minor/security to match the "queue Dependabot updates" rule
-    # that's the only thing invoking this queue - see that rule's comment
-    # for why majors are excluded here too, not just at entry.
+    # branch_protection_injection_mode: merge - the default ("queue")
+    # injects master's ruleset into BOTH queue entry and the merge gate,
+    # which meant a Dependabot PR couldn't even enter the queue until
+    # Gitar/SonarCloud/review were satisfied (confirmed live: "Waiting
+    # for queue conditions" listed all three, stuck at the "Enter queue"
+    # step). "merge" injects the ruleset only at the merge gate, so entry
+    # stays governed purely by queue_conditions below - and once queued,
+    # Mergify tests the PR on its own mergify/merge-queue/* branch under
+    # its own identity, which may get Gitar/SonarCloud to actually run
+    # where they don't on the PR's own branch (untested until now - see
+    # PR history for what actually happened). This also means no
+    # merge_bot_account is needed - Mergify merges under its own identity
+    # once the real ruleset is satisfied.
+    branch_protection_injection_mode: merge
     queue_conditions:
       - author=dependabot[bot]
       - or:
