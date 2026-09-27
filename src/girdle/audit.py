@@ -28,13 +28,8 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from girdle.hygiene import AGENT_INSTRUCTIONS_LOCATIONS
 from girdle.runner import run_check
-
-AGENT_INSTRUCTIONS_LOCATIONS = (
-    "AGENTS.md",
-    "CLAUDE.md",
-    ".github/copilot-instructions.md",
-)
 
 DEFAULT_AGENT_CMD = ["claude", "-p", "--output-format", "json"]
 DEFAULT_TIMEOUT = 300
@@ -62,10 +57,11 @@ Respond with ONLY a JSON array, no other text, no markdown code fences,
 matching exactly this schema:
 [
   {{"excerpt": "verbatim quoted instruction, <=200 chars",
-   "bucket": "1, 2, or 3",
+   "bucket": 1,
    "rationale": "one or two sentences",
    "citation": "specific tool/config/hook name, or empty string for bucket 3"}}
 ]
+("bucket" is 1, 2, or 3 - an integer, not the string shown above)
 
 FILE: {path}
 ---
@@ -122,8 +118,8 @@ def parse_agent_output(stdout: str) -> tuple[list[AuditFinding] | None, str | No
     except json.JSONDecodeError as e:
         return None, f"agent output was not valid JSON: {e}"
     result_text = outer.get("result") if isinstance(outer, dict) else None
-    if result_text is None:
-        return None, "agent output missing result field"
+    if not isinstance(result_text, str):
+        return None, "agent output missing string result field"
     try:
         inner = json.loads(result_text)
     except json.JSONDecodeError as e:

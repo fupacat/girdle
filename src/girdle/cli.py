@@ -198,7 +198,12 @@ def audit_cmd(path: str, files: tuple[str, ...], agent_cmd: str | None,
     """
     repo_root = Path(path)
     explicit = [repo_root / f for f in files] if files else None
-    cmd = shlex.split(agent_cmd) if agent_cmd else None
+    try:
+        cmd = shlex.split(agent_cmd) if agent_cmd else None
+    except ValueError as e:
+        raise click.BadParameter(
+            f"could not parse --agent-cmd: {e}", param_hint="--agent-cmd"
+        ) from e
     results = audit.run_audit(repo_root, files=explicit, agent_cmd=cmd, timeout=timeout)
     if as_json:
         click.echo(json.dumps([r.to_dict() for r in results], indent=2))
