@@ -29,12 +29,12 @@ src/girdle/coverage_gate.py | python | 141L | _ci_texts, _first_existing_name, _
 src/girdle/coverage_parse.py | python | 45L | _first_match, parse_percentage
 src/girdle/dashboard.py | python | 24L | render_dashboard
 src/girdle/detectors/__init__.py | python | 3L | 
-src/girdle/detectors/_util.py | python | 31L | read_json, read_toml, read_text
+src/girdle/detectors/_util.py | python | 63L | read_json, read_toml, read_text, scan_ci
 src/girdle/detectors/base.py | python | 44L | Fingerprint, Detector
-src/girdle/detectors/dotnet.py | python | 174L | DotNetDetector
-src/girdle/detectors/go_mod.py | python | 114L | GoModDetector
-src/girdle/detectors/java_gradle.py | python | 134L | JavaGradleDetector
-src/girdle/detectors/java_maven.py | python | 127L | JavaMavenDetector
+src/girdle/detectors/dotnet.py | python | 157L | DotNetDetector
+src/girdle/detectors/go_mod.py | python | 96L | GoModDetector
+src/girdle/detectors/java_gradle.py | python | 114L | JavaGradleDetector
+src/girdle/detectors/java_maven.py | python | 110L | JavaMavenDetector
 src/girdle/detectors/js_bun.py | python | 53L | JsBunDetector
 src/girdle/detectors/js_common.py | python | 151L | _install_verb, detect_variants, scan_tests, scan_lint, scan_coverage, scan_ci, is_lockfile_gitignored, run_commands
 src/girdle/detectors/js_npm.py | python | 60L | JsNpmDetector
@@ -46,7 +46,7 @@ src/girdle/detectors/python_pip.py | python | 122L | PythonPipDetector
 src/girdle/detectors/python_pipenv.py | python | 52L | PythonPipenvDetector
 src/girdle/detectors/python_uv.py | python | 49L | PythonUvDetector
 src/girdle/detectors/registry.py | python | 33L | 
-src/girdle/detectors/rust.py | python | 146L | RustDetector
+src/girdle/detectors/rust.py | python | 129L | RustDetector
 src/girdle/fsutil.py | python | 34L | walk_excluding, rglob_excluding
 src/girdle/hygiene.py | python | 269L | _read_text, HygieneResult, _first_existing, check_editorconfig, check_gitattributes, check_precommit, check_agent_sandbox_bootstrap, check_gitignore, check_codeowners, check_readme, check_contributing, build_hygiene
 src/girdle/indexer.py | python | 413L | _parser, _text, _name_of, _defs_python, _defs_lexical_declaration, _unwrap_export, _defs_js_ts, _defs_go_type_declaration, _defs_go, _defs_rust, _defs_java, _defs_csharp_from, IndexEntry, RepoIndex, _iter_source_files, _extract_symbol_pairs, _extract_symbols, find_symbol_source, build_index, _estimate_tokens, _render_entry, render_manifest, render_block, inject_into, is_stale
@@ -77,6 +77,7 @@ tests/test_runner.py | python | 32L | test_missing_binary_is_not_ran, test_succe
 tests/test_rust.py | python | 46L | test_detect_none_without_cargo_toml, test_bin_crate_missing_lock_is_absent_and_applicable, test_lib_crate_missing_lock_is_excluded_from_applicable, test_lib_crate_with_committed_lock_is_applicable_and_configured, test_inline_test_detected
 tests/test_scan_verify.py | python | 60L | _FakeDetector, _fp, test_verify_upgrades_to_verified_on_success, test_verify_keeps_configured_on_failure, test_verify_skips_absent_categories, test_verify_noop_without_run_commands, test_verify_static_mode_adds_generic_hint_not_execution
 tests/test_scoring.py | python | 32L | _eco, test_category_min_is_gated_by_weakest, test_inapplicable_categories_excluded_from_min, test_scan_result_overall_min_is_weakest_ecosystem
+tests/test_util_scan_ci.py | python | 52L | test_github_actions_match, test_gitlab_fallback, test_azure_fallback, test_absent_when_no_ci, test_no_match_in_workflow, test_gradle_pattern_matches_gradlew_and_gradle
 tests/test_vault.py | python | 375L | _git, _init_repo, _write_example, _write_note, test_load_note_parses_frontmatter, test_current_hash_symbol_level, test_current_hash_missing_symbol_is_none, test_current_hash_file_level_no_symbol, test_load_all_notes_skips_reserved_names, test_ack_records_current_hash_and_stages, test_check_blocks_when_note_not_updated, test_check_auto_reconciles_when_note_staged_too, test_check_skips_notes_without_watches, test_check_does_not_reconcile_when_only_stale_marker_was_staged, test_reconcile_raises_on_dangling_watch, test_ack_raises_on_dangling_watch, test_check_blocks_dangling_watch_even_when_note_staged, test_check_blocks_point_in_time_type_with_watches, test_ack_resolves_relative_root_and_note_path, test_render_vault_index, test_load_note_without_frontmatter, test_load_all_notes_no_vault_dir, test_current_hash_unsupported_extension_with_symbol, test_check_leaves_unchanged_notes_alone, test_check_auto_reconciles_brand_new_note_never_committed, test_inject_vault_index_separator_variants, test_inject_vault_index_creates_and_replaces_block
 tests/test_vendor_exclusion.py | python | 49L | test_python_ignores_test_files_inside_venv, test_python_still_finds_real_top_level_tests, test_go_ignores_test_files_inside_vendor, test_rust_ignores_rs_files_inside_target
 ```
