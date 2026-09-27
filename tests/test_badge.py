@@ -1,4 +1,4 @@
-from girdle.badge import badge_markdown, badge_url
+from girdle.badge import badge_endpoint, badge_markdown, badge_url
 
 
 def _data(overall_min: int) -> dict:
@@ -36,3 +36,19 @@ def test_badge_markdown_links_to_girdle_by_default():
 def test_badge_markdown_custom_link():
     md = badge_markdown(_data(1), link="https://example.com")
     assert md.endswith("(https://example.com)")
+
+
+def test_badge_endpoint_schema():
+    endpoint = badge_endpoint(_data(2))
+    assert endpoint == {
+        "schemaVersion": 1,
+        "label": "girdle",
+        "message": "verified",
+        "color": "4caf7d",
+    }
+
+
+def test_badge_endpoint_custom_label():
+    endpoint = badge_endpoint(_data(0), label="my-repo")
+    assert endpoint["label"] == "my-repo"
+    assert endpoint["message"] == "absent"
