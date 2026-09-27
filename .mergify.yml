@@ -89,12 +89,11 @@ queue_rules:
     # branch_protection_injection_mode: none means this queue's own
     # merge_conditions are authoritative instead of auto-inheriting every
     # check master's ruleset requires - listed explicitly below instead.
-    # The required-review requirement isn't listed here: Mergify rejects
-    # github-review-approved/github-code-owner-review-satisfied as direct
-    # conditions ("evaluated internally, cannot be used in conditions") -
-    # instead the "auto-approve safe Dependabot updates" pull_request_rule
-    # above satisfies the real GitHub requirement before this queue's
-    # merge attempt runs.
+    # github-review-approved/github-code-owner-review-satisfied are
+    # rejected as direct conditions ("evaluated internally, cannot be
+    # used in conditions") - #approved-reviews-by is the documented
+    # equivalent. The "auto-approve safe Dependabot updates"
+    # pull_request_rule above is what actually posts that approval.
     branch_protection_injection_mode: none
     queue_conditions:
       - author=dependabot[bot]
@@ -105,5 +104,6 @@ queue_rules:
     merge_conditions:
       - check-success=test
       - check-success=SonarCloud Code Analysis
+      - "#approved-reviews-by>=1"
 merge_queue:
   max_parallel_checks: 7
