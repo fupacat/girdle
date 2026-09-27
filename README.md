@@ -42,9 +42,9 @@ lifecycles:
 - **Continuous drift prevention (every commit/PR)**: `girdle scan` itself
   is designed to live as a CI gate — it's exit-code driven (`--fail-under`,
   default tier "configured"), so wiring it into CI or a pre-commit hook
-  catches regression the moment it happens. `girdle index --check` and
-  `girdle notes check` are the same shape — cheap, deterministic, meant to
-  run on every commit, exactly how this repo's own
+  catches regression the moment it happens. `girdle index --check AGENTS.md`
+  and `girdle notes check` are the same shape — cheap, deterministic, meant
+  to run on every commit, exactly how this repo's own
   `.pre-commit-config.yaml`/`.github/workflows/ci.yml` already use them.
 - **Periodic/occasional (not per-commit)**: `girdle scan --run` (tier-2,
   actually executes the repo's own tests/lint) runs arbitrary repo code -
@@ -52,9 +52,9 @@ lifecycles:
   to run in a tight local loop. `girdle scan --platform` is a live
   authenticated GitHub API call, unrelated to code changes (branch
   protection doesn't drift per-commit) - better suited to a scheduled/cron
-  check than per-PR. `girdle audit` is periodic by design, not
-  continuous - it costs a real LLM call and its output is a review
-  proposal for a human, not a pass/fail gate.
+  check than per-PR. `girdle audit` (not yet on `master` - landing via #16)
+  is periodic by design, not continuous - it costs a real LLM call and its
+  output is a review proposal for a human, not a pass/fail gate.
 
 `girdle index` is a separate, mechanically-generated structural index — not
 part of the verification score. It's a flat, budget-capped (`--budget-tokens`,
