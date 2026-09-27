@@ -99,7 +99,18 @@ queue_rules:
     # would have failed at the actual merge step despite passing
     # `config validate`/`simulate`, which only check schema and
     # conditions, not this kind of semantic mismatch.
+    # max_checks_retries: 1 forces Mergify to always create a draft PR
+    # (disables the "trusted"/in-place optimization, which reuses the
+    # real PR's own checks when it's already up to date with master -
+    # confirmed live: with retries at the default 0, PR #25's queue run
+    # used "trusted" mode and neither SonarCloud nor Gitar got a chance
+    # to run at all, unlike PR #23's earlier draft_pr run where
+    # SonarCloud did trigger). Now that Gitar has whitelisted dependabot
+    # and mergify in its own config, re-including it here to test
+    # whether it actually posts on the draft branch; drop it again if it
+    # still doesn't fire.
     branch_protection_injection_mode: none
+    max_checks_retries: 1
     queue_conditions:
       - author=dependabot[bot]
       - or:
@@ -109,6 +120,7 @@ queue_rules:
     merge_conditions:
       - check-success=test
       - check-success=SonarCloud Code Analysis
+      - check-success=Gitar
       - "#approved-reviews-by>=1"
 merge_queue:
   max_parallel_checks: 7
