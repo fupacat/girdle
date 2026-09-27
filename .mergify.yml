@@ -43,9 +43,10 @@ pull_request_rules:
     # unapproved (matching the queue) until any reviewer approves it for
     # any reason during review, at which point the queue would silently
     # auto-merge it with no explicit merge step, undermining "label major
-    # bumps for manual review". test/SonarCloud/review gate the actual
-    # merge (see the queue rule's merge_conditions for why Gitar is
-    # deliberately excluded there). Uses Mergify's own bot identity to
+    # bumps for manual review". test/SonarCloud/Gitar/review gate the
+    # actual merge - see the queue rule's merge_conditions/checks_timeout
+    # for the current state of getting Gitar to run at all. Uses
+    # Mergify's own bot identity to
     # merge (a real actor, not GITHUB_TOKEN), so downstream workflows and
     # required-status-check events fire normally on the commit it
     # produces.
@@ -85,10 +86,12 @@ queue_rules:
     # conditions - ruleset bypass_actors doesn't help here either, since
     # Mergify's own queue engine waits for its internal copy of each
     # condition regardless of whether it could bypass the final merge
-    # call. branch_protection_injection_mode: none plus explicit
-    # merge_conditions below deliberately excludes Gitar - the one
-    # requirement genuinely unsatisfiable through this queue - while
-    # keeping test/SonarCloud/review, which are all confirmed working.
+    # call. Gitar has since been whitelisted for dependabot/mergify in
+    # its own config, so it's back in merge_conditions below on a trial
+    # basis (see max_checks_retries/checks_timeout: if Gitar still
+    # doesn't post on the draft branch, checks_timeout bounds the wait so
+    # a stuck PR dequeues visibly instead of hanging forever - remove
+    # Gitar from merge_conditions again if that happens).
     # No merge_bot_account set: per Mergify's docs, omitting it means
     # "Mergify merges the pull request itself" - i.e. as the app (id
     # 10562), which already holds ruleset bypass. merge_bot_account is
@@ -111,6 +114,12 @@ queue_rules:
     # still doesn't fire.
     branch_protection_injection_mode: none
     max_checks_retries: 1
+    # Bounds how long the queue waits before giving up - without this,
+    # Mergify's default (auto, effectively no timeout until enough CI
+    # history exists) would leave a PR stuck indefinitely if Gitar still
+    # doesn't post on the draft branch, the same silent stall this whole
+    # trial is trying to avoid repeating.
+    checks_timeout: 30m
     queue_conditions:
       - author=dependabot[bot]
       - or:
