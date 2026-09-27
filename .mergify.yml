@@ -1,4 +1,16 @@
 pull_request_rules:
+  - name: TEMP diagnostic - label any open PR
+    # Temporary: verifies the rule engine executes actions at all
+    # (independent of Dependabot-specific conditions), since Dependabot PRs
+    # haven't shown any automatic rule action despite repeated refreshes.
+    # Remove once diagnosed.
+    conditions:
+      - -closed
+    actions:
+      label:
+        add:
+          - mergify-engine-test
+
   - name: keep safe Dependabot PRs up to date with master
     # master's ruleset requires strict status checks (branch must be
     # current before merge), so a Dependabot PR that sits for a while
