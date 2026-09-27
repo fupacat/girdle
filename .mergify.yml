@@ -1,32 +1,30 @@
-queue_rules:
-  - name: default
-    merge_method: squash
-    queue_conditions:
-      - check-success=test
-    merge_conditions:
-      - check-success=test
-
 pull_request_rules:
-  - name: auto-queue safe Dependabot updates
-    # Patch/minor/security bumps are low-risk; queue them once the test job
-    # passes. Mergify performs the merge itself (a real actor, not
-    # GITHUB_TOKEN), so downstream workflows and required-status-check
-    # events fire normally on the commit it produces - unlike a hand-rolled
-    # GITHUB_TOKEN-based auto-merge, which GitHub silently won't chain.
+  - name: auto-merge safe Dependabot updates
+    # Patch/minor/security bumps are low-risk; merge them once the test job
+    # passes. Uses the plain `merge` action, not `queue` (Mergify's
+    # batching/merge-train feature) - queue requires activating "Merge
+    # Queue" as a separate product on Mergify's dashboard, which this repo
+    # doesn't have enabled, and we don't need batching here anyway. `merge`
+    # still performs the merge under Mergify's own bot identity (a real
+    # actor, not GITHUB_TOKEN), so downstream workflows and
+    # required-status-check events fire normally on the commit it
+    # produces - unlike a hand-rolled GITHUB_TOKEN-based auto-merge, which
+    # GitHub silently won't chain.
     conditions:
       - author=dependabot[bot]
       - -conflict
+      - check-success=test
       - or:
           - dependabot-update-type=version-update:semver-patch
           - dependabot-update-type=version-update:semver-minor
           - dependabot-update-type=security
     actions:
-      queue:
-        name: default
+      merge:
+        method: squash
 
   - name: label major Dependabot updates for manual review
     # Major bumps carry real breaking-change risk - leave them for a human
-    # to look at and queue explicitly, rather than auto-merging.
+    # to look at and merge explicitly, rather than auto-merging.
     conditions:
       - author=dependabot[bot]
       - dependabot-update-type=version-update:semver-major
