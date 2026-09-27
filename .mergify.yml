@@ -95,6 +95,8 @@ queue_rules:
     # merge_bot_account is needed - Mergify merges under its own identity
     # once the real ruleset is satisfied.
     branch_protection_injection_mode: merge
+    max_checks_retries: 1
+    checks_timeout: 30m
     queue_conditions:
       - author=dependabot[bot]
       - or:
