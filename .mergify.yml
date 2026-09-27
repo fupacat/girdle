@@ -124,9 +124,11 @@ queue_rules:
     # merge_conditions, no explicit list or merge_bot_account needed -
     # unlike the Dependabot queue, checks genuinely run on these PRs'
     # own branches, so there's no in-place/trusted-vs-draft distinction
-    # to work around.
+    # to work around. Copilot PRs route through here too now -
+    # auto-merge-copilot.yml no longer arms GitHub's native auto-merge
+    # (it can't bypass the ruleset either), just promotes out of draft
+    # and lets this queue handle the actual merge.
     queue_conditions:
       - author!=dependabot[bot]
-      - author!=Copilot
 merge_queue:
   max_parallel_checks: 7
