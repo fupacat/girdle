@@ -6,6 +6,7 @@ from girdle.platform import (
     check_platform,
     compute_recommendations,
     extract_protection_facts,
+    extract_ruleset_facts,
 )
 
 PROTECTION_RESPONSE = {
@@ -157,3 +158,121 @@ def test_to_dict_available_and_protected():
     assert d["available"] is True
     assert d["protected"] is True
     assert d["required_approving_review_count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Ruleset tests
+# ---------------------------------------------------------------------------
+
+# Shape returned by GET repos/{owner}/{repo}/rules/branches/{branch} - a
+# flat list of {type, parameters} for the rules already active on that
+# specific branch (GitHub resolves org-level rulesets and ref targeting
+# server-side; nothing here carries a ruleset id/conditions/enforcement).
+BRANCH_RULES_RESPONSE = [
+    {
+        "type": "pull_request",
+        "parameters": {
+            "required_approving_review_count": 1,
+            "require_code_owner_review": False,
+        },
+    },
+    {
+        "type": "required_status_checks",
+        "parameters": {
+            "required_status_checks": [
+                {"context": "ci/test"},
+                {"context": "ci/lint"},
+            ]
+        },
+    },
+    {"type": "non_fast_forward"},
+    {"type": "deletion"},
+]
+
+
+def test_extract_ruleset_facts_active_rules():
+    facts = extract_ruleset_facts(BRANCH_RULES_RESPONSE)
+    assert facts["required_approving_review_count"] == 1
+    assert facts["allow_force_pushes"] is False
+    assert "ci/test" in facts["required_status_check_contexts"]
+    assert "ci/lint" in facts["required_status_check_contexts"]
+
+
+def test_extract_ruleset_facts_no_rules_is_empty():
+    assert extract_ruleset_facts([]) == {}
+
+
+def test_extract_ruleset_facts_unrecognized_rule_types_ignored():
+    # A rule type this module doesn't model yet must not crash or count as
+    # "matched" on its own.
+    assert extract_ruleset_facts([{"type": "creation"}, {"type": "update"}]) == {}
+
+
+def test_check_platform_ruleset_only_protected(tmp_path: Path):
+    """Classic API returns 404 but an active ruleset protects the branch."""
+    import json
+
+    def fake_run(args, cwd):
+        if args[0] == "auth":
+            return True, ""
+        if args[0] == "repo":
+            return True, json.dumps(
+                {"nameWithOwner": "user/repo", "defaultBranchRef": {"name": "main"}}
+            )
+        if "protection" in " ".join(args):
+            return False, '{"message":"Branch not protected","status":"404"}'
+        if "rules/branches" in " ".join(args):
+            return True, json.dumps(BRANCH_RULES_RESPONSE)
+        return False, "unexpected"
+
+    with patch("girdle.platform.shutil.which", return_value="/usr/bin/gh"):
+        with patch("girdle.platform._run", side_effect=fake_run):
+            result = check_platform(tmp_path)
+
+    assert result.available is True
+    assert result.protected is True
+    assert result.required_approving_review_count == 1
+    assert result.allow_force_pushes is False
+    assert "ci/test" in result.required_status_check_contexts
+
+
+def test_check_platform_classic_and_ruleset_unioned(tmp_path: Path):
+    """Classic protection + branch rules: facts are unioned (max reviews, combined contexts)."""
+    import json
+
+    classic = {
+        "required_pull_request_reviews": {"required_approving_review_count": 2},
+        "required_status_checks": {"contexts": ["classic/ci"]},
+        "enforce_admins": {"enabled": True},
+        "allow_force_pushes": {"enabled": False},
+        "required_signatures": {"enabled": False},
+    }
+    branch_rules = [
+        {"type": "required_status_checks", "parameters": {
+            "required_status_checks": [{"context": "ruleset/extra"}]
+        }},
+    ]
+
+    def fake_run(args, cwd):
+        if args[0] == "auth":
+            return True, ""
+        if args[0] == "repo":
+            return True, json.dumps(
+                {"nameWithOwner": "user/repo", "defaultBranchRef": {"name": "main"}}
+            )
+        if "protection" in " ".join(args):
+            return True, json.dumps(classic)
+        if "rules/branches" in " ".join(args):
+            return True, json.dumps(branch_rules)
+        return False, "unexpected"
+
+    with patch("girdle.platform.shutil.which", return_value="/usr/bin/gh"):
+        with patch("girdle.platform._run", side_effect=fake_run):
+            result = check_platform(tmp_path)
+
+    assert result.available is True
+    assert result.protected is True
+    assert result.required_approving_review_count == 2  # classic wins (higher)
+    assert "classic/ci" in result.required_status_check_contexts
+    assert "ruleset/extra" in result.required_status_check_contexts
+    assert result.enforce_admins is True  # from classic
