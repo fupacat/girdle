@@ -1,6 +1,7 @@
 # girdle
 
 [![CI](https://github.com/fupacat/girdle/actions/workflows/ci.yml/badge.svg)](https://github.com/fupacat/girdle/actions/workflows/ci.yml)
+[![girdle](https://img.shields.io/badge/girdle-configured-d9a441)](https://github.com/fupacat/girdle)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=fupacat_girdle&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=fupacat_girdle)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=fupacat_girdle&metric=coverage)](https://sonarcloud.io/summary/new_code?id=fupacat_girdle)
 
@@ -20,6 +21,7 @@ pip install -e .
 girdle scan .              # static analysis, JSON if piped
 girdle scan . --run        # also execute test/lint tooling for tier-2 verification
 girdle dashboard .          # writes girdle-report.html
+girdle badge . --markdown   # print a shields.io badge reflecting overall readiness tier
 
 girdle index .                        # deterministic structural manifest (path/language/symbols)
 girdle index . --inject AGENTS.md     # insert/update the manifest between markers in a file
