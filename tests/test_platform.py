@@ -3,7 +3,6 @@ from unittest.mock import patch
 
 from girdle.platform import (
     PlatformResult,
-    _ref_matches_branch,
     check_platform,
     compute_recommendations,
     extract_protection_facts,
@@ -165,95 +164,48 @@ def test_to_dict_available_and_protected():
 # Ruleset tests
 # ---------------------------------------------------------------------------
 
-RULESET_RESPONSE = [
+# Shape returned by GET repos/{owner}/{repo}/rules/branches/{branch} - a
+# flat list of {type, parameters} for the rules already active on that
+# specific branch (GitHub resolves org-level rulesets and ref targeting
+# server-side; nothing here carries a ruleset id/conditions/enforcement).
+BRANCH_RULES_RESPONSE = [
     {
-        "id": 1,
-        "enforcement": "active",
-        "conditions": {
-            "ref_name": {
-                "include": ["refs/heads/main"],
-                "exclude": [],
-            }
+        "type": "pull_request",
+        "parameters": {
+            "required_approving_review_count": 1,
+            "require_code_owner_review": False,
         },
-        "rules": [
-            {
-                "type": "pull_request",
-                "parameters": {
-                    "required_approving_review_count": 1,
-                    "require_code_owner_review": False,
-                },
-            },
-            {
-                "type": "required_status_checks",
-                "parameters": {
-                    "required_status_checks": [
-                        {"context": "ci/test"},
-                        {"context": "ci/lint"},
-                    ]
-                },
-            },
-            {"type": "non_fast_forward"},
-            {"type": "deletion"},
-        ],
-    }
+    },
+    {
+        "type": "required_status_checks",
+        "parameters": {
+            "required_status_checks": [
+                {"context": "ci/test"},
+                {"context": "ci/lint"},
+            ]
+        },
+    },
+    {"type": "non_fast_forward"},
+    {"type": "deletion"},
 ]
 
 
-def test_ref_matches_branch_exact_full_ref():
-    assert _ref_matches_branch("refs/heads/main", "main") is True
-
-
-def test_ref_matches_branch_plain_name():
-    assert _ref_matches_branch("main", "main") is True
-
-
-def test_ref_matches_branch_glob():
-    assert _ref_matches_branch("refs/heads/**", "main") is True
-
-
-def test_ref_matches_branch_no_match():
-    assert _ref_matches_branch("refs/heads/other", "main") is False
-
-
-def test_extract_ruleset_facts_active_ruleset():
-    facts = extract_ruleset_facts(RULESET_RESPONSE, "main")
+def test_extract_ruleset_facts_active_rules():
+    facts = extract_ruleset_facts(BRANCH_RULES_RESPONSE)
     assert facts["required_approving_review_count"] == 1
     assert facts["allow_force_pushes"] is False
     assert "ci/test" in facts["required_status_check_contexts"]
     assert "ci/lint" in facts["required_status_check_contexts"]
 
 
-def test_extract_ruleset_facts_disabled_ruleset_ignored():
-    rulesets = [
-        {
-            "id": 2,
-            "enforcement": "disabled",
-            "conditions": {"ref_name": {"include": ["refs/heads/main"]}},
-            "rules": [
-                {"type": "pull_request", "parameters": {"required_approving_review_count": 3}}
-            ],
-        }
-    ]
-    facts = extract_ruleset_facts(rulesets, "main")
-    assert facts == {}
+def test_extract_ruleset_facts_no_rules_is_empty():
+    assert extract_ruleset_facts([]) == {}
 
 
-def test_extract_ruleset_facts_wrong_branch_ignored():
-    facts = extract_ruleset_facts(RULESET_RESPONSE, "develop")
-    assert facts == {}
-
-
-def test_extract_ruleset_facts_glob_pattern():
-    rulesets = [
-        {
-            "id": 3,
-            "enforcement": "active",
-            "conditions": {"ref_name": {"include": ["refs/heads/**"]}},
-            "rules": [{"type": "non_fast_forward"}],
-        }
-    ]
-    facts = extract_ruleset_facts(rulesets, "master")
-    assert facts["allow_force_pushes"] is False
+def test_extract_ruleset_facts_unrecognized_rule_types_ignored():
+    # A rule type this module doesn't model yet must not crash or count as
+    # "matched" on its own.
+    assert extract_ruleset_facts([{"type": "creation"}, {"type": "update"}]) == {}
 
 
 def test_check_platform_ruleset_only_protected(tmp_path: Path):
@@ -269,8 +221,8 @@ def test_check_platform_ruleset_only_protected(tmp_path: Path):
             )
         if "protection" in " ".join(args):
             return False, '{"message":"Branch not protected","status":"404"}'
-        if "rulesets" in " ".join(args):
-            return True, json.dumps(RULESET_RESPONSE)
+        if "rules/branches" in " ".join(args):
+            return True, json.dumps(BRANCH_RULES_RESPONSE)
         return False, "unexpected"
 
     with patch("girdle.platform.shutil.which", return_value="/usr/bin/gh"):
@@ -285,7 +237,7 @@ def test_check_platform_ruleset_only_protected(tmp_path: Path):
 
 
 def test_check_platform_classic_and_ruleset_unioned(tmp_path: Path):
-    """Classic protection + ruleset: facts are unioned (max reviews, combined contexts)."""
+    """Classic protection + branch rules: facts are unioned (max reviews, combined contexts)."""
     import json
 
     classic = {
@@ -295,17 +247,10 @@ def test_check_platform_classic_and_ruleset_unioned(tmp_path: Path):
         "allow_force_pushes": {"enabled": False},
         "required_signatures": {"enabled": False},
     }
-    ruleset = [
-        {
-            "id": 4,
-            "enforcement": "active",
-            "conditions": {"ref_name": {"include": ["refs/heads/main"]}},
-            "rules": [
-                {"type": "required_status_checks", "parameters": {
-                    "required_status_checks": [{"context": "ruleset/extra"}]
-                }},
-            ],
-        }
+    branch_rules = [
+        {"type": "required_status_checks", "parameters": {
+            "required_status_checks": [{"context": "ruleset/extra"}]
+        }},
     ]
 
     def fake_run(args, cwd):
@@ -317,8 +262,8 @@ def test_check_platform_classic_and_ruleset_unioned(tmp_path: Path):
             )
         if "protection" in " ".join(args):
             return True, json.dumps(classic)
-        if "rulesets" in " ".join(args):
-            return True, json.dumps(ruleset)
+        if "rules/branches" in " ".join(args):
+            return True, json.dumps(branch_rules)
         return False, "unexpected"
 
     with patch("girdle.platform.shutil.which", return_value="/usr/bin/gh"):

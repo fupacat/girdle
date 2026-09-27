@@ -19,7 +19,6 @@ does not attempt to detect.
 
 from __future__ import annotations
 
-import fnmatch
 import json
 import shutil
 import subprocess
@@ -124,63 +123,45 @@ def extract_protection_facts(protection_json: dict) -> dict:
     }
 
 
-def _ref_matches_branch(ref_pattern: str, branch: str) -> bool:
-    """Return True if a ruleset ref pattern covers the given branch name.
+def extract_ruleset_facts(rules_json: list[dict]) -> dict:
+    """Fold a branch's active rules into a facts dict with the same shape as
+    :func:`extract_protection_facts`.
 
-    Rulesets use full ref strings like ``refs/heads/main`` or glob patterns
-    like ``refs/heads/**``. We accept both the full-ref form and plain branch
-    names so callers don't have to normalise first.
-    """
-    full_ref = f"refs/heads/{branch}"
-    # Exact match against the full ref or just the branch name.
-    if ref_pattern in (full_ref, branch):
-        return True
-    # fnmatch glob (e.g. "refs/heads/**" or "refs/heads/main*").
-    return fnmatch.fnmatch(full_ref, ref_pattern) or fnmatch.fnmatch(branch, ref_pattern)
-
-
-def extract_ruleset_facts(rulesets_json: list[dict], default_branch: str) -> dict:
-    """Fold active rulesets that target *default_branch* into a facts dict
-    with the same shape as :func:`extract_protection_facts`.
-
-    Multiple matching rulesets are unioned: if *any* ruleset requires an
-    approving review we count the highest ``required_approving_review_count``
-    seen; status-check contexts are accumulated across all matching rulesets.
+    *rules_json* is the response from `GET repos/{owner}/{repo}/rules/branches/{branch}`
+    - a flat list of ``{type, parameters}`` objects for the rules already
+    active on that specific branch. Unlike the list-rulesets endpoint
+    (`GET repos/{owner}/{repo}/rulesets`), which returns only ruleset
+    summaries without `conditions`/`rules`, this endpoint has GitHub resolve
+    org-level rulesets, `~DEFAULT_BRANCH`/`~ALL` targeting, and ref-pattern
+    excludes server-side - no client-side ref matching needed here.
     """
     required_approving_review_count = 0
     require_code_owner_reviews = False
-    allow_force_pushes = True   # ruleset *restricts* force-push via non_fast_forward rule
+    allow_force_pushes = True   # a rule *restricts* force-push via non_fast_forward
     required_status_check_contexts: list[str] = []
     matched = False
 
-    for ruleset in rulesets_json:
-        if ruleset.get("enforcement") != "active":
-            continue
-        conditions = ruleset.get("conditions") or {}
-        ref_name = conditions.get("ref_name") or {}
-        include_patterns: list[str] = ref_name.get("include") or []
-        if not any(_ref_matches_branch(pat, default_branch) for pat in include_patterns):
-            continue
-
-        matched = True
-        for rule in ruleset.get("rules") or []:
-            rtype = rule.get("type")
-            params = rule.get("parameters") or {}
-            if rtype == "pull_request":
-                count = params.get("required_approving_review_count", 0)
-                if count > required_approving_review_count:
-                    required_approving_review_count = count
-                if params.get("require_code_owner_review"):
-                    require_code_owner_reviews = True
-            elif rtype == "required_status_checks":
-                for check in params.get("required_status_checks") or []:
-                    ctx = check.get("context") or check.get("integrationId") or str(check)
-                    if ctx and ctx not in required_status_check_contexts:
-                        required_status_check_contexts.append(ctx)
-            elif rtype == "non_fast_forward":
-                allow_force_pushes = False
-            elif rtype == "deletion":
-                pass  # noted but not surfaced in PlatformResult yet
+    for rule in rules_json:
+        rtype = rule.get("type")
+        params = rule.get("parameters") or {}
+        if rtype == "pull_request":
+            matched = True
+            count = params.get("required_approving_review_count", 0)
+            if count > required_approving_review_count:
+                required_approving_review_count = count
+            if params.get("require_code_owner_review"):
+                require_code_owner_reviews = True
+        elif rtype == "required_status_checks":
+            matched = True
+            for check in params.get("required_status_checks") or []:
+                ctx = check.get("context") or check.get("integrationId") or str(check)
+                if ctx and ctx not in required_status_check_contexts:
+                    required_status_check_contexts.append(ctx)
+        elif rtype == "non_fast_forward":
+            matched = True
+            allow_force_pushes = False
+        elif rtype == "deletion":
+            matched = True  # noted but not surfaced in PlatformResult yet
 
     if not matched:
         return {}
@@ -256,14 +237,16 @@ def check_platform(repo_root: Path) -> PlatformResult:
     elif "404" not in out and "Branch not protected" not in out:
         return PlatformResult(available=False, reason=f"gh api call failed: {out}")
 
-    # --- Rulesets ---
+    # --- Rulesets, via the branch-rules endpoint (already resolves org-level
+    # rulesets and ref targeting for this specific branch - see
+    # extract_ruleset_facts's docstring for why not the list-rulesets one) ---
     ruleset_facts: dict = {}
-    ok, out = _run(["api", f"repos/{name_with_owner}/rulesets"], repo_root)
+    ok, out = _run(["api", f"repos/{name_with_owner}/rules/branches/{default_branch}"], repo_root)
     if ok:
         try:
-            rulesets = json.loads(out)
-            if isinstance(rulesets, list):
-                ruleset_facts = extract_ruleset_facts(rulesets, default_branch)
+            rules = json.loads(out)
+            if isinstance(rules, list):
+                ruleset_facts = extract_ruleset_facts(rules)
         except json.JSONDecodeError:
             pass  # best-effort; fall through to classic-only result
 
