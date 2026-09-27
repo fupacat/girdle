@@ -92,16 +92,18 @@ queue_rules:
     # doesn't post on the draft branch, checks_timeout bounds the wait so
     # a stuck PR dequeues visibly instead of hanging forever - remove
     # Gitar from merge_conditions again if that happens).
-    # No merge_bot_account set: per Mergify's docs, omitting it means
-    # "Mergify merges the pull request itself" - i.e. as the app (id
-    # 10562), which already holds ruleset bypass. merge_bot_account is
-    # for impersonating a real GitHub *user* who has logged into the
-    # Mergify dashboard and holds bypass/write access themselves -
-    # `mergify[bot]` isn't that (it's the app's own identity, can't log
-    # into the dashboard or hold a user token), so setting it to that
-    # would have failed at the actual merge step despite passing
-    # `config validate`/`simulate`, which only check schema and
-    # conditions, not this kind of semantic mismatch.
+    # merge_bot_account: fupacat - confirmed live (real error on PR #23/
+    # #25 after removing this entirely) that branch_protection_injection_
+    # mode: none genuinely requires a merge_bot_account; the general docs
+    # line "omitting it means Mergify merges the pull request itself"
+    # does not override that for injection_mode: none specifically, only
+    # for the default/merge modes. Corrects the earlier mistake of just
+    # deleting `merge_bot_account: mergify[bot]` - the actual problem
+    # Gitar flagged was the *value* (the app's own identity, which can't
+    # log into the dashboard or hold a user token), not the key's
+    # presence. fupacat has logged into the Mergify dashboard and holds
+    # bypass (RepositoryRole, bypass_mode: always) on master's ruleset,
+    # so this is a valid target.
     # max_checks_retries: 1 forces Mergify to always create a draft PR
     # (disables the "trusted"/in-place optimization, which reuses the
     # real PR's own checks when it's already up to date with master -
@@ -113,6 +115,7 @@ queue_rules:
     # whether it actually posts on the draft branch; drop it again if it
     # still doesn't fire.
     branch_protection_injection_mode: none
+    merge_bot_account: fupacat
     max_checks_retries: 1
     # Bounds how long the queue waits before giving up - without this,
     # Mergify's default (auto, effectively no timeout until enough CI
