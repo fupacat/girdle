@@ -220,7 +220,7 @@ def check_codeowners(root: Path) -> CategoryResult:
                 "review requests automatically."
             ),
         )
-    return CategoryResult(Tier.CONFIGURED, evidence=[str(found.relative_to(root))])
+    return CategoryResult(Tier.CONFIGURED, evidence=[found.relative_to(root).as_posix()])
 
 
 def check_readme(root: Path) -> CategoryResult:
@@ -234,11 +234,11 @@ def check_readme(root: Path) -> CategoryResult:
     if len(content) < MIN_NONTRIVIAL_CHARS:
         return CategoryResult(
             Tier.ABSENT,
-            evidence=[str(found.relative_to(root))],
+            evidence=[found.relative_to(root).as_posix()],
             reason="README exists but appears to be an empty stub",
             recommendation="Flesh out the README: project description, setup, and usage.",
         )
-    return CategoryResult(Tier.CONFIGURED, evidence=[str(found.relative_to(root))])
+    return CategoryResult(Tier.CONFIGURED, evidence=[found.relative_to(root).as_posix()])
 
 
 def check_agent_instructions(root: Path) -> CategoryResult:
@@ -252,7 +252,7 @@ def check_agent_instructions(root: Path) -> CategoryResult:
                 "and others) can operate effectively in this repo."
             ),
         )
-    return CategoryResult(Tier.CONFIGURED, evidence=[str(found.relative_to(root))])
+    return CategoryResult(Tier.CONFIGURED, evidence=[found.relative_to(root).as_posix()])
 
 
 def check_contributing(root: Path) -> CategoryResult:
@@ -265,7 +265,7 @@ def check_contributing(root: Path) -> CategoryResult:
                 "changes."
             ),
         )
-    return CategoryResult(Tier.CONFIGURED, evidence=[str(found.relative_to(root))])
+    return CategoryResult(Tier.CONFIGURED, evidence=[found.relative_to(root).as_posix()])
 
 
 def build_hygiene(root: Path, languages: set[str]) -> HygieneResult:
