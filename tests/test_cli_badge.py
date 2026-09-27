@@ -43,3 +43,10 @@ def test_badge_output_writes_file(tmp_path: Path):
     assert result.exit_code == 0
     assert f"wrote {out}" in result.output
     assert '"schemaVersion": 1' in out.read_text(encoding="utf-8")
+
+
+def test_badge_markdown_and_json_together_is_usage_error(tmp_path: Path):
+    _minimal_repo(tmp_path)
+    result = CliRunner().invoke(main, ["badge", str(tmp_path), "--markdown", "--json"])
+    assert result.exit_code != 0
+    assert "mutually exclusive" in result.output

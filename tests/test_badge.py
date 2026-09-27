@@ -25,6 +25,23 @@ def test_badge_url_custom_label():
     assert url.startswith("https://img.shields.io/badge/my%20project-verified-")
 
 
+def test_badge_url_escapes_dashes_in_label():
+    # shields.io's /badge/<label>-<message>-<color> splits on "-", so a
+    # literal dash in the label must become "--" or shields misparses it.
+    url = badge_url(_data(1), label="my-repo")
+    assert url == "https://img.shields.io/badge/my--repo-configured-d9a441"
+
+
+def test_badge_url_escapes_underscores_in_label():
+    url = badge_url(_data(1), label="my_repo")
+    assert url == "https://img.shields.io/badge/my__repo-configured-d9a441"
+
+
+def test_badge_url_escapes_slash_in_label():
+    url = badge_url(_data(1), label="org/repo")
+    assert "org%2Frepo" in url
+
+
 def test_badge_markdown_links_to_girdle_by_default():
     md = badge_markdown(_data(1))
     assert md == (

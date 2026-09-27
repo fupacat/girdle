@@ -12,11 +12,22 @@ TIER_COLOR = {0: "e05252", 1: "d9a441", 2: "4caf7d"}  # matches dashboard.py's p
 GIRDLE_URL = "https://github.com/fupacat/girdle"
 
 
+def _shields_escape(s: str) -> str:
+    """shields.io's /badge/<label>-<message>-<color> path uses "-" as its
+    field separator: a literal "-" must be written "--" and "_" as "__"
+    (per shields.io's static-badge syntax), or shields misparses the split.
+    """
+    return quote(s.replace("-", "--").replace("_", "__"), safe="")
+
+
 def badge_url(data: dict, label: str = "girdle") -> str:
     tier = data["summary"]["overall_min"]
     message = TIER_LABEL.get(tier, "unknown")
     color = TIER_COLOR.get(tier, "lightgrey")
-    return f"https://img.shields.io/badge/{quote(label)}-{message}-{color}"
+    return (
+        f"https://img.shields.io/badge/{_shields_escape(label)}-"
+        f"{_shields_escape(message)}-{color}"
+    )
 
 
 def badge_markdown(data: dict, label: str = "girdle", link: str = GIRDLE_URL) -> str:

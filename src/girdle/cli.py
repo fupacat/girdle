@@ -110,6 +110,8 @@ def badge(
     output: str | None,
 ) -> None:
     """Scan PATH and print a shields.io badge reflecting overall readiness tier."""
+    if markdown and as_json:
+        raise click.UsageError("--markdown and --json are mutually exclusive.")
     result = run_scan(
         Path(path), mode="run" if do_run else "static",
         check_platform_enforcement=check_platform_flag,
