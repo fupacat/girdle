@@ -21,6 +21,26 @@ def test_audit_binary_not_found(tmp_path: Path):
     assert "not found" in result.reason
 
 
+def test_audit_missing_file_is_unavailable_not_a_crash(tmp_path: Path):
+    # --file allows a not-yet-existing path through click validation
+    # (exists=False) - audit_file must degrade gracefully, not raise
+    # FileNotFoundError. Force past the "which" gate so this exercises the
+    # is_file() check specifically, regardless of whether `claude` happens
+    # to be on PATH in this environment.
+    with patch("girdle.audit.shutil.which", return_value="/usr/bin/claude"):
+        result = audit_file(tmp_path / "does-not-exist.md", tmp_path, ["claude", "-p"], 300)
+    assert result.available is False
+    assert "not found" in result.reason
+
+
+def test_audit_directory_target_is_unavailable_not_a_crash(tmp_path: Path):
+    subdir = tmp_path / "a-directory"
+    subdir.mkdir()
+    with patch("girdle.audit.shutil.which", return_value="/usr/bin/claude"):
+        result = audit_file(subdir, tmp_path, ["claude", "-p"], 300)
+    assert result.available is False
+
+
 def test_audit_timeout(tmp_path: Path):
     (tmp_path / "AGENTS.md").write_text("Do the thing.\n")
     outcome = RunOutcome(ran=True, passed=False, reason="timed out after 300s")

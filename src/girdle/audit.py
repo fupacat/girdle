@@ -151,7 +151,12 @@ def audit_file(path: Path, repo_root: Path, agent_cmd: list[str], timeout: int) 
     exe = agent_cmd[0]
     if shutil.which(exe) is None:
         return AuditResult(available=False, reason=f"{exe} not found on PATH", target=target)
-    content = path.read_text(encoding="utf-8")
+    if not path.is_file():
+        return AuditResult(available=False, reason=f"{target} not found", target=target)
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError as e:
+        return AuditResult(available=False, reason=f"failed to read {target}: {e}", target=target)
     prompt = AUDIT_PROMPT_TEMPLATE.format(path=target, content=content)
     outcome = _invoke_agent(prompt, agent_cmd, cwd=repo_root, timeout=timeout)
     if not outcome.ran:
