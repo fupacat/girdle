@@ -81,13 +81,9 @@ pull_request_rules:
     # (queue) rather than the Dependabot queue's none/merge_bot_account/
     # max_checks_retries setup - master's full ruleset auto-injects into
     # both queue_conditions and merge_conditions, no special-casing
-    # needed. Excludes dependabot[bot] (has its own queue above) and
-    # Copilot (has its own native-auto-merge workflow,
-    # .github/workflows/auto-merge-copilot.yml, to avoid two mechanisms
-    # racing to merge the same PR).
+    # needed. Excludes dependabot[bot] (has its own queue above).
     conditions:
       - author!=dependabot[bot]
-      - author!=Copilot
       - -conflict
       - -draft
     actions:
