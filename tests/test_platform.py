@@ -3,9 +3,11 @@ from unittest.mock import patch
 
 from girdle.platform import (
     PlatformResult,
+    _ref_matches_branch,
     check_platform,
     compute_recommendations,
     extract_protection_facts,
+    extract_ruleset_facts,
 )
 
 PROTECTION_RESPONSE = {
@@ -162,8 +164,6 @@ def test_to_dict_available_and_protected():
 # ---------------------------------------------------------------------------
 # Ruleset tests
 # ---------------------------------------------------------------------------
-
-from girdle.platform import _ref_matches_branch, extract_ruleset_facts  # noqa: E402
 
 RULESET_RESPONSE = [
     {
