@@ -248,11 +248,34 @@ def test_contributing_present_in_docs(tmp_path: Path):
     assert result.checks["contributing"].tier == Tier.CONFIGURED
 
 
+def test_dependency_monitoring_absent(tmp_path: Path):
+    result = build_hygiene(tmp_path, languages=set())
+    assert result.checks["dependency_monitoring"].tier == Tier.ABSENT
+
+
+def test_dependency_monitoring_present_dependabot(tmp_path: Path):
+    github_dir = tmp_path / ".github"
+    github_dir.mkdir()
+    (github_dir / "dependabot.yml").write_text("version: 2\n")
+    result = build_hygiene(tmp_path, languages=set())
+    cat = result.checks["dependency_monitoring"]
+    assert cat.tier == Tier.CONFIGURED
+    assert ".github/dependabot.yml" in cat.evidence
+
+
+def test_dependency_monitoring_present_renovate(tmp_path: Path):
+    (tmp_path / ".renovaterc").write_text("{}\n")
+    result = build_hygiene(tmp_path, languages=set())
+    cat = result.checks["dependency_monitoring"]
+    assert cat.tier == Tier.CONFIGURED
+    assert ".renovaterc" in cat.evidence
+
+
 def test_to_dict_shape(tmp_path: Path):
     result = build_hygiene(tmp_path, languages=set())
     d = result.to_dict()
     assert set(d.keys()) == {
         "editorconfig", "gitattributes", "precommit", "agent_sandbox_bootstrap", "gitignore",
-        "codeowners", "agent_instructions", "readme", "contributing",
+        "codeowners", "agent_instructions", "readme", "contributing", "dependency_monitoring",
     }
     assert "tier" in d["editorconfig"]

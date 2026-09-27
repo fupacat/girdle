@@ -9,6 +9,7 @@ import click
 
 from girdle import audit
 from girdle.align import apply_plan, build_align_plans
+from girdle.badge import badge_endpoint, badge_markdown, badge_url
 from girdle.dashboard import render_dashboard
 from girdle.indexer import build_index, inject_into, is_stale, render_manifest
 from girdle.scan import run_scan
@@ -83,6 +84,47 @@ def dashboard(path: str, do_run: bool, output: str, check_platform_flag: bool) -
     html = render_dashboard(result.to_dict())
     Path(output).write_text(html, encoding="utf-8")
     click.echo(f"wrote {output}")
+
+
+@main.command()
+@click.argument("path", default=".", type=click.Path(exists=True, file_okay=False))
+@click.option("--run/--static", "do_run", default=False)
+@click.option(
+    "--platform", "check_platform_flag", is_flag=True,
+    help="Also check GitHub branch protection via `gh` (opt-in: needs gh CLI, network, your auth).",
+)
+@click.option(
+    "--markdown", is_flag=True,
+    help="Print a ready-to-paste markdown snippet instead of the bare badge URL.",
+)
+@click.option(
+    "--json", "as_json", is_flag=True,
+    help=(
+        "Print shields.io endpoint-badge JSON instead (for publishing to a static "
+        "host so the badge stays live without editing markdown each time)."
+    ),
+)
+@click.option("-o", "--output", type=click.Path(), help="Write to this file instead of stdout.")
+def badge(
+    path: str, do_run: bool, check_platform_flag: bool, markdown: bool, as_json: bool,
+    output: str | None,
+) -> None:
+    """Scan PATH and print a shields.io badge reflecting overall readiness tier."""
+    result = run_scan(
+        Path(path), mode="run" if do_run else "static",
+        check_platform_enforcement=check_platform_flag,
+    )
+    data = result.to_dict()
+    if as_json:
+        text = json.dumps(badge_endpoint(data), indent=2)
+    else:
+        text = badge_markdown(data) if markdown else badge_url(data)
+
+    if output:
+        Path(output).write_text(text + "\n", encoding="utf-8")
+        click.echo(f"wrote {output}")
+    else:
+        click.echo(text)
 
 
 @main.command()
