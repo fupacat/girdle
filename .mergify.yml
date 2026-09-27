@@ -3,9 +3,12 @@ pull_request_rules:
     # Temporary: verifies the rule engine executes actions at all
     # (independent of Dependabot-specific conditions), since Dependabot PRs
     # haven't shown any automatic rule action despite repeated refreshes.
-    # Remove once diagnosed.
+    # Must be merged to master to actually run - Mergify reads .mergify.yml
+    # from the default branch, not a PR's own head branch, so this can't
+    # be tested from within the PR that adds it. Remove once diagnosed.
     conditions:
       - -closed
+      - label!=mergify-engine-test
     actions:
       label:
         add:
