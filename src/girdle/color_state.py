@@ -38,7 +38,11 @@ def badge_state(
 
     def band_ok(levels: tuple[Difficulty, ...]) -> bool:
         band = [passed for entry, passed in live.items() if entry.difficulty in levels]
-        return bool(band) and all(band)
+        return (
+            bool(band)
+            and all(any(entry.difficulty == level for entry in live) for level in levels)
+            and all(band)
+        )
 
     if not live or not any(live.values()):
         return DisplayState.NEUTRAL
