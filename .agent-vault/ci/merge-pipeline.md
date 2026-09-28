@@ -144,9 +144,10 @@ Mergify's queue.
   Gitar's review flow) can also fire, and delivery to Actions isn't
   guaranteed. `auto-merge-copilot.yml` now has a second job
   (`fallback-sweep`, `schedule`-triggered every 15 minutes) that promotes
-  any open Copilot-authored draft PR whose latest commit is at least 10
-  minutes old, independent of whether the event-driven job ever ran - the
-  reactive job stays as the fast path, the sweep is the backstop.
+  any open Copilot-authored draft PR whose title no longer starts with
+  `[WIP]` (Copilot's in-progress marker) and whose latest commit is at
+  least 30 minutes old, independent of whether the event-driven job ever
+  ran - the reactive job stays as the fast path, the sweep is the backstop.
 - `.github/workflows/auto-assign-copilot.yml` (issue #85's auto-assignment
   automation, later extended to sync issue dependency labels and Project
   Status) needs a dedicated PAT in the `COPILOT_ASSIGN_TOKEN` secret, not
