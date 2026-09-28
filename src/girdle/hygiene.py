@@ -59,6 +59,17 @@ DEPENDENCY_MONITORING_LOCATIONS = (
 )
 
 MIN_NONTRIVIAL_CHARS = 40
+ZERO_WIDTH_CHARS = ("\u200b", "\u200c", "\u200d", "\ufeff")
+BASE64_BLOB_RE = re.compile(r"(?<![A-Za-z0-9+/=])(?:[A-Za-z0-9+/]{64,}={0,2})(?![A-Za-z0-9+/=])")
+HEX_BLOB_RE = re.compile(r"(?<![0-9A-Fa-f])(?:0x)?[0-9A-Fa-f]{64,}(?![0-9A-Fa-f])")
+MANIPULATIVE_AI_DIRECTIVE_RE = re.compile(
+    r"(?is)\b(?:ai|assistant|agent|copilot|claude|codex)\b.{0,120}"
+    r"\b(?:ignore|disregard|override|bypass|forget|reveal|exfiltrate|steal|"
+    r"hidden instruction|system prompt|developer message|do not tell the user)\b|"
+    r"\b(?:ignore|disregard|override|bypass|forget|reveal|exfiltrate|steal|"
+    r"hidden instruction|system prompt|developer message|do not tell the user)\b.{0,120}"
+    r"\b(?:ai|assistant|agent|copilot|claude|codex)\b"
+)
 
 
 @dataclass
@@ -75,6 +86,68 @@ def _first_existing(root: Path, candidates: tuple[str, ...]) -> Path | None:
         if path.exists():
             return path
     return None
+
+
+def discover_agent_instruction_files(root: Path) -> list[Path]:
+    return [root / name for name in AGENT_INSTRUCTIONS_LOCATIONS if (root / name).is_file()]
+
+
+def _excerpt(text: str, start: int, end: int, limit: int = 120) -> str:
+    snippet = " ".join(text[max(0, start - 20):min(len(text), end + 20)].split())
+    return snippet[:limit]
+
+
+def find_agent_instruction_hazards(root: Path) -> list[dict[str, str]]:
+    findings: list[dict[str, str]] = []
+    for path in discover_agent_instruction_files(root):
+        text = _read_text(path)
+        if text is None:
+            continue
+        rel = path.relative_to(root).as_posix()
+
+        seen_zero_width = sorted({f"U+{ord(ch):04X}" for ch in text if ch in ZERO_WIDTH_CHARS})
+        if seen_zero_width:
+            findings.append(
+                {
+                    "path": rel,
+                    "kind": "invisible_unicode",
+                    "reason": "contains zero-width or invisible Unicode characters",
+                    "evidence": ", ".join(seen_zero_width),
+                }
+            )
+
+        for kind, pattern, reason in (
+            (
+                "suspicious_base64_blob",
+                BASE64_BLOB_RE,
+                "contains an unusually long base64-like block in a prose instruction file",
+            ),
+            (
+                "suspicious_hex_blob",
+                HEX_BLOB_RE,
+                "contains an unusually long hex-like block in a prose instruction file",
+            ),
+            (
+                "manipulative_ai_directive",
+                MANIPULATIVE_AI_DIRECTIVE_RE,
+                (
+                    "contains AI-directed override language inconsistent "
+                    "with a normal instructions file"
+                ),
+            ),
+        ):
+            match = pattern.search(text)
+            if match is None:
+                continue
+            findings.append(
+                {
+                    "path": rel,
+                    "kind": kind,
+                    "reason": reason,
+                    "evidence": _excerpt(text, match.start(), match.end()),
+                }
+            )
+    return findings
 
 
 def check_editorconfig(root: Path) -> CategoryResult:
@@ -289,8 +362,8 @@ def check_readme(root: Path) -> CategoryResult:
 
 
 def check_agent_instructions(root: Path) -> CategoryResult:
-    found = _first_existing(root, AGENT_INSTRUCTIONS_LOCATIONS)
-    if found is None:
+    found = discover_agent_instruction_files(root)
+    if not found:
         return CategoryResult(
             Tier.ABSENT, reason="no agent instructions file found",
             recommendation=(
@@ -299,7 +372,7 @@ def check_agent_instructions(root: Path) -> CategoryResult:
                 "and others) can operate effectively in this repo."
             ),
         )
-    return CategoryResult(Tier.CONFIGURED, evidence=[found.relative_to(root).as_posix()])
+    return CategoryResult(Tier.CONFIGURED, evidence=[found[0].relative_to(root).as_posix()])
 
 
 def check_contributing(root: Path) -> CategoryResult:

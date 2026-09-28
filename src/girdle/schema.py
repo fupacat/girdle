@@ -19,6 +19,37 @@ CATEGORY_NAMES = ("tests", "lint", "coverage", "reproducibility", "ci_gating")
 
 
 @dataclass
+class ActiveHarmFinding:
+    path: str
+    kind: str
+    reason: str
+    evidence: str
+
+    def to_dict(self) -> dict:
+        return {
+            "path": self.path,
+            "kind": self.kind,
+            "reason": self.reason,
+            "evidence": self.evidence,
+        }
+
+
+@dataclass
+class ActiveHarmResult:
+    findings: list[ActiveHarmFinding] = field(default_factory=list)
+
+    @property
+    def present(self) -> bool:
+        return bool(self.findings)
+
+    def to_dict(self) -> dict:
+        return {
+            "present": self.present,
+            "findings": [finding.to_dict() for finding in self.findings],
+        }
+
+
+@dataclass
 class EcosystemResult:
     id: str
     language: str
@@ -66,6 +97,7 @@ class ScanResult:
     warnings: list[str] = field(default_factory=list)
     platform: PlatformResult | None = None
     hygiene: HygieneResult | None = None
+    active_harm: ActiveHarmResult | None = None
 
     @property
     def overall_min(self) -> int:
@@ -90,6 +122,7 @@ class ScanResult:
         return worst[1] if worst else None
 
     def to_dict(self) -> dict:
+        has_active_harm = bool(self.active_harm and self.active_harm.present)
         return {
             "girdle_version": GIRDLE_VERSION,
             "scanned_at": self.scanned_at,
@@ -101,10 +134,12 @@ class ScanResult:
                 "weakest_category": self.weakest_category,
                 "overall_min": self.overall_min,
                 "overall_avg": self.overall_avg,
+                "has_active_harm": has_active_harm,
             },
             "warnings": self.warnings,
             "platform": self.platform.to_dict() if self.platform is not None else None,
             "hygiene": self.hygiene.to_dict() if self.hygiene is not None else None,
+            "active_harm": self.active_harm.to_dict() if self.active_harm is not None else None,
         }
 
 
@@ -113,6 +148,8 @@ __all__ = [
     "CategoryResult",
     "EcosystemResult",
     "ScanResult",
+    "ActiveHarmFinding",
+    "ActiveHarmResult",
     "CATEGORY_NAMES",
     "GIRDLE_VERSION",
     "asdict",

@@ -317,6 +317,10 @@ def _print_human(data: dict) -> None:
     if hygiene is not None:
         click.echo("")
         _print_hygiene(hygiene)
+    active_harm = data.get("active_harm")
+    if active_harm and active_harm.get("findings"):
+        click.echo("")
+        _print_active_harm(active_harm)
     platform = data.get("platform")
     if platform is not None:
         click.echo("")
@@ -331,6 +335,14 @@ def _print_hygiene(hygiene: dict) -> None:
             click.echo(f"    reason: {cat['reason']}")
         if cat["recommendation"]:
             click.echo(f"    fix: {cat['recommendation']}")
+
+
+def _print_active_harm(active_harm: dict) -> None:
+    click.echo("active harm:")
+    for finding in active_harm["findings"]:
+        click.echo(f"  {finding['path']}  [{finding['kind']}]")
+        click.echo(f"    reason: {finding['reason']}")
+        click.echo(f"    evidence: {finding['evidence']}")
 
 
 def _print_platform(platform: dict) -> None:
