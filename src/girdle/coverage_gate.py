@@ -37,7 +37,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from girdle.detectors._util import read_text
+from girdle.detectors._util import _ci_texts, _first_existing_name, read_text
 
 CODECOV_UPLOAD_PATTERN = re.compile(r"codecov/codecov-action|codecov\.io/bash|\bcodecov\b")
 COVERALLS_PATTERN = re.compile(r"coverallsapp/github-action|\bcoveralls\b")
@@ -50,33 +50,6 @@ SONAR_CI_PATTERN = re.compile(
 )
 SONAR_CONFIG_NAMES = ("sonar-project.properties", ".sonarcloud.properties")
 SONAR_REPORT_PATH_PATTERN = re.compile(r"reportPaths", re.IGNORECASE)
-
-CI_FILE_CANDIDATES = ("*.yml", "*.yaml")
-
-
-def _ci_texts(root: Path) -> list[tuple[str, str]]:
-    """(label, content) for every CI config file girdle's ci_gating checks
-    already look at, so this reuses the same file set rather than a new
-    detection surface.
-    """
-    texts = []
-    wf_dir = root / ".github" / "workflows"
-    if wf_dir.exists():
-        for wf in wf_dir.glob("*.y*ml"):
-            texts.append((f".github/workflows/{wf.name}", read_text(wf) or ""))
-    for name in (".gitlab-ci.yml", "azure-pipelines.yml"):
-        p = root / name
-        if p.exists():
-            texts.append((name, read_text(p) or ""))
-    return texts
-
-
-def _first_existing_name(root: Path, names: tuple[str, ...]) -> str | None:
-    for name in names:
-        if (root / name).exists():
-            return name
-    return None
-
 
 def _codecov_gate(root: Path, codecov_cfg: str | None, label: str, text: str) -> str | None:
     if not codecov_cfg or not CODECOV_UPLOAD_PATTERN.search(text):

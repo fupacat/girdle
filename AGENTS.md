@@ -31,7 +31,8 @@ src/girdle/audit.py | python | 184L | AuditFinding, AuditResult, _invoke_agent, 
 src/girdle/badge.py | python | 39L | badge_url, badge_markdown, badge_endpoint
 src/girdle/checks.py | python | 89L | Difficulty, CheckEntry, checks_by_difficulty
 src/girdle/cli.py | python | 409L | main, scan, dashboard, badge, index, align, audit_cmd, _print_audit_human, _print_category, _print_ecosystem, _print_summary, _print_human, _print_hygiene, _print_platform, notes, notes_check, notes_ack, notes_index
-src/girdle/coverage_gate.py | python | 141L | _ci_texts, _first_existing_name, _codecov_gate, _sonar_gate, _diff_cover_gate, _gate_in_text, detect_gate
+src/girdle/coverage_gate.py | python | 114L | _codecov_gate, _sonar_gate, _diff_cover_gate, _gate_in_text, detect_gate
+src/girdle/coverage_parse.py | python | 45L | _first_match, parse_percentage
 src/girdle/detectors/_util.py | python | 128L | read_json, read_toml, read_text, _ci_texts, _first_existing_name, scan_static_analysis, scan_ci
 src/girdle/detectors/js_common.py | python | 151L | _install_verb, detect_variants, scan_tests, scan_lint, scan_coverage, scan_ci, is_lockfile_gitignored, run_commands
 src/girdle/detectors/python_common.py | python | 123L | scan_tests, scan_lint, scan_coverage, coverage_command, scan_ci, is_lockfile_gitignored, lint_command, test_command
@@ -69,7 +70,7 @@ tests/test_static_analysis.py | python | 86L | _wf, test_static_analysis_absent_
 tests/test_util_scan_ci.py | python | 52L | test_github_actions_match, test_gitlab_fallback, test_azure_fallback, test_absent_when_no_ci, test_no_match_in_workflow, test_gradle_pattern_matches_gradlew_and_gradle
 tests/test_vault.py | python | 375L | _git, _init_repo, _write_example, _write_note, test_load_note_parses_frontmatter, test_current_hash_symbol_level, test_current_hash_missing_symbol_is_none, test_current_hash_file_level_no_symbol, test_load_all_notes_skips_reserved_names, test_ack_records_current_hash_and_stages, test_check_blocks_when_note_not_updated, test_check_auto_reconciles_when_note_staged_too, test_check_skips_notes_without_watches, test_check_does_not_reconcile_when_only_stale_marker_was_staged, test_reconcile_raises_on_dangling_watch, test_ack_raises_on_dangling_watch, test_check_blocks_dangling_watch_even_when_note_staged, test_check_blocks_point_in_time_type_with_watches, test_ack_resolves_relative_root_and_note_path, test_render_vault_index, test_load_note_without_frontmatter, test_load_all_notes_no_vault_dir, test_current_hash_unsupported_extension_with_symbol, test_check_leaves_unchanged_notes_alone, test_check_auto_reconciles_brand_new_note_never_committed, test_inject_vault_index_separator_variants, test_inject_vault_index_creates_and_replaces_block
 tests/test_vendor_exclusion.py | python | 49L | test_python_ignores_test_files_inside_venv, test_python_still_finds_real_top_level_tests, test_go_ignores_test_files_inside_vendor, test_rust_ignores_rs_files_inside_target
-# ... truncated to fit 4000-token budget (43/66 files shown)
+# ... truncated to fit 4000-token budget (44/66 files shown)
 ```
 
 <!-- girdle:index:end -->
