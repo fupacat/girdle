@@ -39,7 +39,9 @@ jobs:
               }
             `;
             const copilotHeaders = { 'GraphQL-Features': 'issues_copilot_assignment_api_support' };
-            const repoData = await github.graphql(repoNodeQuery, { owner, repo, headers: copilotHeaders });
+            const repoData = await github.graphql(repoNodeQuery, {
+              owner, repo, headers: copilotHeaders,
+            });
             const suggested = repoData.repository.suggestedActors.nodes;
             const copilotActor = suggested.find(a => a.login === "copilot-swe-agent");
             if (!copilotActor) {
