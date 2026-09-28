@@ -21,9 +21,8 @@ jobs:
         env:
           COPILOT_ASSIGN_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
         with:
-          # Bootstrap the script with GITHUB_TOKEN so the step can still run
-          # and emit a clear warning when COPILOT_ASSIGN_TOKEN is absent.
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Use the PAT when present; otherwise allow the warning path to run.
+          github-token: ${{ secrets.COPILOT_ASSIGN_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             if (!process.env.COPILOT_ASSIGN_TOKEN) {
               core.warning(
@@ -34,8 +33,7 @@ jobs:
               return;
             }
 
-            const { getOctokit } = require("@actions/github");
-            const copilotGitHub = getOctokit(process.env.COPILOT_ASSIGN_TOKEN);
+            const copilotGitHub = github;
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
 
