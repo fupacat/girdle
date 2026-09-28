@@ -26,6 +26,37 @@ BADGE_BY_DIFFICULTY = {
 
 
 @dataclass
+class ActiveHarmFinding:
+    path: str
+    kind: str
+    reason: str
+    evidence: str
+
+    def to_dict(self) -> dict:
+        return {
+            "path": self.path,
+            "kind": self.kind,
+            "reason": self.reason,
+            "evidence": self.evidence,
+        }
+
+
+@dataclass
+class ActiveHarmResult:
+    findings: list[ActiveHarmFinding] = field(default_factory=list)
+
+    @property
+    def present(self) -> bool:
+        return bool(self.findings)
+
+    def to_dict(self) -> dict:
+        return {
+            "present": self.present,
+            "findings": [finding.to_dict() for finding in self.findings],
+        }
+
+
+@dataclass
 class EcosystemResult:
     id: str
     language: str
@@ -73,7 +104,7 @@ class ScanResult:
     warnings: list[str] = field(default_factory=list)
     platform: PlatformResult | None = None
     hygiene: HygieneResult | None = None
-    active_harm: bool = False
+    active_harm: ActiveHarmResult | None = None
 
     @property
     def category_percentages(self) -> dict[str, float | None]:
@@ -194,7 +225,7 @@ class ScanResult:
             percentage = round((100.0 * passed / total), 1) if total else 0.0
             outstanding = [key for key in keys if not statuses[key]["passed"]]
             badge = self._badge_state_for_keys(keys, statuses)
-            if self.active_harm:
+            if self.active_harm and self.active_harm.present:
                 state = "red"
             else:
                 state = badge or "neutral"
@@ -219,7 +250,7 @@ class ScanResult:
         percentage = round((100.0 * passed / total), 1) if total else 0.0
         outstanding = [key for key in keys if not statuses[key]["passed"]]
         badge = self._badge_state_for_keys(keys, statuses)
-        if self.active_harm:
+        if self.active_harm and self.active_harm.present:
             state = "red"
         else:
             state = badge or "neutral"
@@ -236,6 +267,7 @@ class ScanResult:
         statuses = self.check_statuses
         category_scores = self._category_scores(statuses)
         overall_score = self._overall_score(statuses)
+        has_active_harm = bool(self.active_harm and self.active_harm.present)
         return {
             "girdle_version": GIRDLE_VERSION,
             "scanned_at": self.scanned_at,
@@ -247,6 +279,7 @@ class ScanResult:
                 "weakest_category": self.weakest_category,
                 "overall_min": self.overall_min,
                 "overall_avg": self.overall_avg,
+                "has_active_harm": has_active_harm,
                 "overall_percentage": overall_score["percentage"],
                 "overall_state": overall_score["state"],
                 "overall_badge": overall_score["badge"],
@@ -255,10 +288,10 @@ class ScanResult:
                 "category_percentages": self.category_percentages,
             },
             "checks": statuses,
-            "active_harm": self.active_harm,
             "warnings": self.warnings,
             "platform": self.platform.to_dict() if self.platform is not None else None,
             "hygiene": self.hygiene.to_dict() if self.hygiene is not None else None,
+            "active_harm": self.active_harm.to_dict() if self.active_harm is not None else None,
         }
 
 
@@ -267,6 +300,8 @@ __all__ = [
     "CategoryResult",
     "EcosystemResult",
     "ScanResult",
+    "ActiveHarmFinding",
+    "ActiveHarmResult",
     "CATEGORY_NAMES",
     "GIRDLE_VERSION",
     "asdict",

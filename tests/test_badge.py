@@ -1,8 +1,14 @@
 from girdle.badge import badge_endpoint, badge_markdown, badge_url
 
 
-def _data(overall_percentage: float, overall_state: str) -> dict:
-    return {"summary": {"overall_percentage": overall_percentage, "overall_state": overall_state}}
+def _data(overall_percentage: float, overall_state: str, *, has_active_harm: bool = False) -> dict:
+    return {
+        "summary": {
+            "overall_percentage": overall_percentage,
+            "overall_state": overall_state,
+            "has_active_harm": has_active_harm,
+        }
+    }
 
 
 def test_badge_url_neutral():
@@ -57,3 +63,15 @@ def test_badge_endpoint_custom_label():
 def test_badge_falls_back_to_legacy_overall_min():
     endpoint = badge_endpoint({"summary": {"overall_min": 2}})
     assert endpoint["message"] == "verified"
+
+
+def test_badge_url_active_harm_overrides_to_red():
+    url = badge_url(_data(2, "neutral", has_active_harm=True))
+    assert "harm%20detected" in url
+    assert url.endswith("-e05252")
+
+
+def test_badge_endpoint_active_harm_overrides_to_red():
+    endpoint = badge_endpoint(_data(2, "neutral", has_active_harm=True))
+    assert endpoint["message"] == "harm detected"
+    assert endpoint["color"] == "e05252"

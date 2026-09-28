@@ -55,6 +55,18 @@
 
   .list { margin: 0; padding-left: 1.2rem; color: var(--muted); }
   .warnings { color: var(--gold); font-size: 0.85rem; margin-top: 1.5rem; }
+
+  .platform {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1.2rem 1.4rem; margin-bottom: 1.2rem;
+  }
+  .platform h2 { font-size: 1.05rem; margin: 0 0 0.9rem; }
+  .finding {
+    border: 1px solid var(--border); border-left: 4px solid var(--red);
+    border-radius: 8px; padding: 0.8rem 0.9rem; margin-top: 0.7rem;
+  }
+  .finding .name { font-weight: 600; font-size: 0.85rem; }
+  .finding .reason, .finding .evidence { color: var(--muted); font-size: 0.8rem; margin-top: 0.35rem; }
 </style>
 </head>
 <body>
@@ -68,8 +80,12 @@
     </div>
     <div class="summary-card {{ data.summary.overall_state | state_class }}">
       <div class="label">Overall score</div>
+      {% if data.summary.has_active_harm %}
+      <div class="value">harm detected</div>
+      {% else %}
       <div class="value">{{ data.summary.overall_percentage }}%</div>
       <div class="cat-state">{{ data.summary.overall_state | state_label }}</div>
+      {% endif %}
     </div>
     <div class="summary-card">
       <div class="label">Outstanding checks</div>
@@ -124,6 +140,19 @@
       {% endfor %}
     </ul>
   </div>
+
+  {% if data.active_harm and data.active_harm.findings %}
+  <div class="platform">
+    <h2>active harm findings</h2>
+    {% for finding in data.active_harm.findings %}
+    <div class="finding">
+      <div class="name">{{ finding.path | e }} &middot; {{ finding.kind | e }}</div>
+      <div class="reason">{{ finding.reason | e }}</div>
+      <div class="evidence">{{ finding.evidence | e }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   {% if data.platform %}
   <div class="section">

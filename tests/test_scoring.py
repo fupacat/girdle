@@ -1,6 +1,13 @@
 from girdle.checks import CheckEntry, Difficulty
 from girdle.hygiene import HygieneResult
-from girdle.schema import CategoryResult, EcosystemResult, ScanResult, Tier
+from girdle.schema import (
+    ActiveHarmFinding,
+    ActiveHarmResult,
+    CategoryResult,
+    EcosystemResult,
+    ScanResult,
+    Tier,
+)
 
 
 def _eco(tests, lint, repro, ci, applicable=None):
@@ -223,7 +230,9 @@ def test_active_harm_forces_red_state(monkeypatch):
         scanned_at="now",
         mode="static",
         hygiene=HygieneResult(checks={"x": CategoryResult(Tier.CONFIGURED)}),
-        active_harm=True,
+        active_harm=ActiveHarmResult(
+            findings=[ActiveHarmFinding("AGENTS.md", "prompt-injection", "reason", "evidence")]
+        ),
     )
     data = result.to_dict()["summary"]
     assert data["overall_state"] == "red"

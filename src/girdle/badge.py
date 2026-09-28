@@ -19,8 +19,14 @@ STATE_COLOR = {
 GIRDLE_URL = "https://github.com/fupacat/girdle"
 
 
+ACTIVE_HARM_MESSAGE = "harm detected"
+
+
 def _summary_message_color(data: dict) -> tuple[str, str]:
     summary = data.get("summary", {})
+    if summary.get("has_active_harm"):
+        return ACTIVE_HARM_MESSAGE, TIER_COLOR[0]
+
     if "overall_percentage" in summary and "overall_state" in summary:
         percentage = summary["overall_percentage"]
         state = summary["overall_state"]
