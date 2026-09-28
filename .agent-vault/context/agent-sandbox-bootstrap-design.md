@@ -3,7 +3,7 @@ type: context
 watches:
   - path: src/girdle/hygiene.py
     symbol: check_agent_sandbox_bootstrap
-    hash: cbab06d8f7b95e723d4085ac08289f5fbfcb9f1d60c743cb0664ba25df9a5c4d
+    hash: 97485092dd4ef47bc56cd01d2fd485eee4ce94b0fa735dabe40eecc1b7ac9b31
 stale: false
 ---
 
