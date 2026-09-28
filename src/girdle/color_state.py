@@ -15,9 +15,10 @@ flag, returns the display state:
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from enum import Enum
 
-from girdle.checks import CHECK_REGISTRY, Difficulty
+from girdle.checks import CHECK_REGISTRY, CheckEntry, Difficulty
 
 
 class DisplayState(str, Enum):
@@ -28,7 +29,9 @@ class DisplayState(str, Enum):
     RED = "red"
 
 
-def _badge_thresholds() -> tuple[float, float, float]:
+def _badge_thresholds(
+    entries: Iterable[CheckEntry] | None = None,
+) -> tuple[float, float, float]:
     """Return *(bronze, silver, gold)* percentage thresholds from the live registry.
 
     Thresholds are derived by asking: "what percentage would you score if
@@ -38,10 +41,15 @@ def _badge_thresholds() -> tuple[float, float, float]:
     - **Silver** – all BASIC + INTERMEDIATE checks passing.
     - **Gold** – 100 % (every non-reserved check passing).
 
-    Reserved checks (not yet implemented) are excluded so that the thresholds
-    reflect only real, actionable checks.
+    When *entries* is provided, thresholds are derived only from those checks;
+    otherwise the full registry is used. Reserved checks are excluded so the
+    thresholds reflect only real, actionable checks.
     """
-    active = [e for e in CHECK_REGISTRY.values() if not e.reserved]
+    active = [
+        e
+        for e in (entries if entries is not None else CHECK_REGISTRY.values())
+        if not e.reserved
+    ]
     total = len(active)
     if total == 0:
         return (0.0, 0.0, 100.0)
@@ -62,6 +70,7 @@ def display_state(
     percentage: float | None,
     *,
     active_harm: bool = False,
+    entries: Iterable[CheckEntry] | None = None,
 ) -> DisplayState:
     """Return the display state for a dashboard percentage and active-harm flag.
 
@@ -71,14 +80,21 @@ def display_state(
         active_harm: ``True`` when an active-harm finding (secrets,
             malicious/poisoned agent instructions) is present.  Forces
             :attr:`DisplayState.RED` regardless of *percentage*.
+        entries: Applicable checks for this scan, when thresholds should be
+            derived from only the checks included in *percentage*.
     """
     if active_harm:
         return DisplayState.RED
-    if percentage is None or percentage < BRONZE_THRESHOLD:
+    bronze, silver, gold = (
+        _badge_thresholds(entries)
+        if entries is not None
+        else (BRONZE_THRESHOLD, SILVER_THRESHOLD, GOLD_THRESHOLD)
+    )
+    if percentage is None or percentage < bronze:
         return DisplayState.NEUTRAL
-    if percentage < SILVER_THRESHOLD:
+    if percentage < silver:
         return DisplayState.BRONZE
-    if percentage < GOLD_THRESHOLD:
+    if percentage < gold:
         return DisplayState.SILVER
     return DisplayState.GOLD
 
