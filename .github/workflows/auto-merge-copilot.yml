@@ -65,7 +65,7 @@ jobs:
         run: gh pr ready "${{ github.event.pull_request.number }}"
 
   fallback-sweep:
-    # Debounce is deliberately generous (10 minutes) - promoting a PR
+    # Debounce is deliberately generous (30 minutes) - promoting a PR
     # Copilot is still actively pushing commits to risks queueing
     # unfinished work, same risk the opened/synchronize triggers avoid
     # above.
@@ -77,7 +77,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
-      DEBOUNCE_MINUTES: 10
+      DEBOUNCE_MINUTES: 30
     steps:
       - name: Promote stale Copilot draft PRs out of draft
         run: |
@@ -87,15 +87,16 @@ jobs:
           repo_owner="${GH_REPO%%/*}"
           now_epoch=$(date -u +%s)
 
-          json_fields="number,author,headRefName,isDraft,baseRefName,headRepositoryOwner"
+          json_fields="number,author,headRefName,isDraft,baseRefName,headRepositoryOwner,title"
           jq_filter='.[]
             | select(.isDraft == true)
             | select(.author.login == "Copilot")
             | select(.headRefName | startswith("copilot/"))
+            | select(.title | test("^\\[WIP\\]") | not)
             | [.number, .baseRefName, .headRepositoryOwner.login]
             | @tsv'
 
-          gh pr list --state open --json "$json_fields" -q "$jq_filter" \
+          gh pr list --state open --draft --limit 500 --json "$json_fields" -q "$jq_filter" \
           | while IFS=$'\t' read -r pr base_ref head_owner; do
               if [ "$base_ref" != "$default_branch" ] || [ "$head_owner" != "$repo_owner" ]; then
                 echo "Skipping PR #$pr (base=$base_ref, head owner=$head_owner)"
