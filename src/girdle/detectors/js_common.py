@@ -112,14 +112,18 @@ def scan_coverage(pkg_data: dict, pkg_manager: str = "npm") -> CategoryResult:
 
 
 def has_build_script(pkg_data: dict) -> bool:
-    scripts = pkg_data.get("scripts", {})
+    scripts = pkg_data.get("scripts")
+    if not isinstance(scripts, dict):
+        return False
     return isinstance(scripts.get("build"), str) and bool(scripts["build"].strip())
 
 
 def scan_build(pkg_data: dict) -> CategoryResult:
+    scripts = pkg_data.get("scripts") or {}
+    build_val = scripts.get("build", "") if isinstance(scripts, dict) else ""
     return CategoryResult(
         Tier.CONFIGURED,
-        evidence=[f"package.json#scripts.build = {pkg_data['scripts']['build']!r}"],
+        evidence=[f"package.json#scripts.build = {build_val!r}"],
     )
 
 

@@ -6,7 +6,7 @@
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=fupacat_girdle&metric=coverage)](https://sonarcloud.io/summary/new_code?id=fupacat_girdle)
 
 Scores a repository's agent-readiness verification infrastructure — tests,
-lint/type-checking, reproducible builds, and CI gating — across common
+lint/type-checking, static analysis, reproducible builds, and CI gating — across common
 language ecosystems (JS/TS, Python, Go, .NET, Rust, Java, and their major
 toolchain variants).
 
