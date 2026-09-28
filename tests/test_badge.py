@@ -1,66 +1,77 @@
 from girdle.badge import badge_endpoint, badge_markdown, badge_url
 
 
-def _data(overall_min: int, *, has_active_harm: bool = False) -> dict:
-    return {"summary": {"overall_min": overall_min, "has_active_harm": has_active_harm}}
+def _data(overall_percentage: float, overall_state: str, *, has_active_harm: bool = False) -> dict:
+    return {
+        "summary": {
+            "overall_percentage": overall_percentage,
+            "overall_state": overall_state,
+            "has_active_harm": has_active_harm,
+        }
+    }
 
 
-def test_badge_url_absent():
-    url = badge_url(_data(0))
-    assert url == "https://img.shields.io/badge/girdle-absent-e05252"
+def test_badge_url_neutral():
+    url = badge_url(_data(0.0, "neutral"))
+    assert url == "https://img.shields.io/badge/girdle-0%25-7f8794"
 
 
-def test_badge_url_configured():
-    url = badge_url(_data(1))
-    assert url == "https://img.shields.io/badge/girdle-configured-d9a441"
+def test_badge_url_bronze():
+    url = badge_url(_data(50.0, "bronze"))
+    assert url == "https://img.shields.io/badge/girdle-50%25%20bronze-cd7f32"
 
 
-def test_badge_url_verified():
-    url = badge_url(_data(2))
-    assert url == "https://img.shields.io/badge/girdle-verified-4caf7d"
+def test_badge_url_red():
+    url = badge_url(_data(12.5, "red"))
+    assert url == "https://img.shields.io/badge/girdle-12.5%25-e05252"
 
 
 def test_badge_url_custom_label():
-    url = badge_url(_data(2), label="my project")
-    assert url.startswith("https://img.shields.io/badge/my%20project-verified-")
+    url = badge_url(_data(100, "gold"), label="my project")
+    assert url.startswith("https://img.shields.io/badge/my%20project-100%25%20gold-")
 
 
 def test_badge_markdown_links_to_girdle_by_default():
-    md = badge_markdown(_data(1))
+    md = badge_markdown(_data(50, "bronze"))
     assert md == (
-        "[![girdle](https://img.shields.io/badge/girdle-configured-d9a441)]"
+        "[![girdle](https://img.shields.io/badge/girdle-50%25%20bronze-cd7f32)]"
         "(https://github.com/fupacat/girdle)"
     )
 
 
 def test_badge_markdown_custom_link():
-    md = badge_markdown(_data(1), link="https://example.com")
+    md = badge_markdown(_data(50, "bronze"), link="https://example.com")
     assert md.endswith("(https://example.com)")
 
 
 def test_badge_endpoint_schema():
-    endpoint = badge_endpoint(_data(2))
+    endpoint = badge_endpoint(_data(100, "gold"))
     assert endpoint == {
         "schemaVersion": 1,
         "label": "girdle",
-        "message": "verified",
-        "color": "4caf7d",
+        "message": "100% gold",
+        "color": "d4af37",
     }
 
 
 def test_badge_endpoint_custom_label():
-    endpoint = badge_endpoint(_data(0), label="my-repo")
+    endpoint = badge_endpoint(_data(0, "neutral"), label="my-repo")
     assert endpoint["label"] == "my-repo"
-    assert endpoint["message"] == "absent"
+    assert endpoint["message"] == "0%"
+
+
+def test_badge_falls_back_to_legacy_overall_min():
+    endpoint = badge_endpoint({"summary": {"overall_min": 2}})
+    assert endpoint["message"] == "verified"
 
 
 def test_badge_url_active_harm_overrides_to_red():
-    url = badge_url(_data(2, has_active_harm=True))
+    url = badge_url(_data(2, "neutral", has_active_harm=True))
     assert "harm%20detected" in url
     assert url.endswith("-e05252")
 
 
 def test_badge_endpoint_active_harm_overrides_to_red():
-    endpoint = badge_endpoint(_data(2, has_active_harm=True))
+    endpoint = badge_endpoint(_data(2, "neutral", has_active_harm=True))
     assert endpoint["message"] == "harm detected"
     assert endpoint["color"] == "e05252"

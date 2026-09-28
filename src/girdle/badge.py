@@ -8,6 +8,13 @@ from urllib.parse import quote
 
 TIER_LABEL = {0: "absent", 1: "configured", 2: "verified"}
 TIER_COLOR = {0: "e05252", 1: "d9a441", 2: "4caf7d"}  # matches dashboard.py's palette
+STATE_COLOR = {
+    "neutral": "7f8794",
+    "bronze": "cd7f32",
+    "silver": "aeb5c0",
+    "gold": "d4af37",
+    "red": "e05252",
+}
 
 GIRDLE_URL = "https://github.com/fupacat/girdle"
 
@@ -15,16 +22,24 @@ GIRDLE_URL = "https://github.com/fupacat/girdle"
 ACTIVE_HARM_MESSAGE = "harm detected"
 
 
+def _summary_message_color(data: dict) -> tuple[str, str]:
+    summary = data.get("summary", {})
+    if summary.get("has_active_harm"):
+        return ACTIVE_HARM_MESSAGE, TIER_COLOR[0]
+
+    if "overall_percentage" in summary and "overall_state" in summary:
+        percentage = summary["overall_percentage"]
+        state = summary["overall_state"]
+        suffix = f" {state}" if state in {"bronze", "silver", "gold"} else ""
+        return f"{percentage:g}%{suffix}", STATE_COLOR.get(state, "lightgrey")
+
+    tier = summary.get("overall_min")
+    return TIER_LABEL.get(tier, "unknown"), TIER_COLOR.get(tier, "lightgrey")
+
+
 def badge_url(data: dict, label: str = "girdle") -> str:
-    if data["summary"].get("has_active_harm"):
-        return (
-            f"https://img.shields.io/badge/{quote(label)}"
-            f"-{quote(ACTIVE_HARM_MESSAGE)}-{TIER_COLOR[0]}"
-        )
-    tier = data["summary"]["overall_min"]
-    message = TIER_LABEL.get(tier, "unknown")
-    color = TIER_COLOR.get(tier, "lightgrey")
-    return f"https://img.shields.io/badge/{quote(label)}-{message}-{color}"
+    message, color = _summary_message_color(data)
+    return f"https://img.shields.io/badge/{quote(label)}-{quote(message)}-{color}"
 
 
 def badge_markdown(data: dict, label: str = "girdle", link: str = GIRDLE_URL) -> str:
@@ -38,17 +53,10 @@ def badge_endpoint(data: dict, label: str = "girdle") -> dict:
     (e.g. GitHub Pages) that shields.io fetches live on every render, so the
     badge stays current without embedding a fixed color/message in markdown.
     """
-    if data["summary"].get("has_active_harm"):
-        return {
-            "schemaVersion": 1,
-            "label": label,
-            "message": ACTIVE_HARM_MESSAGE,
-            "color": TIER_COLOR[0],
-        }
-    tier = data["summary"]["overall_min"]
+    message, color = _summary_message_color(data)
     return {
         "schemaVersion": 1,
         "label": label,
-        "message": TIER_LABEL.get(tier, "unknown"),
-        "color": TIER_COLOR.get(tier, "lightgrey"),
+        "message": message,
+        "color": color,
     }

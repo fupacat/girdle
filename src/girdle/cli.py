@@ -298,9 +298,16 @@ def _print_ecosystem(eco: dict) -> None:
 
 def _print_summary(data: dict) -> None:
     summary = data["summary"]
+    overall_pct = summary.get("overall_percentage")
+    overall_state = summary.get("overall_state")
+    score_text = (
+        f"{overall_pct:g}% ({overall_state})"
+        if overall_pct is not None and overall_state is not None
+        else TIER_LABEL[summary["overall_min"]]
+    )
     click.echo(
         f"summary: {summary['ecosystem_count']} ecosystem(s), "
-        f"overall_min={TIER_LABEL[summary['overall_min']]}, "
+        f"overall={score_text}, "
         f"weakest={summary['weakest_category']}"
     )
     for w in data["warnings"]:

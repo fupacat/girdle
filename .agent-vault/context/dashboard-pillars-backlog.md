@@ -28,9 +28,10 @@ so the record of what was considered and why survives.
 
 ## New pillars (from the Factory.ai Agent Readiness comparison)
 
-- [in-progress] **Build System** - [issue #78](https://github.com/fupacat/girdle/issues/78),
-  unassigned (depends on #73). Confirm whether girdle already scores
-  deterministic build commands, or whether this is a genuine gap.
+- [done] **Build System** - [issue #78](https://github.com/fupacat/girdle/issues/78):
+  new intermediate `build` check added for compiled ecosystems plus
+  JS repos with an explicit `scripts.build`, with `--run` verification
+  commands where the toolchain has a standard build entry point.
 - [ ] **Debugging & Observability** (structured logging, tracing,
   metrics) - genuine gap, no existing girdle category. Needs its own
   design pass (what's deterministically checkable here - structured
