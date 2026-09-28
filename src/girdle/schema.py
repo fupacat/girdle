@@ -7,8 +7,10 @@ object. Never build a second, dashboard-only representation.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 
+from girdle.checks import CHECK_REGISTRY, Difficulty
 from girdle.hygiene import HygieneResult
 from girdle.platform import PlatformResult
 from girdle.tiers import CategoryResult, Tier
@@ -16,6 +18,16 @@ from girdle.tiers import CategoryResult, Tier
 GIRDLE_VERSION = "0.1.0"
 
 CATEGORY_NAMES = ("tests", "lint", "coverage", "reproducibility", "ci_gating")
+BADGE_BY_DIFFICULTY = {
+    Difficulty.BASIC: "bronze",
+    Difficulty.INTERMEDIATE: "silver",
+    Difficulty.ADVANCED: "gold",
+}
+DIFFICULTY_RANK = {
+    Difficulty.BASIC: 0,
+    Difficulty.INTERMEDIATE: 1,
+    Difficulty.ADVANCED: 2,
+}
 
 
 @dataclass
@@ -66,6 +78,7 @@ class ScanResult:
     warnings: list[str] = field(default_factory=list)
     platform: PlatformResult | None = None
     hygiene: HygieneResult | None = None
+    active_harm: bool = False
 
     @property
     def overall_min(self) -> int:
@@ -89,6 +102,121 @@ class ScanResult:
                     worst = (int(cat.tier), name)
         return worst[1] if worst else None
 
+    @property
+    def check_statuses(self) -> dict[str, dict]:
+        statuses: dict[str, dict] = {}
+        for key, entry in CHECK_REGISTRY.items():
+            if entry.reserved:
+                continue
+
+            if self.hygiene is not None and key in self.hygiene.checks:
+                passed = self.hygiene.checks[key].tier >= Tier.CONFIGURED
+                statuses[key] = {
+                    "passed": passed,
+                    "difficulty": entry.difficulty.value,
+                    "categories": list(entry.categories),
+                    "failing_in": [] if passed else ["hygiene"],
+                }
+                continue
+
+            seen_in: list[str] = []
+            failing_in: list[str] = []
+            for eco in self.ecosystems:
+                if key not in eco.applicable_categories and key not in eco.categories:
+                    continue
+                cat = eco.categories.get(key)
+                if cat is None:
+                    continue
+                seen_in.append(eco.id)
+                if cat.tier < Tier.CONFIGURED:
+                    failing_in.append(eco.id)
+
+            if not seen_in:
+                continue
+
+            statuses[key] = {
+                "passed": len(failing_in) == 0,
+                "difficulty": entry.difficulty.value,
+                "categories": list(entry.categories),
+                "failing_in": failing_in,
+            }
+        return statuses
+
+    @staticmethod
+    def _badge_state_for_keys(keys: list[str], statuses: dict[str, dict]) -> str | None:
+        earned: str | None = None
+        for difficulty in (Difficulty.BASIC, Difficulty.INTERMEDIATE, Difficulty.ADVANCED):
+            gated_keys = [
+                key
+                for key in keys
+                if DIFFICULTY_RANK[CHECK_REGISTRY[key].difficulty] <= DIFFICULTY_RANK[difficulty]
+            ]
+            if not gated_keys:
+                continue
+            if all(statuses[key]["passed"] for key in gated_keys):
+                earned = BADGE_BY_DIFFICULTY[difficulty]
+        return earned
+
+    @property
+    def category_scores(self) -> dict[str, dict]:
+        statuses = self.check_statuses
+        per_category: dict[str, list[str]] = defaultdict(list)
+        for key, status in statuses.items():
+            for category in status["categories"]:
+                per_category[category].append(key)
+
+        all_categories = sorted(
+            {
+                category
+                for entry in CHECK_REGISTRY.values()
+                if not entry.reserved
+                for category in entry.categories
+            }
+        )
+        scores: dict[str, dict] = {}
+        for category in all_categories:
+            keys = sorted(per_category.get(category, []))
+            total = len(keys)
+            passed = sum(1 for key in keys if statuses[key]["passed"])
+            percentage = round((100.0 * passed / total), 1) if total else 0.0
+            outstanding = [key for key in keys if not statuses[key]["passed"]]
+            badge = self._badge_state_for_keys(keys, statuses)
+            if self.active_harm:
+                state = "red"
+            else:
+                state = badge or "neutral"
+            scores[category] = {
+                "passed": passed,
+                "total": total,
+                "percentage": percentage,
+                "badge": badge,
+                "state": state,
+                "outstanding": outstanding,
+            }
+        return scores
+
+    @property
+    def overall_score(self) -> dict:
+        statuses = self.check_statuses
+        keys = sorted(statuses.keys())
+        total = len(keys)
+        passed = sum(1 for key in keys if statuses[key]["passed"])
+        percentage = round((100.0 * passed / total), 1) if total else 0.0
+        outstanding = [key for key in keys if not statuses[key]["passed"]]
+        badge = self._badge_state_for_keys(keys, statuses)
+        if self.active_harm:
+            state = "red"
+        else:
+            state = badge or "neutral"
+        return {
+            "passed": passed,
+            "total": total,
+            "percentage": percentage,
+            "badge": badge,
+            "state": state,
+            "outstanding": outstanding,
+        }
+
     def to_dict(self) -> dict:
         return {
             "girdle_version": GIRDLE_VERSION,
@@ -101,7 +229,14 @@ class ScanResult:
                 "weakest_category": self.weakest_category,
                 "overall_min": self.overall_min,
                 "overall_avg": self.overall_avg,
+                "overall_percentage": self.overall_score["percentage"],
+                "overall_state": self.overall_score["state"],
+                "overall_badge": self.overall_score["badge"],
+                "overall_outstanding": self.overall_score["outstanding"],
+                "category_scores": self.category_scores,
             },
+            "checks": self.check_statuses,
+            "active_harm": self.active_harm,
             "warnings": self.warnings,
             "platform": self.platform.to_dict() if self.platform is not None else None,
             "hygiene": self.hygiene.to_dict() if self.hygiene is not None else None,
