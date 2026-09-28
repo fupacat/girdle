@@ -150,7 +150,7 @@ class ScanResult:
     def _badge_state_for_keys(keys: list[str], statuses: dict[str, dict]) -> str | None:
         earned: str | None = None
         for difficulty in (Difficulty.BASIC, Difficulty.INTERMEDIATE, Difficulty.ADVANCED):
-            tier_keys = [k for k in keys if CHECK_REGISTRY[k].difficulty is difficulty]
+            tier_keys = [k for k in keys if Difficulty(statuses[k]["difficulty"]) is difficulty]
             if not tier_keys or not all(statuses[k]["passed"] for k in tier_keys):
                 break
             earned = BADGE_BY_DIFFICULTY[difficulty]
