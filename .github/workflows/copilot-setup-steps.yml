@@ -2,11 +2,11 @@ name: "Copilot Setup Steps"
 
 # Bootstraps the Copilot coding agent's sandbox before it starts working on
 # an assigned issue. Without this, the agent runs plain `git commit` with
-# no local hooks active at all - `pre-commit install` here gives it the
-# same enforcement (ruff, pytest, the structural-index freshness check,
-# vault notes staleness) any human contributor gets, so a stale index or
-# a lint violation is caught and can be self-corrected before the PR is
-# ever opened, instead of surfacing downstream in CI for the first time.
+# no local hooks active at all. This still matters for in-sandbox manual
+# checks (`pre-commit run`, `ruff`, `pytest`, etc.), but Copilot-authored
+# commits are not guaranteed to be created via local `git commit`, so local
+# hooks are not a reliable enforcement gate for those commits. CI remains
+# the authoritative fail-closed gate before merge.
 #
 # The job name is load-bearing: GitHub only picks this workflow up for
 # Copilot's sandbox if the job is named exactly `copilot-setup-steps`.
