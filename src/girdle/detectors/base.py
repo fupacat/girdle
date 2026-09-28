@@ -4,7 +4,7 @@ A detector's job is split in two so scoring stays mechanical:
 - `detect(root)` returns fingerprint info if this ecosystem is present at `root`,
   or None if not. Detection must be marker-file based, never content-sniffed
   prose, per the structural-facts-only security stance.
-- `scan(fingerprint, mode)` returns the four CategoryResults for that ecosystem.
+- `scan(fingerprint, mode)` returns the scored CategoryResults for that ecosystem.
   `mode="run"` may execute the repo's own tooling (e.g. `pytest --collect-only`
   or an actual test run); `mode="static"` must only read files.
 """

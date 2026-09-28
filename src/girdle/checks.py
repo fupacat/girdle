@@ -53,6 +53,7 @@ _ENTRIES: tuple[CheckEntry, ...] = (
     CheckEntry("tests", ("tests",), Difficulty.INTERMEDIATE),
     CheckEntry("lint", ("lint",), Difficulty.INTERMEDIATE),
     CheckEntry("coverage", ("coverage",), Difficulty.INTERMEDIATE),
+    CheckEntry("build", ("build",), Difficulty.INTERMEDIATE),
     CheckEntry("ci_gating", ("ci_gating",), Difficulty.INTERMEDIATE),
     CheckEntry("codeowners", ("codeowners",), Difficulty.INTERMEDIATE),
     CheckEntry("dependency_monitoring", ("dependency_monitoring",), Difficulty.INTERMEDIATE),
@@ -60,6 +61,7 @@ _ENTRIES: tuple[CheckEntry, ...] = (
     CheckEntry("gitattributes", ("gitattributes",), Difficulty.INTERMEDIATE),
     CheckEntry("precommit", ("precommit",), Difficulty.INTERMEDIATE),
     # ── Advanced ───────────────────────────────────────────────────────────
+    CheckEntry("static_analysis", ("static_analysis",), Difficulty.ADVANCED),
     CheckEntry("agent_instructions", ("agent_instructions",), Difficulty.ADVANCED),
     CheckEntry("agent_sandbox_bootstrap", ("agent_sandbox_bootstrap",), Difficulty.ADVANCED),
     CheckEntry(

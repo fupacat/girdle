@@ -7,16 +7,53 @@ object. Never build a second, dashboard-only representation.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 
-from girdle.checks import CHECK_REGISTRY, CheckEntry
+from girdle.checks import CHECK_REGISTRY, Difficulty
 from girdle.hygiene import HygieneResult
 from girdle.platform import PlatformResult
 from girdle.tiers import CategoryResult, Tier
 
 GIRDLE_VERSION = "0.1.0"
 
-CATEGORY_NAMES = ("tests", "lint", "coverage", "reproducibility", "ci_gating")
+CATEGORY_NAMES = ("tests", "lint", "coverage", "build", "reproducibility", "ci_gating")
+BADGE_BY_DIFFICULTY = {
+    Difficulty.BASIC: "bronze",
+    Difficulty.INTERMEDIATE: "silver",
+    Difficulty.ADVANCED: "gold",
+}
+
+
+@dataclass
+class ActiveHarmFinding:
+    path: str
+    kind: str
+    reason: str
+    evidence: str
+
+    def to_dict(self) -> dict:
+        return {
+            "path": self.path,
+            "kind": self.kind,
+            "reason": self.reason,
+            "evidence": self.evidence,
+        }
+
+
+@dataclass
+class ActiveHarmResult:
+    findings: list[ActiveHarmFinding] = field(default_factory=list)
+
+    @property
+    def present(self) -> bool:
+        return bool(self.findings)
+
+    def to_dict(self) -> dict:
+        return {
+            "present": self.present,
+            "findings": [finding.to_dict() for finding in self.findings],
+        }
 
 
 @dataclass
@@ -67,75 +104,16 @@ class ScanResult:
     warnings: list[str] = field(default_factory=list)
     platform: PlatformResult | None = None
     hygiene: HygieneResult | None = None
-
-    def _check_passed(self, entry: CheckEntry) -> bool | None:
-        tiers: list[Tier] = []
-        for eco in self.ecosystems:
-            cat = eco.categories.get(entry.key)
-            if cat is not None and entry.key in eco.applicable_categories:
-                tiers.append(cat.tier)
-                continue
-            for category in entry.categories:
-                if category not in eco.applicable_categories:
-                    continue
-                cat = eco.categories.get(category)
-                if cat is None:
-                    continue
-                tiers.append(cat.tier)
-        if self.hygiene is not None:
-            cat = self.hygiene.checks.get(entry.key)
-            if cat is not None:
-                tiers.append(cat.tier)
-        if not tiers:
-            return None
-        return all(tier >= Tier.CONFIGURED for tier in tiers)
+    active_harm: ActiveHarmResult | None = None
 
     @property
     def category_percentages(self) -> dict[str, float | None]:
-        categories: list[str] = []
-        seen: set[str] = set()
-        for entry in CHECK_REGISTRY.values():
-            for category in entry.categories:
-                if category in seen:
-                    continue
-                categories.append(category)
-                seen.add(category)
-
-        totals = {category: 0 for category in categories}
-        passed = {category: 0 for category in categories}
-
-        for entry in CHECK_REGISTRY.values():
-            check_passed = self._check_passed(entry)
-            if check_passed is None:
-                continue
-            for category in entry.categories:
-                totals[category] += 1
-                if check_passed:
-                    passed[category] += 1
-
-        return {
-            category: (
-                round((passed[category] / totals[category]) * 100, 2)
-                if totals[category]
-                else None
-            )
-            for category in categories
-        }
+        return {k: v["percentage"] for k, v in self.category_scores.items()}
 
     @property
     def overall_percentage(self) -> float | None:
-        total = 0
-        passed = 0
-        for entry in CHECK_REGISTRY.values():
-            check_passed = self._check_passed(entry)
-            if check_passed is None:
-                continue
-            total += 1
-            if check_passed:
-                passed += 1
-        if total == 0:
-            return None
-        return round((passed / total) * 100, 2)
+        score = self._overall_score(self.check_statuses)
+        return score["percentage"]
 
     @property
     def overall_min(self) -> int:
@@ -159,7 +137,137 @@ class ScanResult:
                     worst = (int(cat.tier), name)
         return worst[1] if worst else None
 
+    @property
+    def check_statuses(self) -> dict[str, dict]:
+        statuses: dict[str, dict] = {}
+        for key, entry in CHECK_REGISTRY.items():
+            if entry.reserved:
+                continue
+
+            seen_in: list[str] = []
+            failing_in: list[str] = []
+            if self.hygiene is not None and key in self.hygiene.checks:
+                seen_in.append("hygiene")
+                if self.hygiene.checks[key].tier < Tier.CONFIGURED:
+                    failing_in.append("hygiene")
+
+            for eco in self.ecosystems:
+                cat = eco.categories.get(key)
+                if cat is not None and key in eco.applicable_categories:
+                    seen_in.append(eco.id)
+                    if cat.tier < Tier.CONFIGURED:
+                        failing_in.append(eco.id)
+                    continue
+
+                fallback_cats = [
+                    eco.categories[category]
+                    for category in entry.categories
+                    if category in eco.applicable_categories
+                    and category in eco.categories
+                ]
+                if fallback_cats:
+                    seen_in.append(eco.id)
+                    if any(cat.tier < Tier.CONFIGURED for cat in fallback_cats):
+                        failing_in.append(eco.id)
+                    continue
+                if key in eco.applicable_categories:
+                    seen_in.append(eco.id)
+                    failing_in.append(eco.id)
+                    continue
+                if cat is None:
+                    continue
+                # Defensive fallback for detector output drift: if a category
+                # result exists but the key was omitted from applicable_categories,
+                # still count the observed result instead of dropping it.
+                seen_in.append(eco.id)
+                if cat.tier < Tier.CONFIGURED:
+                    failing_in.append(eco.id)
+
+            if not seen_in:
+                continue
+
+            statuses[key] = {
+                "passed": len(failing_in) == 0,
+                "difficulty": entry.difficulty.value,
+                "categories": list(entry.categories),
+                "failing_in": failing_in,
+            }
+        return statuses
+
+    @staticmethod
+    def _badge_state_for_keys(keys: list[str], statuses: dict[str, dict]) -> str | None:
+        earned: str | None = None
+        for difficulty in (Difficulty.BASIC, Difficulty.INTERMEDIATE, Difficulty.ADVANCED):
+            tier_keys = [k for k in keys if Difficulty(statuses[k]["difficulty"]) == difficulty]
+            if not tier_keys:
+                continue
+            if not all(statuses[k]["passed"] for k in tier_keys):
+                break
+            earned = BADGE_BY_DIFFICULTY[difficulty]
+        return earned
+
+    @property
+    def category_scores(self) -> dict[str, dict]:
+        return self._category_scores(self.check_statuses)
+
+    def _category_scores(self, statuses: dict[str, dict]) -> dict[str, dict]:
+        per_category: dict[str, list[str]] = defaultdict(list)
+        for key, status in statuses.items():
+            for category in status["categories"]:
+                per_category[category].append(key)
+
+        all_categories = sorted(per_category.keys())
+        scores: dict[str, dict] = {}
+        for category in all_categories:
+            keys = sorted(per_category.get(category, []))
+            total = len(keys)
+            passed = sum(1 for key in keys if statuses[key]["passed"])
+            percentage = round((100.0 * passed / total), 1) if total else 0.0
+            outstanding = [key for key in keys if not statuses[key]["passed"]]
+            badge = self._badge_state_for_keys(keys, statuses)
+            if self.active_harm and self.active_harm.present:
+                state = "red"
+            else:
+                state = badge or "neutral"
+            scores[category] = {
+                "passed": passed,
+                "total": total,
+                "percentage": percentage,
+                "badge": badge,
+                "state": state,
+                "outstanding": outstanding,
+            }
+        return scores
+
+    @property
+    def overall_score(self) -> dict:
+        return self._overall_score(self.check_statuses)
+
+    def _overall_score(self, statuses: dict[str, dict]) -> dict:
+        keys = sorted(statuses.keys())
+        total = len(keys)
+        passed = sum(1 for key in keys if statuses[key]["passed"])
+        percentage = round((100.0 * passed / total), 1) if total else 0.0
+        outstanding = [key for key in keys if not statuses[key]["passed"]]
+        badge = self._badge_state_for_keys(keys, statuses)
+        if self.active_harm and self.active_harm.present:
+            state = "red"
+        else:
+            state = badge or "neutral"
+        return {
+            "passed": passed,
+            "total": total,
+            "percentage": percentage,
+            "badge": badge,
+            "state": state,
+            "outstanding": outstanding,
+        }
+
     def to_dict(self) -> dict:
+        statuses = self.check_statuses
+        category_scores = self._category_scores(statuses)
+        overall_score = self._overall_score(statuses)
+        has_active_harm = bool(self.active_harm and self.active_harm.present)
         return {
             "girdle_version": GIRDLE_VERSION,
             "scanned_at": self.scanned_at,
@@ -171,12 +279,19 @@ class ScanResult:
                 "weakest_category": self.weakest_category,
                 "overall_min": self.overall_min,
                 "overall_avg": self.overall_avg,
+                "has_active_harm": has_active_harm,
+                "overall_percentage": overall_score["percentage"],
+                "overall_state": overall_score["state"],
+                "overall_badge": overall_score["badge"],
+                "overall_outstanding": overall_score["outstanding"],
+                "category_scores": category_scores,
                 "category_percentages": self.category_percentages,
-                "overall_percentage": self.overall_percentage,
             },
+            "checks": statuses,
             "warnings": self.warnings,
             "platform": self.platform.to_dict() if self.platform is not None else None,
             "hygiene": self.hygiene.to_dict() if self.hygiene is not None else None,
+            "active_harm": self.active_harm.to_dict() if self.active_harm is not None else None,
         }
 
 
@@ -185,6 +300,8 @@ __all__ = [
     "CategoryResult",
     "EcosystemResult",
     "ScanResult",
+    "ActiveHarmFinding",
+    "ActiveHarmResult",
     "CATEGORY_NAMES",
     "GIRDLE_VERSION",
     "asdict",

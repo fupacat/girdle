@@ -10,11 +10,19 @@ from pathlib import Path
 from girdle.coverage_gate import detect_gate
 from girdle.coverage_parse import parse_percentage
 from girdle.detectors import ALL_DETECTORS
+from girdle.detectors._util import scan_static_analysis
 from girdle.detectors.base import Detector, Fingerprint
-from girdle.hygiene import build_hygiene
+from girdle.hygiene import build_hygiene, find_agent_instruction_hazards
 from girdle.platform import check_platform
 from girdle.runner import run_check
-from girdle.schema import CategoryResult, EcosystemResult, ScanResult, Tier
+from girdle.schema import (
+    ActiveHarmFinding,
+    ActiveHarmResult,
+    CategoryResult,
+    EcosystemResult,
+    ScanResult,
+    Tier,
+)
 
 
 def _run_detector(detector: Detector, repo_root: Path, mode: str) -> EcosystemResult | None:
@@ -22,8 +30,10 @@ def _run_detector(detector: Detector, repo_root: Path, mode: str) -> EcosystemRe
     if fp is None:
         return None
     categories = detector.scan(fp, mode)
+    categories["static_analysis"] = scan_static_analysis(repo_root)
     _verify(detector, fp, categories, mode)
     _check_coverage_gate(fp, categories)
+    applicable = detector.applicable_categories(fp)
     return EcosystemResult(
         id=fp.id,
         language=fp.language,
@@ -31,7 +41,7 @@ def _run_detector(detector: Detector, repo_root: Path, mode: str) -> EcosystemRe
         root=str(fp.root.relative_to(repo_root)) if fp.root != repo_root else ".",
         variants=fp.variants,
         categories=categories,
-        applicable_categories=detector.applicable_categories(fp),
+        applicable_categories=applicable,
     )
 
 
@@ -52,6 +62,9 @@ def run_scan(
     platform = check_platform(repo_root) if check_platform_enforcement else None
     languages = {e.language for e in ecosystems}
     hygiene = build_hygiene(repo_root, languages)
+    raw_findings = find_agent_instruction_hazards(repo_root)
+    findings = [ActiveHarmFinding(**finding) for finding in raw_findings]
+    active_harm = ActiveHarmResult(findings=findings)
 
     return ScanResult(
         repo_root=str(repo_root),
@@ -61,6 +74,7 @@ def run_scan(
         warnings=warnings,
         platform=platform,
         hygiene=hygiene,
+        active_harm=active_harm,
     )
 
 

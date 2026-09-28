@@ -1,9 +1,9 @@
 """Repo-wide hygiene checks: .editorconfig, .gitattributes, .gitignore,
 CODEOWNERS, README, CONTRIBUTING, LICENSE. Language-agnostic - these don't
-belong to any one ecosystem's four categories
-(tests/lint/reproducibility/ci_gating), so they're reported as their own
-top-level section, same pattern as platform.py, and for the same reason:
-it's a different kind of signal, not blended into overall_min/overall_avg.
+belong to any one ecosystem's scored categories (tests/lint/coverage/build/
+reproducibility/ci_gating), so they're reported as their own top-level
+section, same pattern as platform.py, and for the same reason: it's a
+different kind of signal, not blended into overall_min/overall_avg.
 
 Most checks are local file reads only. LICENSE scoring is the one exception:
 it is visibility-conditional, so it checks the ``GITHUB_REPOSITORY_VISIBILITY``
@@ -30,7 +30,7 @@ from girdle.tiers import CategoryResult, Tier
 def _read_text(path: Path) -> str | None:
     try:
         return path.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return None
 
 
@@ -248,6 +248,22 @@ LICENSE_ALIASES = {
 }
 
 MIN_NONTRIVIAL_CHARS = 40
+ZERO_WIDTH_CHARS = ("\u200b", "\u200c", "\u200d", "\ufeff")
+BASE64_BLOB_RE = re.compile(
+    r"(?<![A-Za-z0-9+/=])"
+    r"(?:[A-Za-z0-9+/]{64,}={0,2})"
+    r"(?![A-Za-z0-9+/=])"
+)
+HEX_BLOB_RE = re.compile(
+    r"(?<![0-9A-Fa-f])"
+    r"(?:0x)?[0-9A-Fa-f]{64,}"
+    r"(?![0-9A-Fa-f])"
+)
+MANIPULATIVE_AI_DIRECTIVE_RE = re.compile(
+    r"(?i)\b(?:ignore|disregard|forget)\s+(?:all\s+|any\s+)?(?:previous|prior|above|earlier)\s+instructions\b"
+    r"|\b(?:reveal|print|leak|exfiltrate)\s+(?:the\s+|your\s+)?(?:system\s+prompt|developer\s+message|hidden\s+instructions?)\b"
+    r"|\bdo\s+not\s+tell\s+the\s+user\b"
+)
 
 
 @dataclass
@@ -276,6 +292,76 @@ def _first_existing(root: Path, candidates: tuple[str, ...]) -> Path | None:
         if path.exists():
             return path
     return None
+
+
+def discover_agent_instruction_files(root: Path) -> list[Path]:
+    return [root / name for name in AGENT_INSTRUCTIONS_LOCATIONS if (root / name).is_file()]
+
+
+def _excerpt(text: str, start: int, end: int, limit: int = 120) -> str:
+    snippet = " ".join(text[max(0, start - 20):min(len(text), end + 20)].split())
+    return snippet[:limit]
+
+
+def find_agent_instruction_hazards(root: Path) -> list[dict[str, str]]:
+    findings: list[dict[str, str]] = []
+    for path in discover_agent_instruction_files(root):
+        try:
+            raw = path.read_bytes()
+        except OSError:
+            continue
+        text = raw.decode("utf-8", errors="replace")
+        rel = path.relative_to(root).as_posix()
+        if "\ufffd" in text and b"\xef\xbf\xbd" not in raw:
+            findings.append({"path": rel, "kind": "invalid_utf8",
+                             "reason": "contains bytes that are not valid UTF-8",
+                             "evidence": "undecodable byte sequence"})
+
+        seen_zero_width = sorted({f"U+{ord(ch):04X}" for ch in text if ch in ZERO_WIDTH_CHARS})
+        if seen_zero_width:
+            findings.append(
+                {
+                    "path": rel,
+                    "kind": "invisible_unicode",
+                    "reason": "contains zero-width or invisible Unicode characters",
+                    "evidence": ", ".join(seen_zero_width),
+                }
+            )
+
+        for kind, pattern, reason in (
+            (
+                "suspicious_base64_blob",
+                BASE64_BLOB_RE,
+                "contains an unusually long base64-like block in a prose instruction file",
+            ),
+            (
+                "suspicious_hex_blob",
+                HEX_BLOB_RE,
+                "contains an unusually long hex-like block in a prose instruction file",
+            ),
+            (
+                "manipulative_ai_directive",
+                MANIPULATIVE_AI_DIRECTIVE_RE,
+                (
+                    "contains AI-directed override language inconsistent "
+                    "with a normal instructions file"
+                ),
+            ),
+        ):
+            match = pattern.search(text)
+            if match is None:
+                continue
+            if kind == "suspicious_base64_blob" and HEX_BLOB_RE.fullmatch(match.group(0)):
+                continue
+            findings.append(
+                {
+                    "path": rel,
+                    "kind": kind,
+                    "reason": reason,
+                    "evidence": _excerpt(text, match.start(), match.end()),
+                }
+            )
+    return findings
 
 
 def check_editorconfig(root: Path) -> CategoryResult:
@@ -490,8 +576,8 @@ def check_readme(root: Path) -> CategoryResult:
 
 
 def check_agent_instructions(root: Path) -> CategoryResult:
-    found = _first_existing(root, AGENT_INSTRUCTIONS_LOCATIONS)
-    if found is None:
+    found = discover_agent_instruction_files(root)
+    if not found:
         return CategoryResult(
             Tier.ABSENT, reason="no agent instructions file found",
             recommendation=(
@@ -500,7 +586,7 @@ def check_agent_instructions(root: Path) -> CategoryResult:
                 "and others) can operate effectively in this repo."
             ),
         )
-    return CategoryResult(Tier.CONFIGURED, evidence=[found.relative_to(root).as_posix()])
+    return CategoryResult(Tier.CONFIGURED, evidence=[found[0].relative_to(root).as_posix()])
 
 
 def check_contributing(root: Path) -> CategoryResult:
