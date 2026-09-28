@@ -25,16 +25,19 @@ jobs:
           # warning path can still run before we construct the Copilot client.
           github-token: ${{ github.token }}
           script: |
-            if (!process.env.COPILOT_ASSIGN_TOKEN) {
+            const labelClient = github;
+            const copilotTokenAvailable = Boolean(process.env.COPILOT_ASSIGN_TOKEN);
+            if (!copilotTokenAvailable) {
               core.warning(
                 "COPILOT_ASSIGN_TOKEN is not configured; skipping Copilot auto-assignment. " +
                 "Set a user token with metadata:read plus read/write access to " +
                 "actions, contents, issues, and pull requests.",
               );
-              return;
             }
 
-            const copilotGitHub = getOctokit(process.env.COPILOT_ASSIGN_TOKEN);
+            const copilotGitHub = copilotTokenAvailable
+              ? getOctokit(process.env.COPILOT_ASSIGN_TOKEN)
+              : github;
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
 
@@ -65,25 +68,25 @@ jobs:
                 'coding_agent_model_selection',
               ].join(','),
             };
-            const repoData = await copilotGitHub.graphql(repoNodeQuery, {
-              owner, repo, headers: copilotHeaders,
-            });
-            const suggested = repoData.repository.suggestedActors.nodes;
-            const copilotActor = suggested.find(a => a.login === "copilot-swe-agent");
-            if (!copilotActor) {
-              core.warning("copilot-swe-agent not found in suggestedActors – skipping.");
-              return;
+            let copilotId = null;
+            if (copilotTokenAvailable) {
+              const repoData = await copilotGitHub.graphql(repoNodeQuery, {
+                owner, repo, headers: copilotHeaders,
+              });
+              const suggested = repoData.repository.suggestedActors.nodes;
+              const copilotActor = suggested.find(a => a.login === "copilot-swe-agent");
+              if (!copilotActor) {
+                core.warning("copilot-swe-agent not found in suggestedActors – skipping.");
+              } else if (!copilotActor.id) {
+                core.warning(
+                  `copilot-swe-agent was returned as ${copilotActor.__typename}` +
+                  " without an assignable id – skipping.",
+                );
+              } else {
+                copilotId = copilotActor.id;
+                core.info(`Copilot actor id: ${copilotId}`);
+              }
             }
-            if (!copilotActor.id) {
-              core.warning(
-                `copilot-swe-agent was returned as ${copilotActor.__typename}` +
-                " without an assignable id – skipping.",
-              );
-              return;
-            }
-            const copilotId = copilotActor.id;
-
-            core.info(`Copilot actor id: ${copilotId}`);
 
             // ------------------------------------------------------------------
             // 2. Fetch all open issues (paginate with cursor).
@@ -203,7 +206,7 @@ jobs:
             const syncStatusLabels = async (issueNumber, currentLabels, desiredLabels) => {
               for (const name of statusLabels) {
                 if (desiredLabels.has(name) && !currentLabels.has(name)) {
-                  await copilotGitHub.rest.issues.addLabels({
+                  await labelClient.rest.issues.addLabels({
                     owner,
                     repo,
                     issue_number: issueNumber,
@@ -215,7 +218,7 @@ jobs:
               for (const name of statusLabels) {
                 if (!desiredLabels.has(name) && currentLabels.has(name)) {
                   try {
-                    await copilotGitHub.rest.issues.removeLabel({
+                    await labelClient.rest.issues.removeLabel({
                       owner,
                       repo,
                       issue_number: issueNumber,
@@ -250,7 +253,7 @@ jobs:
                   .map(b => "#" + b.number)
                   .join(", ");
                 core.info(`Issue #${issue.number} still blocked (${openNums})`);
-              } else if (isUnassigned) {
+              } else if (isUnassigned && copilotId) {
                 core.info(`Issue #${issue.number} is unblocked – assigning to Copilot`);
                 try {
                   await copilotGitHub.graphql(assignMutation, {
@@ -296,5 +299,9 @@ jobs:
               if (hasOpenBlocker) desiredStatusLabels.add("status:blocked");
               if (!hasOpenBlocker && isUnassigned) desiredStatusLabels.add("status:ready");
               if (isBlockingOpenIssue) desiredStatusLabels.add("status:blocker");
-              await syncStatusLabels(issue.number, currentStatusLabels, desiredStatusLabels);
+              try {
+                await syncStatusLabels(issue.number, currentStatusLabels, desiredStatusLabels);
+              } catch (err) {
+                core.warning(`Failed to sync status labels on #${issue.number}: ${err.message}`);
+              }
             }
