@@ -47,7 +47,6 @@ _ENTRIES: tuple[CheckEntry, ...] = (
         "license",
         ("license",),
         Difficulty.BASIC,
-        reserved=True,
     ),
     CheckEntry("contributing", ("contributing",), Difficulty.BASIC),
     # ── Intermediate ───────────────────────────────────────────────────────

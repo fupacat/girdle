@@ -326,7 +326,8 @@ def _print_human(data: dict) -> None:
 def _print_hygiene(hygiene: dict) -> None:
     click.echo("hygiene:")
     for name, cat in hygiene.items():
-        click.echo(f"  {name:<14} {TIER_LABEL[cat['tier']]}")
+        marker = TIER_LABEL[cat["tier"]] if cat.get("applicable", True) else "n/a"
+        click.echo(f"  {name:<14} {marker}")
         if cat["reason"]:
             click.echo(f"    reason: {cat['reason']}")
         if cat["recommendation"]:

@@ -1,21 +1,28 @@
 """Repo-wide hygiene checks: .editorconfig, .gitattributes, .gitignore,
-CODEOWNERS, README, CONTRIBUTING. Language-agnostic - these don't belong to
-any one ecosystem's four categories (tests/lint/reproducibility/ci_gating),
-so they're reported as their own top-level section, same pattern as
-platform.py, and for the same reason: it's a different kind of signal, not
-blended into overall_min/overall_avg.
+CODEOWNERS, README, CONTRIBUTING, LICENSE. Language-agnostic - these don't
+belong to any one ecosystem's four categories
+(tests/lint/reproducibility/ci_gating), so they're reported as their own
+top-level section, same pattern as platform.py, and for the same reason:
+it's a different kind of signal, not blended into overall_min/overall_avg.
 
-All checks are local file reads only - same zero-auth trust model as the
-verification-infra detectors, unlike platform.py's live API call, so this
-runs as part of every default scan with no opt-in flag.
+Most checks are local file reads only. LICENSE scoring is the one exception:
+it is visibility-conditional, so it first uses GitHub Actions'
+``GITHUB_REPOSITORY_VISIBILITY`` env var when available and otherwise makes a
+best-effort ``gh repo view --json visibility`` probe. If visibility can't be
+determined, the check renders as not applicable rather than guessing.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
+
+import tomllib
 
 from girdle.tiers import CategoryResult, Tier
 
@@ -25,6 +32,102 @@ def _read_text(path: Path) -> str | None:
         return path.read_text(encoding="utf-8")
     except OSError:
         return None
+
+
+def _read_json(path: Path) -> dict | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _read_toml(path: Path) -> dict | None:
+    try:
+        return tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+
+
+def _normalize_text(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", text.casefold()).strip()
+
+
+def _detect_repo_visibility(root: Path) -> str | None:
+    visibility = os.environ.get(REPO_VISIBILITY_ENV, "").strip().casefold()
+    if visibility in VISIBILITY_VALUES:
+        return visibility
+    if shutil.which("gh") is None:
+        return None
+    try:
+        proc = subprocess.run(
+            ["gh", "repo", "view", "--json", "visibility"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=GH_TIMEOUT,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return None
+    visibility = str(data.get("visibility") or "").casefold()
+    return visibility if visibility in VISIBILITY_VALUES else None
+
+
+def _detect_license_id(text: str) -> str | None:
+    normalized = _normalize_text(text)
+    for spdx_id, phrases in LICENSE_SIGNATURES.items():
+        if all(_normalize_text(phrase) in normalized for phrase in phrases):
+            return spdx_id
+    return None
+
+
+def _declared_license_ids(raw: str) -> set[str]:
+    ids = set()
+    normalized = _normalize_text(raw)
+    if alias := LICENSE_ALIASES.get(normalized):
+        ids.add(alias)
+    for token in re.findall(r"[A-Za-z0-9.+-]+", raw):
+        if token.upper() in {"AND", "OR", "WITH"}:
+            continue
+        if alias := LICENSE_ALIASES.get(_normalize_text(token)):
+            ids.add(alias)
+    return ids
+
+
+def _manifest_license_declarations(root: Path) -> list[tuple[str, str, set[str]]]:
+    declarations: list[tuple[str, str, set[str]]] = []
+
+    package_json = _read_json(root / "package.json") or {}
+    package_license = package_json.get("license")
+    if isinstance(package_license, dict):
+        package_license = package_license.get("type")
+    if isinstance(package_license, str) and package_license.strip():
+        declarations.append(
+            ("package.json", package_license, _declared_license_ids(package_license))
+        )
+
+    pyproject = _read_toml(root / "pyproject.toml") or {}
+    project = pyproject.get("project") if isinstance(pyproject, dict) else None
+    pyproject_license = project.get("license") if isinstance(project, dict) else None
+    if isinstance(pyproject_license, dict):
+        pyproject_license = pyproject_license.get("text") or pyproject_license.get("type")
+    if isinstance(pyproject_license, str) and pyproject_license.strip():
+        declarations.append(
+            ("pyproject.toml", pyproject_license, _declared_license_ids(pyproject_license))
+        )
+
+    cargo_toml = _read_toml(root / "Cargo.toml") or {}
+    package = cargo_toml.get("package") if isinstance(cargo_toml, dict) else None
+    cargo_license = package.get("license") if isinstance(package, dict) else None
+    if isinstance(cargo_license, str) and cargo_license.strip():
+        declarations.append(("Cargo.toml", cargo_license, _declared_license_ids(cargo_license)))
+
+    return declarations
 
 
 # language -> gitignore patterns a healthy repo in that ecosystem usually has.
@@ -57,6 +160,72 @@ DEPENDENCY_MONITORING_LOCATIONS = (
     "renovate.json",
     "renovate.json5",
 )
+LICENSE_LOCATIONS = ("LICENSE", "LICENSE.txt", "LICENSE.md", "COPYING", "COPYING.txt")
+REPO_VISIBILITY_ENV = "GITHUB_REPOSITORY_VISIBILITY"
+VISIBILITY_VALUES = {"public", "private", "internal"}
+GH_TIMEOUT = 5
+LICENSE_SIGNATURES = {
+    "MIT": (
+        "permission is hereby granted free of charge to any person obtaining a copy",
+        "the above copyright notice and this permission notice shall be included",
+        'the software is provided "as is" without warranty of any kind',
+    ),
+    "Apache-2.0": (
+        "apache license",
+        "version 2 0 january 2004",
+        "http www apache org licenses",
+        "limitations under the license",
+    ),
+    "ISC": (
+        "permission to use copy modify and or distribute this software for any purpose "
+        "with or without fee is hereby granted",
+        'the software is provided "as is" and the author disclaims all warranties',
+    ),
+    "BSD-2-Clause": (
+        "redistribution and use in source and binary forms with or without modification are "
+        "permitted provided that the following conditions are met",
+        "1 redistributions of source code must retain the above copyright notice",
+        "2 redistributions in binary form must reproduce the above copyright notice",
+        'this software is provided by the copyright holders and contributors "as is"',
+    ),
+    "BSD-3-Clause": (
+        "redistribution and use in source and binary forms with or without modification are "
+        "permitted provided that the following conditions are met",
+        "1 redistributions of source code must retain the above copyright notice",
+        "2 redistributions in binary form must reproduce the above copyright notice",
+        "3 neither the name of the copyright holder nor the names of its contributors may be "
+        "used to endorse or promote products derived from this software without specific prior "
+        "written permission",
+        'this software is provided by the copyright holders and contributors "as is"',
+    ),
+    "MPL-2.0": (
+        "mozilla public license version 2 0",
+        "1 definitions",
+        "2 license grants and conditions",
+        "3 responsibilities",
+    ),
+    "Unlicense": (
+        "this is free and unencumbered software released into the public domain",
+        "anyone is free to copy modify publish use compile sell or distribute this software",
+        'the software is provided "as is" without warranty of any kind',
+    ),
+}
+LICENSE_ALIASES = {
+    "mit": "MIT",
+    "mit license": "MIT",
+    "apache 2 0": "Apache-2.0",
+    "apache license 2 0": "Apache-2.0",
+    "apache-2.0": "Apache-2.0",
+    "isc": "ISC",
+    "isc license": "ISC",
+    "bsd-2-clause": "BSD-2-Clause",
+    "bsd 2 clause": "BSD-2-Clause",
+    "bsd-3-clause": "BSD-3-Clause",
+    "bsd 3 clause": "BSD-3-Clause",
+    "mpl-2.0": "MPL-2.0",
+    "mozilla public license 2 0": "MPL-2.0",
+    "unlicense": "Unlicense",
+}
 
 MIN_NONTRIVIAL_CHARS = 40
 
@@ -64,9 +233,16 @@ MIN_NONTRIVIAL_CHARS = 40
 @dataclass
 class HygieneResult:
     checks: dict[str, CategoryResult] = field(default_factory=dict)
+    applicable_checks: list[str] = field(default_factory=list)
+
+    def is_applicable(self, name: str) -> bool:
+        return name in self.applicable_checks if self.applicable_checks else True
 
     def to_dict(self) -> dict:
-        return {name: cat.to_dict() for name, cat in self.checks.items()}
+        return {
+            name: {**cat.to_dict(), "applicable": self.is_applicable(name)}
+            for name, cat in self.checks.items()
+        }
 
 
 def _first_existing(root: Path, candidates: tuple[str, ...]) -> Path | None:
@@ -328,19 +504,74 @@ def check_dependency_monitoring(root: Path) -> CategoryResult:
     return CategoryResult(Tier.CONFIGURED, evidence=[found.relative_to(root).as_posix()])
 
 
-def build_hygiene(root: Path, languages: set[str]) -> HygieneResult:
+def check_license(root: Path, visibility: str | None) -> CategoryResult:
+    if visibility != "public":
+        reason = (
+            "repo is not public; LICENSE check not scored"
+            if visibility in {"private", "internal"}
+            else "repo visibility could not be determined; LICENSE check not scored"
+        )
+        return CategoryResult(Tier.ABSENT, reason=reason)
+
+    found = _first_existing(root, LICENSE_LOCATIONS)
+    if found is None:
+        return CategoryResult(
+            Tier.ABSENT,
+            reason="no LICENSE file found",
+            recommendation=(
+                "Add a root LICENSE file with a recognized SPDX license text (for example MIT "
+                "or Apache-2.0)."
+            ),
+        )
+
+    content = (_read_text(found) or "").strip()
+    spdx_id = _detect_license_id(content)
+    rel = found.relative_to(root).as_posix()
+    if spdx_id is None:
+        return CategoryResult(
+            Tier.ABSENT,
+            evidence=[rel],
+            reason="LICENSE exists but does not match a recognized license text",
+            recommendation=(
+                "Replace the LICENSE contents with a complete recognized license text rather "
+                "than a placeholder or custom stub."
+            ),
+        )
+
+    evidence = [f"{rel}: {spdx_id}"]
+    mismatches = []
+    for manifest, declared, declared_ids in _manifest_license_declarations(root):
+        evidence.append(f"{manifest}: {declared}")
+        if declared_ids and spdx_id not in declared_ids:
+            mismatches.append(f"{manifest} declares {declared} but LICENSE is {spdx_id}")
+
+    if mismatches:
+        return CategoryResult(
+            Tier.ABSENT,
+            evidence=evidence,
+            reason="; ".join(mismatches),
+            recommendation="Make manifest license declarations match the repository LICENSE text.",
+        )
+    return CategoryResult(Tier.CONFIGURED, evidence=evidence)
+
+
+def build_hygiene(
+    root: Path, languages: set[str], repo_visibility: str | None = None
+) -> HygieneResult:
     precommit = check_precommit(root)
-    return HygieneResult(
-        checks={
-            "editorconfig": check_editorconfig(root),
-            "gitattributes": check_gitattributes(root),
-            "precommit": precommit,
-            "agent_sandbox_bootstrap": check_agent_sandbox_bootstrap(root, precommit),
-            "gitignore": check_gitignore(root, languages),
-            "codeowners": check_codeowners(root),
-            "agent_instructions": check_agent_instructions(root),
-            "readme": check_readme(root),
-            "contributing": check_contributing(root),
-            "dependency_monitoring": check_dependency_monitoring(root),
-        }
-    )
+    visibility = repo_visibility or _detect_repo_visibility(root)
+    checks = {
+        "editorconfig": check_editorconfig(root),
+        "gitattributes": check_gitattributes(root),
+        "precommit": precommit,
+        "agent_sandbox_bootstrap": check_agent_sandbox_bootstrap(root, precommit),
+        "gitignore": check_gitignore(root, languages),
+        "license": check_license(root, visibility),
+        "codeowners": check_codeowners(root),
+        "agent_instructions": check_agent_instructions(root),
+        "readme": check_readme(root),
+        "contributing": check_contributing(root),
+        "dependency_monitoring": check_dependency_monitoring(root),
+    }
+    applicable_checks = [name for name in checks if name != "license" or visibility == "public"]
+    return HygieneResult(checks=checks, applicable_checks=applicable_checks)

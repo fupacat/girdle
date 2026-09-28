@@ -37,11 +37,13 @@
   .cat.tier-absent { border-left-color: var(--absent); }
   .cat.tier-configured { border-left-color: var(--configured); }
   .cat.tier-verified { border-left-color: var(--verified); }
+  .cat.tier-na { border-left-color: var(--muted); }
   .cat .cat-name { font-weight: 600; font-size: 0.85rem; text-transform: capitalize; }
   .cat .cat-status { font-size: 0.8rem; margin-top: 0.15rem; }
   .cat .cat-status.tier-absent { color: var(--absent); }
   .cat .cat-status.tier-configured { color: var(--configured); }
   .cat .cat-status.tier-verified { color: var(--verified); }
+  .cat .cat-status.tier-na { color: var(--muted); }
   .cat .evidence, .cat .reason { color: var(--muted); font-size: 0.75rem; margin-top: 0.35rem; }
   .cat .recommendation {
     color: var(--text); font-size: 0.75rem; margin-top: 0.5rem; padding-top: 0.5rem;
@@ -102,9 +104,11 @@
     <h2>hygiene <span class="sub">repo-wide, language-agnostic</span></h2>
     <div class="cat-grid">
       {% for name, cat in data.hygiene.items() %}
-      <div class="cat {{ cat.tier | tier_class }}">
+      {% set applicable = cat.get('applicable', true) %}
+      {% set tier_class = cat.tier | tier_class if applicable else 'tier-na' %}
+      <div class="cat {{ tier_class }}">
         <div class="cat-name">{{ name.replace('_', ' ') }}</div>
-        <div class="cat-status {{ cat.tier | tier_class }}">{{ cat.tier | tier_label }}</div>
+        <div class="cat-status {{ tier_class }}">{{ cat.tier | tier_label if applicable else 'n/a' }}</div>
         {% if cat.evidence %}<div class="evidence">{{ cat.evidence | join(' · ') }}</div>{% endif %}
         {% if cat.reason %}<div class="reason">{{ cat.reason }}</div>{% endif %}
         {% if cat.recommendation %}<div class="recommendation">{{ cat.recommendation }}</div>{% endif %}
