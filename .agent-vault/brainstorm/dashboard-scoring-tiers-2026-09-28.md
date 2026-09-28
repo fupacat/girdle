@@ -454,10 +454,11 @@ session - not yet final/exhaustive as new checks get added):
 - **Intermediate** (deliberate setup, moderately common): `tests`,
   `lint`, `coverage`, `ci_gating`, `codeowners`, `dependency_monitoring`,
   `editorconfig`/`gitattributes`, `precommit`
-- **Advanced/rare**: SAST/static-analysis-configured (**new check
-  candidate**, distinct from `lint` - girdle dogfoods SonarCloud itself
-  but doesn't score "does a repo have CodeQL/Semgrep/similar configured"
-  as its own category today), `agent_instructions`,
+- **Advanced/rare**: SAST/static-analysis-configured (distinct from
+  `lint`, and now reported as the `static_analysis` check for each detected
+  ecosystem). It is excluded from `applicable_categories`, so a missing SAST
+  setup does not cap an ecosystem's minimum score. Other checks in this tier:
+  `agent_instructions`,
   `agent_sandbox_bootstrap`, `reproducibility`, structural index,
   design/decision notes, Debugging & Observability, Task Discovery
 

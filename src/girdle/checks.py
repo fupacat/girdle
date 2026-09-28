@@ -61,6 +61,7 @@ _ENTRIES: tuple[CheckEntry, ...] = (
     CheckEntry("gitattributes", ("gitattributes",), Difficulty.INTERMEDIATE),
     CheckEntry("precommit", ("precommit",), Difficulty.INTERMEDIATE),
     # ── Advanced ───────────────────────────────────────────────────────────
+    CheckEntry("static_analysis", ("static_analysis",), Difficulty.ADVANCED),
     CheckEntry("agent_instructions", ("agent_instructions",), Difficulty.ADVANCED),
     CheckEntry("agent_sandbox_bootstrap", ("agent_sandbox_bootstrap",), Difficulty.ADVANCED),
     CheckEntry(

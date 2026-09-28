@@ -534,7 +534,11 @@ jobs:
               const hasOpenBlocker = openBlockers.length > 0;
               const desiredLabels = [];
               if (issue.state === "OPEN") {
-                desiredLabels.push(hasOpenBlocker ? "status:blocked" : "status:ready");
+                if (hasOpenBlocker) {
+                  desiredLabels.push("status:blocked");
+                } else if (issue.assignees.totalCount === 0) {
+                  desiredLabels.push("status:ready");
+                }
                 if (openBlocking.length > 0) {
                   desiredLabels.push("status:blocker");
                 }
