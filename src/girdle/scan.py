@@ -10,6 +10,7 @@ from pathlib import Path
 from girdle.coverage_gate import detect_gate
 from girdle.coverage_parse import parse_percentage
 from girdle.detectors import ALL_DETECTORS
+from girdle.detectors._util import scan_static_analysis
 from girdle.detectors.base import Detector, Fingerprint
 from girdle.hygiene import build_hygiene
 from girdle.platform import check_platform
@@ -22,8 +23,12 @@ def _run_detector(detector: Detector, repo_root: Path, mode: str) -> EcosystemRe
     if fp is None:
         return None
     categories = detector.scan(fp, mode)
+    categories["static_analysis"] = scan_static_analysis(fp.root)
     _verify(detector, fp, categories, mode)
     _check_coverage_gate(fp, categories)
+    applicable = detector.applicable_categories(fp)
+    if "static_analysis" not in applicable:
+        applicable = [*applicable, "static_analysis"]
     return EcosystemResult(
         id=fp.id,
         language=fp.language,
@@ -31,7 +36,7 @@ def _run_detector(detector: Detector, repo_root: Path, mode: str) -> EcosystemRe
         root=str(fp.root.relative_to(repo_root)) if fp.root != repo_root else ".",
         variants=fp.variants,
         categories=categories,
-        applicable_categories=detector.applicable_categories(fp),
+        applicable_categories=applicable,
     )
 
 
