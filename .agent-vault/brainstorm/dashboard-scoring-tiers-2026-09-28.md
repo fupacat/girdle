@@ -327,8 +327,10 @@ previously named anywhere in this note, added to the backlog:
 
 - `ci_gating` vs. `tests`: does the CI-detected test command actually
   match the `tests` category's own configured command?
+
 - `reproducibility`: does the lockfile actually match the manifest (no
   version drift between e.g. `package.json` and `package-lock.json`)?
+
 - `precommit` vs. CI: does pre-commit wire the *same* checks CI actually
   runs, or a silently diverging subset?
 
