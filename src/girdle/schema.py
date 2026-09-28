@@ -42,6 +42,12 @@ def _registry_category_names() -> list[str]:
     return names
 
 
+def _record_lowest(results: dict[str, CategoryResult], key: str, result: CategoryResult) -> None:
+    current = results.get(key)
+    if current is None or result.tier < current.tier:
+        results[key] = result
+
+
 @dataclass
 class EcosystemResult:
     id: str
@@ -125,7 +131,9 @@ class ScanResult:
     @property
     def category_percentages(self) -> dict[str, float]:
         percentages = {category: 0.0 for category in _registry_category_names()}
-        bucketed: dict[str, list[CategoryResult]] = {category: [] for category in percentages}
+        by_category: dict[str, dict[str, CategoryResult]] = {
+            category: {} for category in percentages
+        }
 
         for eco in self.ecosystems:
             for check_key, result in eco.applicable_checks.items():
@@ -134,7 +142,7 @@ class ScanResult:
                     continue
                 for category in entry.categories:
                     if category in eco.applicable_categories:
-                        bucketed[category].append(result)
+                        _record_lowest(by_category[category], check_key, result)
 
         if self.hygiene is not None:
             for check_key, result in self.hygiene.checks.items():
@@ -142,23 +150,23 @@ class ScanResult:
                 if entry is None:
                     continue
                 for category in entry.categories:
-                    if category in bucketed:
-                        bucketed[category].append(result)
+                    if category in by_category:
+                        _record_lowest(by_category[category], check_key, result)
 
-        for category, results in bucketed.items():
-            percentages[category] = _percentage(results)
+        for category, results in by_category.items():
+            percentages[category] = _percentage(list(results.values()))
         return percentages
 
     @property
     def overall_percentage(self) -> float:
-        seen: dict[tuple[str, str], CategoryResult] = {}
+        seen: dict[str, CategoryResult] = {}
         for eco in self.ecosystems:
             for check_key, result in eco.applicable_checks.items():
-                seen[(eco.id, check_key)] = result
-        results = list(seen.values())
+                _record_lowest(seen, check_key, result)
         if self.hygiene is not None:
-            results.extend(self.hygiene.checks.values())
-        return _percentage(results)
+            for check_key, result in self.hygiene.checks.items():
+                _record_lowest(seen, check_key, result)
+        return _percentage(list(seen.values()))
 
     @property
     def overall_min(self) -> int:

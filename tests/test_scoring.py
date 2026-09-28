@@ -124,10 +124,10 @@ def test_scan_result_overall_percentage_counts_checks_not_ecosystem_averages():
         toolchain="x",
         root=".",
         categories={
-            "tests": CategoryResult(Tier.ABSENT),
             "lint": CategoryResult(Tier.ABSENT),
+            "coverage": CategoryResult(Tier.ABSENT),
         },
-        applicable_categories=["tests", "lint"],
+        applicable_categories=["lint", "coverage"],
     )
 
     result = ScanResult(repo_root=".", scanned_at="now", mode="static", ecosystems=[first, second])
@@ -135,3 +135,27 @@ def test_scan_result_overall_percentage_counts_checks_not_ecosystem_averages():
     assert first.overall_percentage == 100.0
     assert second.overall_percentage == 0.0
     assert result.overall_percentage == 33.33
+
+
+def test_scan_result_overall_percentage_dedupes_duplicate_check_keys_by_worst_tier():
+    first = EcosystemResult(
+        id="a",
+        language="x",
+        toolchain="x",
+        root=".",
+        categories={"tests": CategoryResult(Tier.CONFIGURED)},
+        applicable_categories=["tests"],
+    )
+    second = EcosystemResult(
+        id="b",
+        language="x",
+        toolchain="x",
+        root=".",
+        categories={"tests": CategoryResult(Tier.ABSENT)},
+        applicable_categories=["tests"],
+    )
+
+    result = ScanResult(repo_root=".", scanned_at="now", mode="static", ecosystems=[first, second])
+
+    assert result.category_percentages["tests"] == 0.0
+    assert result.overall_percentage == 0.0
