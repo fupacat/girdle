@@ -146,15 +146,10 @@ class ScanResult:
     def _badge_state_for_keys(keys: list[str], statuses: dict[str, dict]) -> str | None:
         earned: str | None = None
         for difficulty in (Difficulty.BASIC, Difficulty.INTERMEDIATE, Difficulty.ADVANCED):
-            gated_keys = [
-                key
-                for key in keys
-                if DIFFICULTY_RANK[CHECK_REGISTRY[key].difficulty] <= DIFFICULTY_RANK[difficulty]
-            ]
-            if not gated_keys:
-                continue
-            if all(statuses[key]["passed"] for key in gated_keys):
-                earned = BADGE_BY_DIFFICULTY[difficulty]
+            tier_keys = [k for k in keys if CHECK_REGISTRY[k].difficulty is difficulty]
+            if not tier_keys or not all(statuses[k]["passed"] for k in tier_keys):
+                break
+            earned = BADGE_BY_DIFFICULTY[difficulty]
         return earned
 
     @property
