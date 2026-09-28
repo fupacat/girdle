@@ -71,6 +71,10 @@ class ScanResult:
     def _check_passed(self, entry: CheckEntry) -> bool | None:
         tiers: list[Tier] = []
         for eco in self.ecosystems:
+            cat = eco.categories.get(entry.key)
+            if cat is not None and entry.key in eco.applicable_categories:
+                tiers.append(cat.tier)
+                continue
             for category in entry.categories:
                 if category not in eco.applicable_categories:
                     continue
