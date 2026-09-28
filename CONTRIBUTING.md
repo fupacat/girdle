@@ -31,13 +31,18 @@ in place; the pre-commit hook does this for you, same as `ruff --fix`.
 
 ## Branch protection
 
-`master` is protected, including for admins: changes land via a PR with a
-passing `test` status check (which itself fails if `ruff`, `pytest`, the
-index-freshness check, or the SonarCloud Quality Gate fails). There's no
-required-approving-review rule — GitHub always blocks self-approval, which
-makes that rule unsatisfiable on a repo with one author. Direct `git push`
-to `master` will be rejected, even from the repo owner — open a branch and
-PR instead.
+`master` is protected, including for admins: changes land via a PR with
+three passing status checks (`test`, `SonarCloud Code Analysis`, `Gitar`)
+and one approving review. Direct `git push` to `master` will be rejected,
+even from the repo owner — open a branch and PR instead.
+
+Merging itself goes through Mergify's queue, not GitHub's native
+auto-merge (disabled repo-wide) or a manual merge button. The required
+review is satisfied by Gitar's automated review (or Mergify self-approving
+for low-risk Dependabot bumps) rather than a human, since this is a
+single-author repo. Full rationale for how Mergify, Gitar, SonarCloud,
+Copilot, and GitHub Actions divide the work — and why — is in the
+`.agent-vault/ci/merge-pipeline.md` vault note.
 
 ## Adding a new ecosystem detector
 
