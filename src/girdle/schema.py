@@ -69,12 +69,12 @@ class EcosystemResult:
     @property
     def category_percentages(self) -> dict[str, float]:
         percentages = {category: 0.0 for category in self.applicable_categories}
-        applicable_checks = self.applicable_checks
         for category in self.applicable_categories:
             results = [
                 result
-                for check_key, result in applicable_checks.items()
-                if category in CHECK_REGISTRY[check_key].categories
+                for check_key, result in self.categories.items()
+                if (entry := CHECK_REGISTRY.get(check_key)) is not None
+                and category in entry.categories
             ]
             percentages[category] = _percentage(results)
         return percentages
@@ -140,7 +140,8 @@ class ScanResult:
                 if entry is None:
                     continue
                 for category in entry.categories:
-                    bucketed[category].append(result)
+                    if category in bucketed:
+                        bucketed[category].append(result)
 
         for category, results in bucketed.items():
             percentages[category] = _percentage(results)
