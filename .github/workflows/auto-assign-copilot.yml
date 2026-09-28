@@ -6,7 +6,7 @@ on:
   issues:
     types: [opened, reopened, closed]
   pull_request:
-    types: [opened, reopened, ready_for_review, converted_to_draft, closed]
+    types: [ready_for_review, converted_to_draft, closed]
 
 permissions:
   contents: read
@@ -15,6 +15,8 @@ permissions:
 jobs:
   assign:
     runs-on: ubuntu-latest
+    env:
+      PROJECT_NUMBER: "3"
     steps:
       - name: Sync dependency status and assign unblocked issues
         uses: actions/github-script@v9
@@ -38,7 +40,7 @@ jobs:
             const copilotGitHub = getOctokit(process.env.COPILOT_ASSIGN_TOKEN);
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
-            const projectNumber = 3;
+            const projectNumber = Number(process.env.PROJECT_NUMBER ?? "0");
             const projectStatusFieldName = "Status";
             const desiredStatusLabels = [
               "status:blocked",
@@ -73,6 +75,13 @@ jobs:
               );
             };
 
+            if (!Number.isInteger(projectNumber) || projectNumber <= 0) {
+              core.warning(
+                `PROJECT_NUMBER='${process.env.PROJECT_NUMBER ?? ""}' is invalid; ` +
+                "skipping project status sync.",
+              );
+            }
+
             // ------------------------------------------------------------------
             // 1. Discover repo metadata needed for assignment, labels, and the
             //    linked repository project board.
@@ -98,7 +107,25 @@ jobs:
                   }
                 }
                 repositoryOwner(login: $owner) {
-                  ... on ProjectV2Owner {
+                  __typename
+                  ... on User {
+                    projectV2(number: $projectNumber) {
+                      id
+                      fields(first: 50) {
+                        nodes {
+                          ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                            options {
+                              id
+                              name
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                  ... on Organization {
                     projectV2(number: $projectNumber) {
                       id
                       fields(first: 50) {
@@ -147,7 +174,10 @@ jobs:
             const labelIdsByName = new Map(
               bootstrap.repository.labels.nodes.map(label => [label.name, label.id]),
             );
-            const project = bootstrap.repositoryOwner?.projectV2 ?? null;
+            const project =
+              projectNumber > 0
+                ? (bootstrap.repositoryOwner?.projectV2 ?? null)
+                : null;
             const statusField =
               project?.fields?.nodes?.find(field => field?.name === projectStatusFieldName) ??
               null;
@@ -156,7 +186,7 @@ jobs:
             );
 
             core.info(`Copilot actor id: ${copilotId}`);
-            if (!project) {
+            if (projectNumber > 0 && !project) {
               core.warning(
                 `Project #${projectNumber} was not found for ${owner}; ` +
                 "skipping project status sync.",
