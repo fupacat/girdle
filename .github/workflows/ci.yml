@@ -114,10 +114,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: pip install -e .
+      - run: pip install -e ".[dev]"
       - run: mkdir -p public
-      - run: girdle dashboard . -o public/index.html
-      - run: girdle badge . --json -o public/girdle.json
+      - run: girdle dashboard . --run -o public/index.html
+      - run: girdle badge . --run --json -o public/girdle.json
       - uses: actions/upload-pages-artifact@v5
         with:
           path: public
