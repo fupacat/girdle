@@ -106,10 +106,16 @@ def _excerpt(text: str, start: int, end: int, limit: int = 120) -> str:
 def find_agent_instruction_hazards(root: Path) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
     for path in discover_agent_instruction_files(root):
-        text = _read_text(path)
-        if text is None:
+        try:
+            raw = path.read_bytes()
+        except OSError:
             continue
+        text = raw.decode("utf-8", errors="replace")
         rel = path.relative_to(root).as_posix()
+        if "\ufffd" in text and b"\xef\xbf\xbd" not in raw:
+            findings.append({"path": rel, "kind": "invalid_utf8",
+                             "reason": "contains bytes that are not valid UTF-8",
+                             "evidence": "undecodable byte sequence"})
 
         seen_zero_width = sorted({f"U+{ord(ch):04X}" for ch in text if ch in ZERO_WIDTH_CHARS})
         if seen_zero_width:
