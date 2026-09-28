@@ -8,8 +8,12 @@ pull_request_rules:
     # authored by Mergify) - Dependabot stops managing a branch once it
     # sees a commit from someone else, losing its own auto-rebase/
     # conflict-resolution/version-refresh behavior. Scoped to the same
-    # patch/minor/security types the merge rule covers, so major bumps
-    # held for manual review aren't churned with pointless rebases/CI runs.
+    # patch/minor/security types the merge rule covers, plus majors that
+    # already have the required approval (queued in Dependabot-major) -
+    # otherwise an approved major falls behind master with no way to
+    # rebase and stalls in the queue or hits checks_timeout. Unapproved
+    # majors held for manual review still aren't churned with pointless
+    # rebases/CI runs.
     conditions:
       - author=dependabot[bot]
       - -conflict
@@ -18,6 +22,9 @@ pull_request_rules:
           - dependabot-update-type=version-update:semver-patch
           - dependabot-update-type=version-update:semver-minor
           - dependabot-update-type=security
+          - and:
+              - dependabot-update-type=version-update:semver-major
+              - "#approved-reviews-by>=1"
     actions:
       comment:
         message: "@dependabot rebase"
