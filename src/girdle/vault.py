@@ -298,6 +298,13 @@ def check(root: Path) -> CheckResult:
             # determines type. E.g. .agent-vault/context/sub/note.md → "context".
             vault_root = root / VAULT_DIR
             rel_to_vault = note.file_path.relative_to(vault_root)
+            if len(rel_to_vault.parts) < 2:
+                result.blocking.append(
+                    f"{rel}: type '{note.type}' should be in "
+                    f".agent-vault/{expected_folder}/ but the note is at the vault root "
+                    "(notes must be placed in a subfolder)"
+                )
+                continue
             actual_folder = rel_to_vault.parts[0]
             if actual_folder != expected_folder:
                 result.blocking.append(

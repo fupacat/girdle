@@ -424,3 +424,21 @@ def test_check_passes_valid_note_without_watches(tmp_path: Path):
     result = check(tmp_path)
     assert result.blocking == []
     assert result.reconciled == []
+
+
+def test_check_blocks_note_at_vault_root(tmp_path: Path):
+    _init_repo(tmp_path)
+    (tmp_path / ".agent-vault").mkdir(parents=True)
+    # Note placed directly in .agent-vault/ with no subfolder
+    bad_note = tmp_path / ".agent-vault" / "orphan.md"
+    bad_note.write_text(
+        "---\ntype: context\n---\n\n# A note at the vault root\n", encoding="utf-8"
+    )
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "init")
+
+    result = check(tmp_path)
+    assert result.reconciled == []
+    assert len(result.blocking) == 1
+    assert "vault root" in result.blocking[0]
+    assert "subfolder" in result.blocking[0]
