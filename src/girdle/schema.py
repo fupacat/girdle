@@ -120,6 +120,9 @@ class ScanResult:
                     continue
                 if cat is None:
                     continue
+                # Defensive fallback for detector output drift: if a category
+                # result exists but the key was omitted from applicable_categories,
+                # still count the observed result instead of dropping it.
                 seen_in.append(eco.id)
                 if cat.tier < Tier.CONFIGURED:
                     failing_in.append(eco.id)

@@ -174,5 +174,5 @@ def test_hygiene_and_ecosystem_contributions_both_count(monkeypatch):
         hygiene=HygieneResult(checks={"shared": CategoryResult(Tier.CONFIGURED)}),
     )
     checks = result.to_dict()["checks"]["shared"]
-    assert checks["passed"] is False
+    assert not checks["passed"]
     assert checks["failing_in"] == ["py-pip"]
