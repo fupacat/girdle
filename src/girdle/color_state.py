@@ -65,6 +65,13 @@ def display_state(
 ) -> DisplayState:
     """Return the display state for a dashboard percentage and active-harm flag.
 
+    Thresholds are recomputed from the live registry on each call via
+    :func:`_badge_thresholds`, so the function always reflects the current
+    ``CHECK_REGISTRY`` (relevant when tests patch the registry).  The
+    module-level constants :data:`BRONZE_THRESHOLD`, :data:`SILVER_THRESHOLD`,
+    and :data:`GOLD_THRESHOLD` are provided as a convenience for callers that
+    need to display or compare the thresholds directly.
+
     Args:
         percentage: Overall or per-category percentage (0–100), or ``None``
             when no applicable checks exist.
@@ -74,11 +81,12 @@ def display_state(
     """
     if active_harm:
         return DisplayState.RED
-    if percentage is None or percentage < BRONZE_THRESHOLD:
+    bronze, silver, gold = _badge_thresholds()
+    if percentage is None or percentage < bronze:
         return DisplayState.NEUTRAL
-    if percentage < SILVER_THRESHOLD:
+    if percentage < silver:
         return DisplayState.BRONZE
-    if percentage < GOLD_THRESHOLD:
+    if percentage < gold:
         return DisplayState.SILVER
     return DisplayState.GOLD
 
