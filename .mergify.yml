@@ -3,14 +3,19 @@ pull_request_rules:
     # Gitar's CI-failure auto-fix (build/test/lint/flaky-test) is opt-in
     # per PR, not a global default - it activates via either a PR comment
     # (`gitar auto-apply:on`) or the `gitar-managed` label. Applying the
-    # label here on every PR (any author, any branch) is what makes fix
-    # automation actually blanket instead of needing a manual step per
-    # PR. Gitar's own auto-merge is deliberately never enabled (no
-    # .gitar/config/merge.md exists) - Mergify remains the only thing
-    # that merges, so this only reaches into the fix loop, not the merge
-    # decision.
+    # label here on every PR is what makes fix automation actually
+    # blanket instead of needing a manual step per PR. Gitar's own
+    # auto-merge is deliberately never enabled (no .gitar/config/merge.md
+    # exists) - Mergify remains the only thing that merges, so this only
+    # reaches into the fix loop, not the merge decision. Excludes
+    # dependabot[bot]: a Gitar auto-fix commit pushed onto a Dependabot
+    # PR's branch is "a commit from someone else" - the same condition
+    # that makes Dependabot stop auto-managing the branch (losing its own
+    # rebase/conflict-resolution/version-refresh behavior), documented on
+    # the rebase rule below.
     conditions:
       - -closed
+      - author!=dependabot[bot]
     actions:
       label:
         add:
