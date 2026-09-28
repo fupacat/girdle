@@ -115,7 +115,7 @@ def _manifest_license_declarations(root: Path) -> list[tuple[str, str, set[str]]
     project = pyproject.get("project") if isinstance(pyproject, dict) else None
     pyproject_license = project.get("license") if isinstance(project, dict) else None
     if isinstance(pyproject_license, dict):
-        pyproject_license = pyproject_license.get("text") or pyproject_license.get("type")
+        pyproject_license = pyproject_license.get("text")
     if isinstance(pyproject_license, str) and pyproject_license.strip():
         declarations.append(
             ("pyproject.toml", pyproject_license, _declared_license_ids(pyproject_license))
@@ -233,10 +233,10 @@ MIN_NONTRIVIAL_CHARS = 40
 @dataclass
 class HygieneResult:
     checks: dict[str, CategoryResult] = field(default_factory=dict)
-    applicable_checks: list[str] = field(default_factory=list)
+    applicable_checks: list[str] | None = None
 
     def is_applicable(self, name: str) -> bool:
-        return name in self.applicable_checks if self.applicable_checks else True
+        return True if self.applicable_checks is None else name in self.applicable_checks
 
     def to_dict(self) -> dict:
         return {

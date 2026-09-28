@@ -209,6 +209,14 @@ def test_license_private_repo_is_not_applicable(tmp_path: Path):
     assert "license" not in result.applicable_checks
 
 
+def test_license_unknown_visibility_is_not_applicable(tmp_path: Path):
+    result = build_hygiene(tmp_path, languages=set(), repo_visibility=None)
+    cat = result.checks["license"]
+    assert cat.tier == Tier.ABSENT
+    assert "could not be determined" in cat.reason
+    assert "license" not in result.applicable_checks
+
+
 def test_license_public_repo_missing_is_absent(tmp_path: Path):
     result = build_hygiene(tmp_path, languages=set(), repo_visibility="public")
     cat = result.checks["license"]
