@@ -35,7 +35,10 @@ class DotNetDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "coverage", "build", "reproducibility", "ci_gating"]
+        categories = ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
+        if self._build_evidence(fp.root):
+            categories.insert(3, "build")
+        return categories
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
