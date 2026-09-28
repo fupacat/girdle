@@ -73,6 +73,21 @@ class PythonPipDetector:
                     Tier.ABSENT, reason=f"{POETRY_LOCK} exists but is gitignored",
                     recommendation=f"Remove {POETRY_LOCK} from .gitignore and commit it.",
                 )
+            drift = _check_poetry_drift(root)
+            if drift:
+                missing = ", ".join(sorted(drift)[:5])
+                return CategoryResult(
+                    Tier.ABSENT,
+                    evidence=[POETRY_LOCK],
+                    reason=(
+                        f"manifest/lockfile drift: {len(drift)} package(s) missing"
+                        f" from lockfile: {missing}"
+                    ),
+                    recommendation=(
+                        "Run `poetry lock` to regenerate the lockfile"
+                        " from the current pyproject.toml."
+                    ),
+                )
             return CategoryResult(Tier.CONFIGURED, evidence=[POETRY_LOCK])
 
         req = root / REQUIREMENTS_TXT
@@ -103,6 +118,21 @@ class PythonPipDetector:
         lines = [ln for ln in text.splitlines() if ln.strip() and not ln.strip().startswith("#")]
         pinned = [ln for ln in lines if "==" in ln]
         if lines and len(pinned) == len(lines):
+            drift = _check_pip_drift(root, lines)
+            if drift:
+                missing = ", ".join(sorted(drift)[:5])
+                return CategoryResult(
+                    Tier.ABSENT,
+                    evidence=[REQUIREMENTS_TXT],
+                    reason=(
+                        f"manifest/lockfile drift: {len(drift)} package(s) missing"
+                        f" from requirements.txt: {missing}"
+                    ),
+                    recommendation=(
+                        f"Run `pip-compile pyproject.toml -o {REQUIREMENTS_TXT}`"
+                        " to regenerate the lockfile."
+                    ),
+                )
             return CategoryResult(
                 Tier.CONFIGURED, evidence=[f"{REQUIREMENTS_TXT} (all deps pinned with ==)"]
             )
@@ -120,3 +150,52 @@ class PythonPipDetector:
             Tier.ABSENT, reason=f"{REQUIREMENTS_TXT} is empty",
             recommendation=f"Populate {REQUIREMENTS_TXT} with pinned dependencies.",
         )
+
+
+def _check_poetry_drift(root: Path) -> list[str]:
+    """Return packages in [tool.poetry.dependencies] absent from poetry.lock."""
+    import re
+
+    pyproject = read_toml(root / "pyproject.toml")
+    if not pyproject:
+        return []
+    declared = set((pyproject.get("tool", {}).get("poetry", {}).get("dependencies") or {}).keys())
+    # "python" is a special constraint, not a real package
+    declared.discard("python")
+    if not declared:
+        return []
+
+    lock_text = read_text(root / POETRY_LOCK) or ""
+    locked = set(re.findall(r'^name\s*=\s*"([^"]+)"', lock_text, re.MULTILINE))
+    locked_normalized = {re.sub(r"[-_.]+", "-", n).lower() for n in locked}
+
+    return [
+        pkg for pkg in declared
+        if re.sub(r"[-_.]+", "-", pkg).lower() not in locked_normalized
+    ]
+
+
+def _check_pip_drift(root: Path, req_lines: list[str]) -> list[str]:
+    """Return packages in pyproject.toml [project.dependencies] absent from requirements.txt."""
+    import re
+
+    pyproject = read_toml(root / "pyproject.toml")
+    if not pyproject:
+        return []
+    raw_deps = pyproject.get("project", {}).get("dependencies") or []
+    if not raw_deps:
+        return []
+
+    # Extract bare package name from PEP 508 specifier (e.g. "requests>=2.0" -> "requests")
+    def _name(spec: str) -> str:
+        m = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", spec)
+        return re.sub(r"[-_.]+", "-", m.group(1)).lower() if m else ""
+
+    declared = {_name(d) for d in raw_deps if d.strip()}
+    if not declared:
+        return []
+
+    # Normalize names from requirements.txt lines (e.g. "requests==2.31.0" -> "requests")
+    locked_normalized = {_name(ln) for ln in req_lines}
+
+    return [pkg for pkg in declared if pkg not in locked_normalized]
