@@ -73,6 +73,20 @@ pull_request_rules:
         add:
           - dependency-major-review
 
+  - name: queue major Dependabot updates pending review
+    # Major bumps still need to go through the merge queue once approved
+    # (labeled above for a human to look at) - approval is required at
+    # queue entry, not just at merge, so an unapproved major can't sit in
+    # the train blocking the Dependabot/default queues behind it.
+    conditions:
+      - author=dependabot[bot]
+      - -conflict
+      - dependabot-update-type=version-update:semver-major
+      - "#approved-reviews-by>=1"
+    actions:
+      queue:
+        name: Dependabot-major
+
   - name: Keep PRs up to date
     conditions:
       - -draft
@@ -122,6 +136,26 @@ queue_rules:
           - dependabot-update-type=version-update:semver-patch
           - dependabot-update-type=version-update:semver-minor
           - dependabot-update-type=security
+    merge_conditions:
+      - check-success=test
+      - check-success=SonarCloud Code Analysis
+      - check-success=Gitar
+      - "#approved-reviews-by>=1"
+
+  - name: Dependabot-major
+    # Same branch_protection_injection_mode: merge rationale as the
+    # Dependabot queue above - entry stays governed by queue_conditions
+    # only, and Mergify's own draft-PR mechanism gets Gitar/SonarCloud to
+    # run. Approval is required at queue_conditions (not just
+    # merge_conditions) so an unapproved major never enters the train and
+    # blocks the queues behind it.
+    branch_protection_injection_mode: merge
+    max_checks_retries: 1
+    checks_timeout: 30m
+    queue_conditions:
+      - author=dependabot[bot]
+      - dependabot-update-type=version-update:semver-major
+      - "#approved-reviews-by>=1"
     merge_conditions:
       - check-success=test
       - check-success=SonarCloud Code Analysis
