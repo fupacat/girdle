@@ -199,7 +199,7 @@ jobs:
                     "permissions for Copilot issue assignment " +
                     "(metadata:read plus read/write actions, contents, issues, and pull requests).",
                   );
-                  return;
+                  break;
                 }
                 core.warning(`Failed to assign #${issue.number}: ${err.message}`);
               }
