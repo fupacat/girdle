@@ -17,7 +17,7 @@ from girdle.tiers import CategoryResult, Tier
 
 GIRDLE_VERSION = "0.1.0"
 
-CATEGORY_NAMES = ("tests", "lint", "coverage", "reproducibility", "ci_gating")
+CATEGORY_NAMES = ("tests", "lint", "coverage", "build", "reproducibility", "ci_gating")
 BADGE_BY_DIFFICULTY = {
     Difficulty.BASIC: "bronze",
     Difficulty.INTERMEDIATE: "silver",

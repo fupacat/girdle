@@ -58,3 +58,14 @@ def test_verify_static_mode_adds_generic_hint_not_execution(tmp_path: Path):
     assert categories["tests"].tier == Tier.CONFIGURED
     assert categories["tests"].recommendation is not None
     assert "--run" in categories["tests"].recommendation
+
+
+def test_verify_handles_build_category(tmp_path: Path):
+    categories = {"build": CategoryResult(Tier.CONFIGURED, evidence=["some config"])}
+
+    class BuildDetector:
+        def run_commands(self, fp):
+            return {"build": [sys.executable, "-c", "exit(0)"]}
+
+    _verify(BuildDetector(), _fp(tmp_path), categories, mode="run")
+    assert categories["build"].tier == Tier.VERIFIED
