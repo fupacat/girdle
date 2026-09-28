@@ -35,6 +35,24 @@ def test_semgrep_config_detected(tmp_path: Path):
     assert cat.evidence == [".semgrep.yml"]
 
 
+def test_semgrep_workflow_detected_with_current_action_name(tmp_path: Path):
+    _wf(tmp_path, "steps:\n  - uses: semgrep/semgrep-action@v1\n")
+
+    cat = scan_static_analysis(tmp_path)
+
+    assert cat.tier == Tier.CONFIGURED
+    assert cat.evidence == [".github/workflows/ci.yml: runs Semgrep"]
+
+
+def test_semgrep_cli_command_detected(tmp_path: Path):
+    _wf(tmp_path, "steps:\n  - run: semgrep ci\n")
+
+    cat = scan_static_analysis(tmp_path)
+
+    assert cat.tier == Tier.CONFIGURED
+    assert cat.evidence == [".github/workflows/ci.yml: runs Semgrep"]
+
+
 def test_sonar_scan_with_config_detected(tmp_path: Path):
     (tmp_path / "sonar-project.properties").write_text("sonar.projectKey=demo\n")
     _wf(tmp_path, "steps:\n  - uses: SonarSource/sonarqube-scan-action@v4\n")
@@ -56,3 +74,13 @@ def test_run_scan_surfaces_static_analysis_without_affecting_applicability(tmp_p
     eco = result.ecosystems[0]
     assert "static_analysis" not in eco.applicable_categories
     assert eco.categories["static_analysis"].tier == Tier.CONFIGURED
+
+
+def test_run_scan_keeps_static_analysis_applicable_when_absent(tmp_path: Path):
+    (tmp_path / "requirements.txt").write_text("pytest==8.0.0\n")
+
+    result = run_scan(tmp_path)
+
+    eco = result.ecosystems[0]
+    assert "static_analysis" in eco.applicable_categories
+    assert eco.categories["static_analysis"].tier == Tier.ABSENT
