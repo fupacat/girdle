@@ -17,23 +17,24 @@ jobs:
     if: github.event_name == 'schedule' || github.event.pull_request.merged == true
     steps:
       - name: Find and assign unblocked issues
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           COPILOT_ASSIGN_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
         with:
-          # Use the PAT when present; otherwise allow the warning path to run.
-          github-token: ${{ secrets.COPILOT_ASSIGN_TOKEN || secrets.GITHUB_TOKEN }}
+          # Bootstrap github-script with the workflow token so the missing-secret
+          # warning path can still run before we construct the Copilot client.
+          github-token: ${{ github.token }}
           script: |
             if (!process.env.COPILOT_ASSIGN_TOKEN) {
               core.warning(
                 "COPILOT_ASSIGN_TOKEN is not configured; skipping Copilot auto-assignment. " +
-                "Set a user token with the Copilot issue-assignment permissions " +
-                "described in GitHub's API docs.",
+                "Set a user token with metadata:read plus read/write access to " +
+                "actions, contents, issues, and pull requests.",
               );
               return;
             }
 
-            const copilotGitHub = github;
+            const copilotGitHub = getOctokit(process.env.COPILOT_ASSIGN_TOKEN);
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
 
@@ -58,7 +59,12 @@ jobs:
                 }
               }
             `;
-            const copilotHeaders = { 'GraphQL-Features': 'issues_copilot_assignment_api_support' };
+            const copilotHeaders = {
+              'GraphQL-Features': [
+                'issues_copilot_assignment_api_support',
+                'coding_agent_model_selection',
+              ].join(','),
+            };
             const repoData = await copilotGitHub.graphql(repoNodeQuery, {
               owner, repo, headers: copilotHeaders,
             });
@@ -187,6 +193,28 @@ jobs:
                 });
                 core.info(`Assigned #${issue.number} to copilot-swe-agent`);
               } catch (err) {
-                core.warning(`Failed to assign #${issue.number}: ${err.message}`);
+                const errorMessages = [
+                  err.message,
+                  ...(Array.isArray(err.errors) ? err.errors.map(e => e?.message) : []),
+                  typeof err.data === "string" ? err.data : "",
+                ].filter(Boolean);
+                const errorText = errorMessages.join("\n");
+                const rateLimited = /rate limit/i.test(errorText);
+                const tokenScopeError =
+                  (err.status === 403 && !rateLimited) ||
+                  errorText.includes("Resource not accessible by personal access token") ||
+                  errorText.includes("Resource not accessible by integration");
+                if (tokenScopeError) {
+                  // A mis-scoped token will fail every remaining assignment too, so
+                  // abort the whole run loudly instead of downgrading it to per-issue noise.
+                  throw new Error(
+                    "COPILOT_ASSIGN_TOKEN is configured but lacks GitHub's required " +
+                    "permissions for Copilot issue assignment " +
+                    "(metadata:read plus read/write actions, contents, " +
+                    "issues, and pull requests). " +
+                    `GitHub responded: ${errorMessages.join(" | ")}`,
+                  );
+                }
+                core.warning(`Failed to assign #${issue.number}: ${errorMessages.join(" | ")}`);
               }
             }
