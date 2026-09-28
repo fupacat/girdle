@@ -35,7 +35,7 @@ class DotNetDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
+        return ["tests", "lint", "coverage", "build", "reproducibility", "ci_gating"]
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
@@ -47,6 +47,7 @@ class DotNetDetector:
             "tests": self._scan_tests(root, combined),
             "lint": self._scan_lint(root),
             "coverage": self._scan_coverage(root, combined),
+            "build": self._scan_build(root),
             "reproducibility": self._scan_reproducibility(root, combined),
             "ci_gating": self._scan_ci(root),
         }
@@ -54,7 +55,7 @@ class DotNetDetector:
     def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
         # Analyzers run as part of the build, not a separate lint invocation;
         # no standalone lint command to declare here.
-        commands = {"tests": ["dotnet", "test"]}
+        commands = {"tests": ["dotnet", "test"], "build": ["dotnet", "build"]}
         project_texts = [
             read_text(p) or "" for p in rglob_excluding(fp.root, CSPROJ_GLOB, FSPROJ_GLOB)
         ]
@@ -115,6 +116,14 @@ class DotNetDetector:
                     '--collect:"XPlat Code Coverage"`.'
                 ),
             )
+        return CategoryResult(Tier.CONFIGURED, evidence=evidence)
+
+    def _scan_build(self, root: Path) -> CategoryResult:
+        evidence = []
+        if any(rglob_excluding(root, CSPROJ_GLOB, FSPROJ_GLOB)):
+            evidence.append("*.csproj/*.fsproj")
+        if any(root.glob("*.sln")):
+            evidence.append("*.sln")
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
     def _scan_reproducibility(self, root: Path, combined: str) -> CategoryResult:

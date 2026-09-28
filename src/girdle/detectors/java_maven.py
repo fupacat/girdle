@@ -27,7 +27,7 @@ class JavaMavenDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
+        return ["tests", "lint", "coverage", "build", "reproducibility", "ci_gating"]
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
@@ -36,6 +36,7 @@ class JavaMavenDetector:
             "tests": self._scan_tests(root, pom_text),
             "lint": self._scan_lint(pom_text),
             "coverage": self._scan_coverage(pom_text),
+            "build": self._scan_build(),
             "reproducibility": self._scan_reproducibility(pom_text),
             "ci_gating": self._scan_ci(root),
         }
@@ -43,7 +44,7 @@ class JavaMavenDetector:
     def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
         # Lint execution skipped: checkstyle/spotbugs/pmd goal names vary by
         # plugin config and aren't safe to guess.
-        return {"tests": ["mvn", "test"]}
+        return {"tests": ["mvn", "test"], "build": ["mvn", "-DskipTests", "package"]}
 
     def _scan_tests(self, root: Path, pom_text: str) -> CategoryResult:
         has_test_dir = (root / "src" / "test" / "java").is_dir()
@@ -82,6 +83,9 @@ class JavaMavenDetector:
                 ),
             )
         return CategoryResult(Tier.CONFIGURED, evidence=["pom.xml: jacoco-maven-plugin"])
+
+    def _scan_build(self) -> CategoryResult:
+        return CategoryResult(Tier.CONFIGURED, evidence=["pom.xml"])
 
     def _scan_reproducibility(self, pom_text: str) -> CategoryResult:
         ranges = RANGE_PATTERN.findall(pom_text)

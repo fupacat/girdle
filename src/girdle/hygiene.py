@@ -1,6 +1,7 @@
 """Repo-wide hygiene checks: .editorconfig, .gitattributes, .gitignore,
 CODEOWNERS, README, CONTRIBUTING. Language-agnostic - these don't belong to
-any one ecosystem's four categories (tests/lint/reproducibility/ci_gating),
+any one ecosystem's scored categories (tests/lint/coverage/build/
+reproducibility/ci_gating),
 so they're reported as their own top-level section, same pattern as
 platform.py, and for the same reason: it's a different kind of signal, not
 blended into overall_min/overall_avg.

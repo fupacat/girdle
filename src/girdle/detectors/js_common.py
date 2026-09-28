@@ -111,6 +111,28 @@ def scan_coverage(pkg_data: dict, pkg_manager: str = "npm") -> CategoryResult:
     return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
 
+def has_build_script(pkg_data: dict) -> bool:
+    scripts = pkg_data.get("scripts", {})
+    return isinstance(scripts.get("build"), str) and bool(scripts["build"].strip())
+
+
+def scan_build(pkg_data: dict, pkg_manager: str = "npm") -> CategoryResult:
+    if has_build_script(pkg_data):
+        return CategoryResult(
+            Tier.CONFIGURED,
+            evidence=[f"package.json#scripts.build = {pkg_data['scripts']['build']!r}"],
+        )
+    install = _install_verb(pkg_manager)
+    return CategoryResult(
+        Tier.ABSENT,
+        reason='no "build" script found in package.json',
+        recommendation=(
+            f'Add a deterministic build script in package.json (for example after '
+            f"installing a bundler with `{pkg_manager} {install} vite`)."
+        ),
+    )
+
+
 def scan_ci(root: Path, run_pattern: str, run_label: str) -> CategoryResult:
     wf_dir = root / ".github" / "workflows"
     if wf_dir.exists():
@@ -148,4 +170,6 @@ def run_commands(root: Path, pkg_manager: str) -> dict[str, list[str]]:
         commands["lint"] = [pkg_manager, "run", "lint"]
     if "coverage" in pkg_data.get("scripts", {}):
         commands["coverage"] = [pkg_manager, "run", "coverage"]
+    if has_build_script(pkg_data):
+        commands["build"] = [pkg_manager, "run", "build"]
     return commands

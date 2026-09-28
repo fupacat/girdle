@@ -22,7 +22,11 @@ class JsPnpmDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
+        categories = ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
+        pkg_data = read_json(fp.root / "package.json") or {}
+        if js_common.has_build_script(pkg_data):
+            categories.insert(3, "build")
+        return categories
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
@@ -31,6 +35,10 @@ class JsPnpmDetector:
             "tests": js_common.scan_tests(pkg_data, "pnpm"),
             "lint": js_common.scan_lint(root, fp, "pnpm"),
             "coverage": js_common.scan_coverage(pkg_data, "pnpm"),
+            **(
+                {"build": js_common.scan_build(pkg_data, "pnpm")}
+                if js_common.has_build_script(pkg_data) else {}
+            ),
             "reproducibility": self._scan_reproducibility(root, fp),
             "ci_gating": js_common.scan_ci(root, r"\bpnpm (run )?test\b", "pnpm test"),
         }
