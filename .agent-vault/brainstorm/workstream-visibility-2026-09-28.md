@@ -30,9 +30,8 @@ scheduled workflow emits a JSON snapshot, a static page renders it) was
 floated as a way to get an actually-live, actually-autonomous board that
 *could* render the dependency graph GitHub Projects can't. Rejected in
 favor of the lighter option below - real build effort (new workflow logic
-
-- a whole rendering layer to build and maintain) for a "fluff" feature,
-  when a much cheaper option gets most of the value.
+plus a whole rendering layer to build and maintain) for a "fluff" feature,
+when a much cheaper option gets most of the value.
 
 Also ruled out: a Claude Artifact kanban. Keeping it live would mean
 either embedding a GitHub token client-side (bad practice) or manually
