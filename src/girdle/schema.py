@@ -68,7 +68,7 @@ class EcosystemResult:
         categories = set(self.applicable_categories)
         for check_key, result in self.categories.items():
             entry = CHECK_REGISTRY.get(check_key)
-            if entry is None:
+            if entry is None or entry.reserved:
                 continue
             if any(category in categories for category in entry.categories):
                 applicable[check_key] = result
@@ -82,6 +82,7 @@ class EcosystemResult:
                 result
                 for check_key, result in self.categories.items()
                 if (entry := CHECK_REGISTRY.get(check_key)) is not None
+                and not entry.reserved
                 and category in entry.categories
             ]
             percentages[category] = _percentage(results)
@@ -146,7 +147,7 @@ class ScanResult:
         if self.hygiene is not None:
             for check_key, result in self.hygiene.checks.items():
                 entry = CHECK_REGISTRY.get(check_key)
-                if entry is None:
+                if entry is None or entry.reserved:
                     continue
                 for category in entry.categories:
                     if category in known_categories:
@@ -168,7 +169,7 @@ class ScanResult:
         if self.hygiene is not None:
             for check_key, result in self.hygiene.checks.items():
                 entry = CHECK_REGISTRY.get(check_key)
-                if entry is None:
+                if entry is None or entry.reserved:
                     continue
                 if any(category in known_categories for category in entry.categories):
                     _record_lowest(seen, check_key, result)
@@ -208,8 +209,8 @@ class ScanResult:
                 "weakest_category": self.weakest_category,
                 "overall_min": self.overall_min,
                 "overall_avg": self.overall_avg,
-                "overall_percentage": self.overall_percentage,
                 "category_percentages": self.category_percentages,
+                "overall_percentage": self.overall_percentage,
             },
             "warnings": self.warnings,
             "platform": self.platform.to_dict() if self.platform is not None else None,

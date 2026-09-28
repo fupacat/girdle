@@ -38,9 +38,13 @@ reviewed_at: 2026-09-26   # optional, for notes without watches (environment/dep
 
 ## Workflow
 
-- **Writing a new note**: pick the folder matching its type. Only add
-  `watches` if the note is actually living documentation of something that
-  can drift - most notes (decisions, research, brainstorm) don't need it.
+- **Writing a new note**: pick the folder matching its type. Settled a
+  real "we chose X over Y, here's what was rejected and why" call, not
+  just documented how something currently works? That's `decisions/` - a
+  short ADR-style anchor, separate from the living note (`context`/`ci`/
+  etc.) that keeps watching the actual code. Only add `watches` if the
+  note is actually living documentation of something that can drift -
+  most notes (decisions, research, brainstorm) don't need it.
 - **Changing code a note watches**: edit the note in the *same commit* as
   the code change. The pre-commit hook (`girdle notes check`) recomputes
   the watched hash and auto-updates the note's frontmatter for you, since
