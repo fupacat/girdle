@@ -119,15 +119,16 @@ def _check_ci_tests_alignment(
     if not test_cmd:
         return
 
-    # Build a pattern from the meaningful tokens of the test command (skip
-    # interpreter wrappers like "poetry run" so we match the real tool name).
     cmd_str = " ".join(test_cmd)
-    # Use the first non-wrapper token as the key search term.
-    skip_prefixes = ("poetry", "run", "pipenv")
-    key_tokens = [t for t in test_cmd if t not in skip_prefixes]
-    if not key_tokens:
+    # Build a search term from the first non-wrapper token of the test command.
+    # Only strip leading wrapper tokens (e.g. "poetry run pytest" → "pytest").
+    skip_prefixes = {"poetry", "run", "pipenv"}
+    remaining = list(test_cmd)
+    while remaining and remaining[0] in skip_prefixes:
+        remaining.pop(0)
+    if not remaining:
         return
-    search_term = key_tokens[0]
+    search_term = remaining[0]
 
     ci_files: list[Path] = []
     wf_dir = fp.root / ".github" / "workflows"
