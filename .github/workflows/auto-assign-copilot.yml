@@ -199,8 +199,9 @@ jobs:
                   typeof err.data === "string" ? err.data : "",
                 ].filter(Boolean);
                 const errorText = errorMessages.join("\n");
+                const rateLimited = /rate limit/i.test(errorText);
                 const tokenScopeError =
-                  err.status === 403 ||
+                  (err.status === 403 && !rateLimited) ||
                   errorText.includes("Resource not accessible by personal access token") ||
                   errorText.includes("Resource not accessible by integration");
                 if (tokenScopeError) {
@@ -209,7 +210,8 @@ jobs:
                   throw new Error(
                     "COPILOT_ASSIGN_TOKEN is configured but lacks GitHub's required " +
                     "permissions for Copilot issue assignment " +
-                    "(metadata:read plus read/write actions, contents, issues, and pull requests).",
+                    "(metadata:read plus read/write actions, contents, issues, and pull requests). " +
+                    `GitHub responded: ${errorMessages.join(" | ")}`,
                   );
                 }
                 core.warning(`Failed to assign #${issue.number}: ${errorMessages.join(" | ")}`);
