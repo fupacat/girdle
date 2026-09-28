@@ -75,74 +75,14 @@ class ScanResult:
     hygiene: HygieneResult | None = None
     active_harm: bool = False
 
-    def _check_passed(self, entry: CheckEntry) -> bool | None:
-        tiers: list[Tier] = []
-        for eco in self.ecosystems:
-            cat = eco.categories.get(entry.key)
-            if cat is not None and entry.key in eco.applicable_categories:
-                tiers.append(cat.tier)
-                continue
-            for category in entry.categories:
-                if category not in eco.applicable_categories:
-                    continue
-                cat = eco.categories.get(category)
-                if cat is None:
-                    continue
-                tiers.append(cat.tier)
-        if self.hygiene is not None:
-            cat = self.hygiene.checks.get(entry.key)
-            if cat is not None:
-                tiers.append(cat.tier)
-        if not tiers:
-            return None
-        return all(tier >= Tier.CONFIGURED for tier in tiers)
-
     @property
     def category_percentages(self) -> dict[str, float | None]:
-        categories: list[str] = []
-        seen: set[str] = set()
-        for entry in CHECK_REGISTRY.values():
-            for category in entry.categories:
-                if category in seen:
-                    continue
-                categories.append(category)
-                seen.add(category)
-
-        totals = {category: 0 for category in categories}
-        passed = {category: 0 for category in categories}
-
-        for entry in CHECK_REGISTRY.values():
-            check_passed = self._check_passed(entry)
-            if check_passed is None:
-                continue
-            for category in entry.categories:
-                totals[category] += 1
-                if check_passed:
-                    passed[category] += 1
-
-        return {
-            category: (
-                round((passed[category] / totals[category]) * 100, 2)
-                if totals[category]
-                else None
-            )
-            for category in categories
-        }
+        return {k: v["percentage"] for k, v in self.category_scores.items()}
 
     @property
     def overall_percentage(self) -> float | None:
-        total = 0
-        passed = 0
-        for entry in CHECK_REGISTRY.values():
-            check_passed = self._check_passed(entry)
-            if check_passed is None:
-                continue
-            total += 1
-            if check_passed:
-                passed += 1
-        if total == 0:
-            return None
-        return round((passed / total) * 100, 2)
+        score = self._overall_score(self.check_statuses)
+        return score["percentage"] if score["total"] else None
 
     @property
     def overall_min(self) -> int:
@@ -182,10 +122,26 @@ class ScanResult:
 
             for eco in self.ecosystems:
                 cat = eco.categories.get(key)
+                if cat is not None and key in eco.applicable_categories:
+                    seen_in.append(eco.id)
+                    if cat.tier < Tier.CONFIGURED:
+                        failing_in.append(eco.id)
+                    continue
+
+                fallback_cats = [
+                    eco.categories[category]
+                    for category in entry.categories
+                    if category in eco.applicable_categories
+                    and category in eco.categories
+                ]
+                if fallback_cats:
+                    seen_in.append(eco.id)
+                    if any(cat.tier < Tier.CONFIGURED for cat in fallback_cats):
+                        failing_in.append(eco.id)
+                    continue
                 if key in eco.applicable_categories:
                     seen_in.append(eco.id)
-                    if cat is None or cat.tier < Tier.CONFIGURED:
-                        failing_in.append(eco.id)
+                    failing_in.append(eco.id)
                     continue
                 if cat is None:
                     continue
