@@ -159,3 +159,18 @@ def test_scan_result_overall_percentage_dedupes_duplicate_check_keys_by_worst_ti
 
     assert result.category_percentages["tests"] == 0.0
     assert result.overall_percentage == 0.0
+
+
+def test_scan_result_category_percentages_omit_categories_without_applicable_checks():
+    eco = EcosystemResult(
+        id="x",
+        language="x",
+        toolchain="x",
+        root=".",
+        categories={"tests": CategoryResult(Tier.CONFIGURED)},
+        applicable_categories=["tests"],
+    )
+
+    result = ScanResult(repo_root=".", scanned_at="now", mode="static", ecosystems=[eco])
+
+    assert result.category_percentages == {"tests": 100.0}

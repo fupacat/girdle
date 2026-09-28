@@ -63,7 +63,7 @@ class EcosystemResult:
         return [self.categories[c].tier for c in self.applicable_categories if c in self.categories]
 
     @property
-    def applicable_checks(self) -> dict[str, CategoryResult]:
+    def _applicable_checks(self) -> dict[str, CategoryResult]:
         applicable = {}
         categories = set(self.applicable_categories)
         for check_key, result in self.categories.items():
@@ -89,7 +89,7 @@ class EcosystemResult:
 
     @property
     def overall_percentage(self) -> float:
-        return _percentage(list(self.applicable_checks.values()))
+        return _percentage(list(self._applicable_checks.values()))
 
     @property
     def category_min(self) -> int:
@@ -130,18 +130,17 @@ class ScanResult:
 
     @property
     def category_percentages(self) -> dict[str, float]:
-        percentages = {category: 0.0 for category in _registry_category_names()}
-        by_category: dict[str, dict[str, CategoryResult]] = {
-            category: {} for category in percentages
-        }
+        by_category: dict[str, dict[str, CategoryResult]] = {}
+        known_categories = set(_registry_category_names())
 
         for eco in self.ecosystems:
-            for check_key, result in eco.applicable_checks.items():
+            for check_key, result in eco._applicable_checks.items():
                 entry = CHECK_REGISTRY.get(check_key)
                 if entry is None:
                     continue
                 for category in entry.categories:
-                    if category in eco.applicable_categories and category in by_category:
+                    if category in eco.applicable_categories:
+                        by_category.setdefault(category, {})
                         _record_lowest(by_category[category], check_key, result)
 
         if self.hygiene is not None:
@@ -150,19 +149,21 @@ class ScanResult:
                 if entry is None:
                     continue
                 for category in entry.categories:
-                    if category in by_category:
+                    if category in known_categories:
+                        by_category.setdefault(category, {})
                         _record_lowest(by_category[category], check_key, result)
 
-        for category, results in by_category.items():
-            percentages[category] = _percentage(list(results.values()))
-        return percentages
+        return {
+            category: _percentage(list(results.values()))
+            for category, results in by_category.items()
+        }
 
     @property
     def overall_percentage(self) -> float:
         seen: dict[str, CategoryResult] = {}
         known_categories = set(_registry_category_names())
         for eco in self.ecosystems:
-            for check_key, result in eco.applicable_checks.items():
+            for check_key, result in eco._applicable_checks.items():
                 _record_lowest(seen, check_key, result)
         if self.hygiene is not None:
             for check_key, result in self.hygiene.checks.items():
