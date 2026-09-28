@@ -141,7 +141,7 @@ class ScanResult:
                 if entry is None:
                     continue
                 for category in entry.categories:
-                    if category in eco.applicable_categories:
+                    if category in eco.applicable_categories and category in by_category:
                         _record_lowest(by_category[category], check_key, result)
 
         if self.hygiene is not None:
@@ -160,12 +160,17 @@ class ScanResult:
     @property
     def overall_percentage(self) -> float:
         seen: dict[str, CategoryResult] = {}
+        known_categories = set(_registry_category_names())
         for eco in self.ecosystems:
             for check_key, result in eco.applicable_checks.items():
                 _record_lowest(seen, check_key, result)
         if self.hygiene is not None:
             for check_key, result in self.hygiene.checks.items():
-                _record_lowest(seen, check_key, result)
+                entry = CHECK_REGISTRY.get(check_key)
+                if entry is None:
+                    continue
+                if any(category in known_categories for category in entry.categories):
+                    _record_lowest(seen, check_key, result)
         return _percentage(list(seen.values()))
 
     @property
