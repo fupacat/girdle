@@ -124,6 +124,12 @@ class DotNetDetector:
             evidence.append("*.csproj/*.fsproj")
         if any(root.glob("*.sln")):
             evidence.append("*.sln")
+        if not evidence:
+            return CategoryResult(
+                Tier.ABSENT,
+                reason="no .csproj/.fsproj or .sln file found to define a build entry point",
+                recommendation="Add a .csproj/.fsproj project or a .sln solution file.",
+            )
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
     def _scan_reproducibility(self, root: Path, combined: str) -> CategoryResult:
