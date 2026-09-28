@@ -29,11 +29,10 @@ jobs:
         # "no token" state verified locally, not an empty one that might
         # be handled differently.
         #
-        # Exit code is captured (rather than letting a failure short-circuit
-        # the step) so the CI Insights step below can still upload/evaluate
-        # results on a failing run - `set +e` avoids the shell's default
-        # exit-on-error, and the trailing `exit $code` preserves the step's
-        # own pass/fail status for the job overall.
+        # Exit code is captured so the CI Insights step below can evaluate
+        # quarantine status before deciding whether a pytest failure should
+        # fail the job. Dependabot runs skip that step, so preserve the raw
+        # pytest result for them.
         run: |
           if [ -z "$MERGIFY_TOKEN" ]; then
             unset MERGIFY_TOKEN
@@ -42,20 +41,21 @@ jobs:
           pytest --cov --cov-report=xml --junitxml=junit.xml
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          exit $code
+          if [ "$GITHUB_ACTOR" = "dependabot[bot]" ]; then
+            exit "$code"
+          fi
+          exit 0
       - name: Mergify CI Insights
         # Uploads JUnit results and evaluates quarantine status for flaky
-        # tests. `if: always()` so it still runs after a pytest failure
-        # (the actual case CI Insights is for). Skipped on Dependabot runs -
-        # GitHub withholds MERGIFY_TOKEN from those the same way it does
-        # SONAR_TOKEN below.
-        if: always() && github.actor != 'dependabot[bot]'
+        # tests. `if: always()` so it still runs after pytest, including when
+        # the tests step did not run, but not on Dependabot runs.
+        if: always() && steps.tests.outcome != 'skipped' && github.actor != 'dependabot[bot]'
         env:
           MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
         run: |
           if [ -z "$MERGIFY_TOKEN" ]; then
-            echo "No MERGIFY_TOKEN - skipping CI Insights upload"
-            exit 0
+            echo "No MERGIFY_TOKEN - using raw pytest result"
+            exit "${{ steps.tests.outputs.exit_code }}"
           fi
           pip install --quiet mergify-cli
           mergify ci junit-process --test-exit-code "${{ steps.tests.outputs.exit_code }}" junit.xml
