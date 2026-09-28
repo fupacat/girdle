@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 
-from girdle.checks import CHECK_REGISTRY
+from girdle.checks import CHECK_REGISTRY, CheckEntry
 from girdle.hygiene import HygieneResult
 from girdle.platform import PlatformResult
 from girdle.tiers import CategoryResult, Tier
@@ -68,17 +68,18 @@ class ScanResult:
     platform: PlatformResult | None = None
     hygiene: HygieneResult | None = None
 
-    def _check_passed(self, check_key: str) -> bool | None:
+    def _check_passed(self, entry: CheckEntry) -> bool | None:
         tiers: list[Tier] = []
         for eco in self.ecosystems:
-            if check_key not in eco.applicable_categories:
-                continue
-            cat = eco.categories.get(check_key)
-            if cat is None:
-                continue
-            tiers.append(cat.tier)
+            for category in entry.categories:
+                if category not in eco.applicable_categories:
+                    continue
+                cat = eco.categories.get(category)
+                if cat is None:
+                    continue
+                tiers.append(cat.tier)
         if self.hygiene is not None:
-            cat = self.hygiene.checks.get(check_key)
+            cat = self.hygiene.checks.get(entry.key)
             if cat is not None:
                 tiers.append(cat.tier)
         if not tiers:
@@ -100,7 +101,7 @@ class ScanResult:
         passed = {category: 0 for category in categories}
 
         for entry in CHECK_REGISTRY.values():
-            check_passed = self._check_passed(entry.key)
+            check_passed = self._check_passed(entry)
             if check_passed is None:
                 continue
             for category in entry.categories:
@@ -122,7 +123,7 @@ class ScanResult:
         total = 0
         passed = 0
         for entry in CHECK_REGISTRY.values():
-            check_passed = self._check_passed(entry.key)
+            check_passed = self._check_passed(entry)
             if check_passed is None:
                 continue
             total += 1
