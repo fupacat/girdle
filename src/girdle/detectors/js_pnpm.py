@@ -36,7 +36,7 @@ class JsPnpmDetector:
             "lint": js_common.scan_lint(root, fp, "pnpm"),
             "coverage": js_common.scan_coverage(pkg_data, "pnpm"),
             **(
-                {"build": js_common.scan_build(pkg_data, "pnpm")}
+                {"build": js_common.scan_build(pkg_data)}
                 if js_common.has_build_script(pkg_data) else {}
             ),
             "reproducibility": self._scan_reproducibility(root, fp),

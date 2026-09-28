@@ -42,7 +42,7 @@ class JsNpmDetector:
             "lint": js_common.scan_lint(root, fp, "npm"),
             "coverage": js_common.scan_coverage(pkg_data, "npm"),
             **(
-                {"build": js_common.scan_build(pkg_data, "npm")}
+                {"build": js_common.scan_build(pkg_data)}
                 if js_common.has_build_script(pkg_data) else {}
             ),
             "reproducibility": self._scan_reproducibility(root),

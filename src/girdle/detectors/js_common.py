@@ -116,20 +116,10 @@ def has_build_script(pkg_data: dict) -> bool:
     return isinstance(scripts.get("build"), str) and bool(scripts["build"].strip())
 
 
-def scan_build(pkg_data: dict, pkg_manager: str = "npm") -> CategoryResult:
-    if has_build_script(pkg_data):
-        return CategoryResult(
-            Tier.CONFIGURED,
-            evidence=[f"package.json#scripts.build = {pkg_data['scripts']['build']!r}"],
-        )
-    install = _install_verb(pkg_manager)
+def scan_build(pkg_data: dict) -> CategoryResult:
     return CategoryResult(
-        Tier.ABSENT,
-        reason='no "build" script found in package.json',
-        recommendation=(
-            f'Add a deterministic build script in package.json (for example after '
-            f"installing a bundler with `{pkg_manager} {install} vite`)."
-        ),
+        Tier.CONFIGURED,
+        evidence=[f"package.json#scripts.build = {pkg_data['scripts']['build']!r}"],
     )
 
 
