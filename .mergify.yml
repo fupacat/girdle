@@ -144,7 +144,19 @@ pull_request_rules:
     # `conflict` reactively off GitHub's webhooks, so this reacts within
     # seconds rather than needing a polling workflow. Copilot coding agent
     # watches for @-mentions on PRs it authored and pushes fix commits in
-    # response, including conflict resolution.
+    # response, including conflict resolution - but per GitHub's own docs,
+    # "Copilot only responds to comments from people who have write access
+    # to the repository," and mergify[bot]'s own App identity doesn't count
+    # (confirmed live: an identical @copilot mention posted as mergify[bot]
+    # sat ignored for 16+ minutes on PRs #93/#98/#100, while the same text
+    # posted by a human got a real fix commit in ~3.5 minutes). bot_account
+    # impersonates a real collaborator account so the mention actually
+    # reaches Copilot. TODO(backlog): replace with a dedicated automation
+    # user account (e.g. girdle-automation) once one is provisioned and
+    # authorized in Mergify, so these nudges don't read as Eric personally
+    # asking each time - deferred for now. NOTE: PRs already labelled
+    # conflict-nudged (e.g. #93/#98/#100) must have that label removed
+    # manually to be re-nudged under this account.
     conditions:
       - conflict
       - author=Copilot
@@ -153,6 +165,7 @@ pull_request_rules:
       - -draft
     actions:
       comment:
+        bot_account: fupacat
         message: >-
           @copilot This PR has a merge conflict with `master`. Please rebase
           onto the latest `master` and resolve the conflicting changes.
