@@ -71,6 +71,7 @@ def test_intermediate_checks_present():
 
 def test_advanced_checks_present():
     keys = [e.key for e in checks_by_difficulty(Difficulty.ADVANCED)]
+    assert "static_analysis" in keys
     assert "agent_instructions" in keys
     assert "agent_sandbox_bootstrap" in keys
 
@@ -92,6 +93,7 @@ def test_live_checks_are_not_reserved():
         "readme", "gitignore", "contributing",
         "tests", "lint", "coverage", "ci_gating", "codeowners",
         "dependency_monitoring", "editorconfig", "gitattributes", "precommit",
+        "static_analysis",
         "agent_instructions", "agent_sandbox_bootstrap",
     ]
     for key in live_keys:
@@ -114,6 +116,7 @@ def test_categories_are_tuples():
     ("lint", "lint"),
     ("coverage", "coverage"),
     ("ci_gating", "ci_gating"),
+    ("static_analysis", "static_analysis"),
     ("codeowners", "codeowners"),
     ("dependency_monitoring", "dependency_monitoring"),
     ("editorconfig", "editorconfig"),
@@ -133,11 +136,11 @@ def test_check_maps_to_expected_category(key, expected_category):
 # Total count
 # ---------------------------------------------------------------------------
 
-def test_registry_covers_all_16_categories():
-    """Registry must cover all 16 categories enumerated in the design doc."""
+def test_registry_covers_all_17_categories():
+    """Registry must cover all 17 categories enumerated in the design doc."""
     expected_categories = {
         "readme", "gitignore", "license", "contributing",
-        "tests", "lint", "coverage", "ci_gating", "codeowners",
+        "tests", "lint", "coverage", "ci_gating", "static_analysis", "codeowners",
         "dependency_monitoring", "editorconfig", "gitattributes", "precommit",
         "agent_instructions", "agent_sandbox_bootstrap", "reproducibility",
     }
