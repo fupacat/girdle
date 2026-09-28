@@ -210,7 +210,8 @@ jobs:
                   throw new Error(
                     "COPILOT_ASSIGN_TOKEN is configured but lacks GitHub's required " +
                     "permissions for Copilot issue assignment " +
-                    "(metadata:read plus read/write actions, contents, issues, and pull requests). " +
+                    "(metadata:read plus read/write actions, contents, " +
+                    "issues, and pull requests). " +
                     `GitHub responded: ${errorMessages.join(" | ")}`,
                   );
                 }
