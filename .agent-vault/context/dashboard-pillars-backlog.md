@@ -49,7 +49,9 @@ so the record of what was considered and why survives.
   filed issue, see below.
 - [in-progress] Three alignment-check candidates, surfaced while
   enumerating every existing category against the code directly:
-  `ci_gating` vs. `tests` - [issue #81](https://github.com/fupacat/girdle/issues/81);
+  `ci_gating` vs. `tests` - [issue #81](https://github.com/fupacat/girdle/issues/81)
+  (implemented: compare the test-command basename against CI `run`/`script`
+  steps, ignoring headlines and comments);
   `reproducibility` lockfile drift - [issue #82](https://github.com/fupacat/girdle/issues/82);
   `precommit` vs. CI - [issue #83](https://github.com/fupacat/girdle/issues/83).
   All unassigned, depend on #74.

@@ -128,7 +128,7 @@ def _check_ci_tests_alignment(
         remaining.pop(0)
     if not remaining:
         return
-    search_term = remaining[0]
+    search_term = Path(remaining[0]).name
 
     ci_files: list[Path] = []
     wf_dir = fp.root / ".github" / "workflows"
@@ -141,8 +141,21 @@ def _check_ci_tests_alignment(
 
     for ci_file in ci_files:
         text = read_text(ci_file) or ""
-        if re.search(re.escape(search_term), text):
-            return  # Aligned: command found in at least one CI file
+        lines = text.splitlines()
+        for index, line in enumerate(lines):
+            execution = re.match(r"(?:-\s*)?(?:run|script)\s*:\s*(.*)", line.strip())
+            if execution is None:
+                continue
+            execution_lines = [execution.group(1)]
+            indent = len(line) - len(line.lstrip())
+            for continuation in lines[index + 1 :]:
+                if not continuation.strip():
+                    continue
+                if len(continuation) - len(continuation.lstrip()) <= indent:
+                    break
+                execution_lines.append(continuation.strip())
+            if re.search(rf"\b{re.escape(search_term)}\b", " ".join(execution_lines)):
+                return  # Aligned: command found in a CI execution step
 
     # ci_gating is configured (something runs in CI) but the declared test
     # command isn't found — flag the drift.

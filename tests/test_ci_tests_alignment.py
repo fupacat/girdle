@@ -125,6 +125,27 @@ def test_aligned_via_azure_pipelines(tmp_path: Path):
 # ── misaligned: CI is configured but doesn't run the test command ─────────────
 
 
+def test_headline_drift_does_not_mask_alignment_gap(tmp_path: Path):
+    _write_gha_workflow(
+        tmp_path,
+        "name: Run pytest suite (headline)\n"
+        "# pytest is configured\n"
+        "jobs:\n"
+        "  test:\n"
+        "    steps:\n"
+        "      - run: python -m unittest\n",
+    )
+    categories = {
+        "tests": CategoryResult(Tier.CONFIGURED, evidence=["pytest.ini"]),
+        "ci_gating": CategoryResult(
+            Tier.CONFIGURED, evidence=["ci.yml: runs python -m unittest"]
+        ),
+    }
+    _check_ci_tests_alignment(_FakeDetector(["pytest", "-q"]), _fp(tmp_path), categories)
+    alignment_evidence = [e for e in categories["ci_gating"].evidence if "alignment" in e]
+    assert alignment_evidence, "Expected headline drift not to mask alignment gap"
+
+
 def test_mismatch_flags_alignment_gap(tmp_path: Path):
     _write_gha_workflow(tmp_path, "run: python -m unittest\n")
     categories = {
