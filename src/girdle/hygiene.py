@@ -528,9 +528,9 @@ def check_dependency_monitoring(root: Path) -> CategoryResult:
 def check_license(root: Path, visibility: str | None) -> CategoryResult:
     if visibility != "public":
         reason = (
-            "not applicable: repo is not public; LICENSE check not scored"
+            "repo is not public; LICENSE check not scored"
             if visibility in {"private", "internal"}
-            else "not applicable: repo visibility could not be determined; LICENSE check not scored"
+            else "repo visibility could not be determined; LICENSE check not scored"
         )
         return CategoryResult(Tier.ABSENT, reason=reason)
 
@@ -580,7 +580,7 @@ def build_hygiene(
     root: Path, languages: set[str], repo_visibility: str | None = None
 ) -> HygieneResult:
     precommit = check_precommit(root)
-    visibility = repo_visibility or _detect_repo_visibility(root)
+    visibility = repo_visibility if repo_visibility is not None else _detect_repo_visibility(root)
     checks = {
         "editorconfig": check_editorconfig(root),
         "gitattributes": check_gitattributes(root),
