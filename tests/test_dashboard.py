@@ -15,6 +15,7 @@ def test_dashboard_renders_percentage_and_outstanding_items():
                     "toolchain": "pip",
                     "root": ".",
                     "variants": [],
+                    "categories": {},
                 }
             ],
             "summary": {
