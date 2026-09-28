@@ -50,15 +50,30 @@ class DotNetDetector:
             "ci_gating": self._scan_ci(root),
         }
 
+    def _build_target(self, root: Path) -> str | None:
+        slns = sorted(root.glob("*.sln"))
+        if len(slns) == 1:
+            return str(slns[0])
+        projects = sorted(rglob_excluding(root, CSPROJ_GLOB, FSPROJ_GLOB))
+        return str(projects[0]) if len(projects) == 1 else None
+
     def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
         # Analyzers run as part of the build, not a separate lint invocation;
         # no standalone lint command to declare here.
-        commands = {"tests": ["dotnet", "test"], "build": ["dotnet", "build"]}
+        target = self._build_target(fp.root)
+        commands = {}
+        if target:
+            commands = {
+                "tests": ["dotnet", "test", target],
+                "build": ["dotnet", "build", target],
+            }
         project_texts = [
             read_text(p) or "" for p in rglob_excluding(fp.root, CSPROJ_GLOB, FSPROJ_GLOB)
         ]
-        if "coverlet" in "\n".join(project_texts).lower():
-            commands["coverage"] = ["dotnet", "test", "--collect:XPlat Code Coverage"]
+        if target and "coverlet" in "\n".join(project_texts).lower():
+            commands["coverage"] = [
+                "dotnet", "test", target, "--collect:XPlat Code Coverage"
+            ]
         return commands
 
     def _scan_tests(self, root: Path, combined: str) -> CategoryResult:
