@@ -4,12 +4,14 @@ build an EcosystemResult per match, and assemble a ScanResult.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 from girdle.coverage_gate import detect_gate
 from girdle.coverage_parse import parse_percentage
 from girdle.detectors import ALL_DETECTORS
+from girdle.detectors._util import read_text
 from girdle.detectors.base import Detector, Fingerprint
 from girdle.hygiene import build_hygiene
 from girdle.platform import check_platform
@@ -24,6 +26,7 @@ def _run_detector(detector: Detector, repo_root: Path, mode: str) -> EcosystemRe
     categories = detector.scan(fp, mode)
     _verify(detector, fp, categories, mode)
     _check_coverage_gate(fp, categories)
+    _check_ci_tests_alignment(detector, fp, categories)
     return EcosystemResult(
         id=fp.id,
         language=fp.language,
@@ -87,6 +90,69 @@ def _check_coverage_gate(fp: Fingerprint, categories: dict[str, CategoryResult])
             "Coverage runs but isn't enforced as a PR-scoped gate. Add a diff-coverage "
             "check (Codecov's patch status, Coveralls, or `diff-cover --fail-under=N` "
             "in CI) as a required status check."
+        )
+
+
+def _check_ci_tests_alignment(
+    detector: Detector, fp: Fingerprint, categories: dict[str, CategoryResult]
+) -> None:
+    """Cross-checks whether the CI test command matches what the `tests`
+    category's run_commands declare. When ci_gating is CONFIGURED but the CI
+    config doesn't actually invoke the expected test command, append an
+    alignment finding to ci_gating's evidence and set a recommendation.
+
+    Only fires when both `tests` and `ci_gating` are at least CONFIGURED, and
+    the detector exposes `run_commands` with a `tests` entry.
+    """
+    tests_result = categories.get("tests")
+    ci_gating_result = categories.get("ci_gating")
+    if tests_result is None or ci_gating_result is None:
+        return
+    if tests_result.tier < Tier.CONFIGURED or ci_gating_result.tier < Tier.CONFIGURED:
+        return
+
+    get_commands = getattr(detector, "run_commands", None)
+    if get_commands is None:
+        return
+    commands = get_commands(fp)
+    test_cmd = commands.get("tests")
+    if not test_cmd:
+        return
+
+    # Build a pattern from the meaningful tokens of the test command (skip
+    # interpreter wrappers like "poetry run" so we match the real tool name).
+    cmd_str = " ".join(test_cmd)
+    # Use the first non-wrapper token as the key search term.
+    skip_prefixes = ("poetry", "run", "pipenv")
+    key_tokens = [t for t in test_cmd if t not in skip_prefixes]
+    if not key_tokens:
+        return
+    search_term = key_tokens[0]
+
+    ci_files: list[Path] = []
+    wf_dir = fp.root / ".github" / "workflows"
+    if wf_dir.exists():
+        ci_files.extend(wf_dir.glob("*.y*ml"))
+    for name in (".gitlab-ci.yml", "azure-pipelines.yml"):
+        p = fp.root / name
+        if p.exists():
+            ci_files.append(p)
+
+    for ci_file in ci_files:
+        text = read_text(ci_file) or ""
+        if re.search(re.escape(search_term), text):
+            return  # Aligned: command found in at least one CI file
+
+    # ci_gating is configured (something runs in CI) but the declared test
+    # command isn't found — flag the drift.
+    ci_gating_result.evidence = [
+        *ci_gating_result.evidence,
+        f"alignment gap: CI does not appear to run `{cmd_str}` (tests command)",
+    ]
+    if ci_gating_result.recommendation is None:
+        ci_gating_result.recommendation = (
+            f"Update your CI workflow to run `{cmd_str}` so it matches the configured "
+            "test command."
         )
 
 
