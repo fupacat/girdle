@@ -131,3 +131,23 @@ def test_active_harm_forces_red_state(monkeypatch):
     data = result.to_dict()["summary"]
     assert data["overall_state"] == "red"
     assert data["category_scores"]["cat"]["state"] == "red"
+
+
+def test_applicable_missing_category_result_counts_as_failing(monkeypatch):
+    monkeypatch.setattr(
+        schema_mod,
+        "CHECK_REGISTRY",
+        {"tests": CheckEntry("tests", ("tests",), Difficulty.INTERMEDIATE)},
+    )
+    eco = EcosystemResult(
+        id="js-npm",
+        language="javascript",
+        toolchain="npm",
+        root=".",
+        categories={},
+        applicable_categories=["tests"],
+    )
+    result = ScanResult(repo_root=".", scanned_at="now", mode="static", ecosystems=[eco])
+    score = result.to_dict()["summary"]["category_scores"]["tests"]
+    assert score["passed"] == 0
+    assert score["outstanding"] == ["tests"]
