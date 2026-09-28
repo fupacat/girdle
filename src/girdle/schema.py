@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
-from functools import cached_property
 
 from girdle.checks import CHECK_REGISTRY, Difficulty
 from girdle.hygiene import HygieneResult
@@ -103,7 +102,7 @@ class ScanResult:
                     worst = (int(cat.tier), name)
         return worst[1] if worst else None
 
-    @cached_property
+    @property
     def check_statuses(self) -> dict[str, dict]:
         statuses: dict[str, dict] = {}
         for key, entry in CHECK_REGISTRY.items():
@@ -150,15 +149,17 @@ class ScanResult:
     def _badge_state_for_keys(keys: list[str], statuses: dict[str, dict]) -> str | None:
         earned: str | None = None
         for difficulty in (Difficulty.BASIC, Difficulty.INTERMEDIATE, Difficulty.ADVANCED):
-            tier_keys = [k for k in keys if Difficulty(statuses[k]["difficulty"]) is difficulty]
+            tier_keys = [k for k in keys if Difficulty(statuses[k]["difficulty"]) == difficulty]
             if not tier_keys or not all(statuses[k]["passed"] for k in tier_keys):
                 break
             earned = BADGE_BY_DIFFICULTY[difficulty]
         return earned
 
-    @cached_property
+    @property
     def category_scores(self) -> dict[str, dict]:
-        statuses = self.check_statuses
+        return self._category_scores(self.check_statuses)
+
+    def _category_scores(self, statuses: dict[str, dict]) -> dict[str, dict]:
         per_category: dict[str, list[str]] = defaultdict(list)
         for key, status in statuses.items():
             for category in status["categories"]:
@@ -194,9 +195,11 @@ class ScanResult:
             }
         return scores
 
-    @cached_property
+    @property
     def overall_score(self) -> dict:
-        statuses = self.check_statuses
+        return self._overall_score(self.check_statuses)
+
+    def _overall_score(self, statuses: dict[str, dict]) -> dict:
         keys = sorted(statuses.keys())
         total = len(keys)
         passed = sum(1 for key in keys if statuses[key]["passed"])
@@ -217,6 +220,9 @@ class ScanResult:
         }
 
     def to_dict(self) -> dict:
+        statuses = self.check_statuses
+        category_scores = self._category_scores(statuses)
+        overall_score = self._overall_score(statuses)
         return {
             "girdle_version": GIRDLE_VERSION,
             "scanned_at": self.scanned_at,
@@ -228,13 +234,13 @@ class ScanResult:
                 "weakest_category": self.weakest_category,
                 "overall_min": self.overall_min,
                 "overall_avg": self.overall_avg,
-                "overall_percentage": self.overall_score["percentage"],
-                "overall_state": self.overall_score["state"],
-                "overall_badge": self.overall_score["badge"],
-                "overall_outstanding": self.overall_score["outstanding"],
-                "category_scores": self.category_scores,
+                "overall_percentage": overall_score["percentage"],
+                "overall_state": overall_score["state"],
+                "overall_badge": overall_score["badge"],
+                "overall_outstanding": overall_score["outstanding"],
+                "category_scores": category_scores,
             },
-            "checks": self.check_statuses,
+            "checks": statuses,
             "active_harm": self.active_harm,
             "warnings": self.warnings,
             "platform": self.platform.to_dict() if self.platform is not None else None,
