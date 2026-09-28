@@ -23,7 +23,7 @@ jobs:
         with:
           # Assigning issues to Copilot needs a user token; GITHUB_TOKEN
           # cannot discover the Copilot actor in suggestedActors.
-          github-token: ${{ secrets.COPILOT_ASSIGN_TOKEN || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
           script: |
             if (!process.env.COPILOT_ASSIGN_TOKEN) {
               core.warning(
