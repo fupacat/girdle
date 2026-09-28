@@ -63,12 +63,7 @@ _ENTRIES: tuple[CheckEntry, ...] = (
     # ── Advanced ───────────────────────────────────────────────────────────
     CheckEntry("agent_instructions", ("agent_instructions",), Difficulty.ADVANCED),
     CheckEntry("agent_sandbox_bootstrap", ("agent_sandbox_bootstrap",), Difficulty.ADVANCED),
-    CheckEntry(
-        "reproducibility",
-        ("reproducibility",),
-        Difficulty.ADVANCED,
-        reserved=True,
-    ),
+    CheckEntry("reproducibility", ("reproducibility",), Difficulty.ADVANCED),
 )
 
 # Keyed look-up, built once at import time.
