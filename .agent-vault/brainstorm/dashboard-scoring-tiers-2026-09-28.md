@@ -332,12 +332,12 @@ previously named anywhere in this note, added to the backlog:
 - `precommit` vs. CI: does pre-commit wire the *same* checks CI actually
   runs, or a silently diverging subset?
 
-**Scope note for the Option A dashboard update** (settled direction -
-recolor the existing `configured` state away from alarm-yellow, no new
-labels, no new detection - see below): only `tests`/`lint`/`coverage` can
-ever reach the green "verified" state today. The other 12 tier-based
-categories in the table above only ever show absent/configured, so their
-`configured` color is exactly what Option A needs to fix.
+- ~~**Scope note for the Option A dashboard update** (settled direction -
+  recolor the existing `configured` state away from alarm-yellow, no new
+  labels, no new detection - see below): only `tests`/`lint`/`coverage` can
+  ever reach the green "verified" state today. The other 12 tier-based
+  categories in the table above only ever show absent/configured, so their
+  `configured` color is exactly what Option A needs to fix.~~ - dropped.
 
 ## Comparison against Factory.ai's Agent Readiness rubric
 
@@ -541,9 +541,9 @@ being introduced as a visibly incomplete preview.
   detection draws its line - a real secret-scanning implementation
   (entropy/pattern-based) is a much bigger scope question than the
   gitignore-style presence check this brainstorm has been assuming.
-- Whether "silver" is scored per-category or as some aggregate across
-  categories - raised, explicitly deferred pending the universal/agentic
-  split done in this pass.
+- ~~Whether "silver" is scored per-category or as some aggregate across
+  categories~~ - resolved: both (see "Decision: percentage-of-checks-passed
+  model supersedes the strict ladder").
 
 ## Related
 
