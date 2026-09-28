@@ -20,6 +20,7 @@ jobs:
       - run: mdformat --check --wrap keep $(git ls-files '*.md')
       - run: yamllint .
       - name: pytest
+        id: tests
         env:
           MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
         # secrets.MERGIFY_TOKEN resolves to an empty string, not truly
@@ -27,11 +28,45 @@ jobs:
         # configured) - unset it here so pytest-mergify sees the same
         # "no token" state verified locally, not an empty one that might
         # be handled differently.
+        #
+        # Always exits 0 - the CI Insights step below is what actually
+        # gates the job. Its own exit code is quarantine-aware (a
+        # quarantined flaky test doesn't fail it), which pytest's raw
+        # exit code here is not; gating on pytest's own code would defeat
+        # the entire point of enabling quarantine. The real exit code is
+        # still captured as an output for that step to fall back to.
         run: |
           if [ -z "$MERGIFY_TOKEN" ]; then
             unset MERGIFY_TOKEN
           fi
-          pytest --cov --cov-report=xml
+          set +e
+          pytest --cov --cov-report=xml --junitxml=junit.xml
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Mergify CI Insights
+        # Uploads JUnit results and evaluates quarantine status for flaky
+        # tests, then gates the job on ITS exit code (quarantine-aware)
+        # rather than pytest's raw one. `if: always()` so it still runs
+        # after a pytest failure - the actual case quarantine is for -
+        # but `steps.tests.outcome != 'skipped'` excludes the case where
+        # an earlier step (ruff/mdformat/yamllint) failed first and
+        # pytest never ran at all: outputs.exit_code would be empty
+        # there, and `exit ""` is a bash error, not a clean pass/fail.
+        # Falls back to pytest's own exit code - real gating, not a
+        # silent pass - when there's no token (Dependabot/fork runs never
+        # get MERGIFY_TOKEN, same as SONAR_TOKEN below) or junit.xml
+        # doesn't exist (pytest can in principle exit without writing one
+        # on a crash before collection finishes).
+        if: always() && steps.tests.outcome != 'skipped'
+        env:
+          MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
+        run: |
+          if [ -z "$MERGIFY_TOKEN" ] || [ ! -f junit.xml ]; then
+            exit "${{ steps.tests.outputs.exit_code }}"
+          fi
+          python -m pip install --quiet mergify-cli
+          mergify ci junit-process --test-exit-code "${{ steps.tests.outputs.exit_code }}" junit.xml
       - run: girdle index . --check AGENTS.md
       - name: vault notes freshness (read-only)
         # The pre-commit hook is the one place auto-reconcile makes sense

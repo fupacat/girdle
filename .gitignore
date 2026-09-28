@@ -11,6 +11,7 @@ girdle-report.html
 .coverage
 htmlcov/
 coverage.xml
+junit.xml
 
 # Obsidian's own device-specific config/cache when .agent-vault/ is opened
 # as a vault - never shared state, keep it out of the repo.
