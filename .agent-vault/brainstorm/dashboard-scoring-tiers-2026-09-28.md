@@ -50,13 +50,12 @@ Not every category can climb the same ladder:
    that have no execution proof - README, CONTRIBUTING, CODEOWNERS, agent
    instructions, `.editorconfig`/`.gitattributes`, vault notes):
    **bronze (configured) -> silver (adequate) -> gold (aligned)**.
-   "Aligned" subsumes currency/freshness rather than needing a fourth rung
-
-   - a vault note or AGENTS.md block that's stale relative to the code it
-     documents isn't just old, it's *disagreeing* with the current repo
-     state, which is the same failure mode as any other alignment break.
-     `vault.py`'s existing hash-based staleness check already treats
-     staleness this way.
+   "Aligned" subsumes currency/freshness rather than needing a fourth
+   rung; a vault note or AGENTS.md block that's stale relative to the code
+   it documents isn't just old, it's *disagreeing* with the current repo
+   state, which is the same failure mode as any other alignment break.
+   `vault.py`'s existing hash-based staleness check already treats
+   staleness this way.
 
 This is where girdle's actual differentiator (`align.py`'s cross-file
 derivation, `vault.py`'s staleness tracking) becomes the scoring mechanism
@@ -134,7 +133,7 @@ category) and revised in this session:
 
 ## Related
 
-- [[.agent-vault/ci/merge-pipeline]] - a similarly-shaped "make the
+- [[merge-pipeline]] - a similarly-shaped "make the
   settled reasoning discoverable, not just chat history" note, same
   session's broader documentation pass.
 - OKF vault: [[Agent-Ready Repository Design]] - the structural-index
