@@ -2,7 +2,7 @@
 type: context
 watches:
   - path: src/girdle/hygiene.py
-    hash: f8a9fc96e093a06b21744cca8d38e77cbbf9563e5682457b1d3d1096861d7cd9
+    hash: dd61ff48972ee422d827eeeb0bb4029015af2aa7b24251c437ecb6bcc8f9c06a
 stale: false
 ---
 
@@ -39,3 +39,13 @@ match both manifest fields and license text.
   provides visibility.
 - Manifest declarations that identify a different recognized license from
   the root LICENSE cause the check to report a mismatch.
+- BSD-2-Clause and BSD-3-Clause share their first two clauses, so detection
+  can't just check "does BSD-3's signature match" first - `_detect_license_id`
+  matches on the shared BSD-2 signature, then looks for the extra "neither
+  the name of ... nor the names of" clause to upgrade the match to BSD-3.
+  Checking BSD-3's fuller signature first (the original approach) missed
+  real BSD-3 texts whose third clause was phrased slightly differently.
+- `ScanResult.check_statuses` only counts a hygiene check as "seen" when
+  `HygieneResult.is_applicable(key)` is true - a not-applicable check (e.g.
+  LICENSE on a private repo, see above) must be excluded from scoring
+  entirely, not counted as seen-and-passing or seen-and-failing.
