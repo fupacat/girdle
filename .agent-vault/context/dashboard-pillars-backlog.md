@@ -56,7 +56,9 @@ so the record of what was considered and why survives.
   `ci_gating` vs. `tests` - [issue #81](https://github.com/fupacat/girdle/issues/81);
   `reproducibility` lockfile drift - [issue #82](https://github.com/fupacat/girdle/issues/82);
   `precommit` vs. CI - [issue #83](https://github.com/fupacat/girdle/issues/83).
-  All unassigned, depend on #74.
+  Reproducibility drift compares Python names using PEP 503 normalization
+  and excludes npm `peerDependencies`, which are not reliably represented
+  as locked root dependencies. All unassigned, depend on #74.
 - [in-progress] LICENSE presence/adequate/aligned, including the
   `licensee`-style deterministic license-text fingerprinting question -
   [issue #84](https://github.com/fupacat/girdle/issues/84), unassigned

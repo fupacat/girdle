@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 
+from girdle.checks import CHECK_REGISTRY, CheckEntry
 from girdle.hygiene import HygieneResult
 from girdle.platform import PlatformResult
 from girdle.tiers import CategoryResult, Tier
@@ -99,6 +100,75 @@ class ScanResult:
     hygiene: HygieneResult | None = None
     active_harm: ActiveHarmResult | None = None
 
+    def _check_passed(self, entry: CheckEntry) -> bool | None:
+        tiers: list[Tier] = []
+        for eco in self.ecosystems:
+            cat = eco.categories.get(entry.key)
+            if cat is not None and entry.key in eco.applicable_categories:
+                tiers.append(cat.tier)
+                continue
+            for category in entry.categories:
+                if category not in eco.applicable_categories:
+                    continue
+                cat = eco.categories.get(category)
+                if cat is None:
+                    continue
+                tiers.append(cat.tier)
+        if self.hygiene is not None:
+            cat = self.hygiene.checks.get(entry.key)
+            if cat is not None:
+                tiers.append(cat.tier)
+        if not tiers:
+            return None
+        return all(tier >= Tier.CONFIGURED for tier in tiers)
+
+    @property
+    def category_percentages(self) -> dict[str, float | None]:
+        categories: list[str] = []
+        seen: set[str] = set()
+        for entry in CHECK_REGISTRY.values():
+            for category in entry.categories:
+                if category in seen:
+                    continue
+                categories.append(category)
+                seen.add(category)
+
+        totals = {category: 0 for category in categories}
+        passed = {category: 0 for category in categories}
+
+        for entry in CHECK_REGISTRY.values():
+            check_passed = self._check_passed(entry)
+            if check_passed is None:
+                continue
+            for category in entry.categories:
+                totals[category] += 1
+                if check_passed:
+                    passed[category] += 1
+
+        return {
+            category: (
+                round((passed[category] / totals[category]) * 100, 2)
+                if totals[category]
+                else None
+            )
+            for category in categories
+        }
+
+    @property
+    def overall_percentage(self) -> float | None:
+        total = 0
+        passed = 0
+        for entry in CHECK_REGISTRY.values():
+            check_passed = self._check_passed(entry)
+            if check_passed is None:
+                continue
+            total += 1
+            if check_passed:
+                passed += 1
+        if total == 0:
+            return None
+        return round((passed / total) * 100, 2)
+
     @property
     def overall_min(self) -> int:
         return min((e.category_min for e in self.ecosystems), default=0)
@@ -135,6 +205,8 @@ class ScanResult:
                 "overall_min": self.overall_min,
                 "overall_avg": self.overall_avg,
                 "has_active_harm": has_active_harm,
+                "category_percentages": self.category_percentages,
+                "overall_percentage": self.overall_percentage,
             },
             "warnings": self.warnings,
             "platform": self.platform.to_dict() if self.platform is not None else None,
