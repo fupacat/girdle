@@ -54,6 +54,19 @@ NOTE_TYPES = (
 # of these is a configuration error, not something check() should enforce.
 POINT_IN_TIME_TYPES = ("decision", "research", "brainstorm")
 
+# Maps each declared type to the subfolder it must live in under .agent-vault/.
+FOLDER_FOR_TYPE: dict[str, str] = {
+    "decision": "decisions",
+    "context": "context",
+    "research": "research",
+    "brainstorm": "brainstorm",
+    "data-model": "data-models",
+    "diagram": "diagrams",
+    "ci": "ci",
+    "environment": "environment",
+    "deployment": "deployment",
+}
+
 
 class DanglingWatchError(Exception):
     """Raised by reconcile()/ack() when asked to record a hash for a watch
@@ -267,6 +280,26 @@ def check(root: Path) -> CheckResult:
     result = CheckResult()
     for note in load_all_notes(root):
         rel = _note_rel(root, note)
+
+        if note.type is not None and note.type not in NOTE_TYPES:
+            result.blocking.append(
+                f"{rel}: unrecognized type '{note.type}' "
+                f"(expected one of: {', '.join(NOTE_TYPES)})"
+            )
+            continue
+
+        if note.type is not None:
+            expected_folder = FOLDER_FOR_TYPE[note.type]
+            # The note must live directly inside .agent-vault/<folder>/
+            # (not in a sub-subfolder of it - just check the parent name).
+            actual_folder = note.file_path.parent.name
+            if actual_folder != expected_folder:
+                result.blocking.append(
+                    f"{rel}: type '{note.type}' should be in "
+                    f".agent-vault/{expected_folder}/ but found in "
+                    f".agent-vault/{actual_folder}/"
+                )
+                continue
 
         if note.type in POINT_IN_TIME_TYPES and note.watches:
             result.blocking.append(
