@@ -1,10 +1,12 @@
-name: Auto-assign unblocked issues to Copilot
+name: Sync issue status and auto-assign Copilot
 
 on:
   schedule:
     - cron: "*/30 * * * *"   # every 30 minutes
+  issues:
+    types: [opened, reopened, closed]
   pull_request:
-    types: [closed]           # faster path: a merge may unblock something
+    types: [opened, reopened, ready_for_review, converted_to_draft, closed]
 
 permissions:
   contents: read
@@ -13,10 +15,8 @@ permissions:
 jobs:
   assign:
     runs-on: ubuntu-latest
-    # For pull_request events only run when the PR was actually merged
-    if: github.event_name == 'schedule' || github.event.pull_request.merged == true
     steps:
-      - name: Find and assign unblocked issues
+      - name: Sync dependency status and assign unblocked issues
         uses: actions/github-script@v9
         env:
           COPILOT_ASSIGN_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
@@ -27,9 +27,10 @@ jobs:
           script: |
             if (!process.env.COPILOT_ASSIGN_TOKEN) {
               core.warning(
-                "COPILOT_ASSIGN_TOKEN is not configured; skipping Copilot auto-assignment. " +
+                "COPILOT_ASSIGN_TOKEN is not configured; " +
+                "skipping issue status sync and Copilot auto-assignment. " +
                 "Set a user token with metadata:read plus read/write access to " +
-                "actions, contents, issues, and pull requests.",
+                "actions, contents, issues, pull requests, and repository projects.",
               );
               return;
             }
@@ -37,15 +38,48 @@ jobs:
             const copilotGitHub = getOctokit(process.env.COPILOT_ASSIGN_TOKEN);
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
+            const projectNumber = 3;
+            const projectStatusFieldName = "Status";
+            const desiredStatusLabels = [
+              "status:blocked",
+              "status:ready",
+              "status:blocker",
+            ];
+
+            const errorMessages = (err) => [
+              err.message,
+              ...(Array.isArray(err.errors) ? err.errors.map(e => e?.message) : []),
+              typeof err.data === "string" ? err.data : "",
+            ].filter(Boolean);
+
+            const isTokenScopeError = (err) => {
+              const messages = errorMessages(err);
+              const text = messages.join("\n");
+              const rateLimited = /rate limit/i.test(text);
+              return (
+                (err.status === 403 && !rateLimited) ||
+                text.includes("Resource not accessible by personal access token") ||
+                text.includes("Resource not accessible by integration")
+              );
+            };
+
+            const throwScopeError = (operation, err) => {
+              throw new Error(
+                "COPILOT_ASSIGN_TOKEN is configured but lacks GitHub's required " +
+                `permissions for ${operation} ` +
+                "(metadata:read plus read/write actions, contents, issues, " +
+                "pull requests, and repository projects). " +
+                `GitHub responded: ${errorMessages(err).join(" | ")}`,
+              );
+            };
 
             // ------------------------------------------------------------------
-            // 1. Discover the assignable node-id of the copilot-swe-agent
-            //    actor via suggestedActors(capabilities: [CAN_BE_ASSIGNED]).
+            // 1. Discover repo metadata needed for assignment, labels, and the
+            //    linked repository project board.
             // ------------------------------------------------------------------
-            const repoNodeQuery = `
-              query($owner: String!, $repo: String!) {
+            const bootstrapQuery = `
+              query($owner: String!, $repo: String!, $projectNumber: Int!) {
                 repository(owner: $owner, name: $repo) {
-                  id
                   suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 100) {
                     nodes {
                       __typename
@@ -54,6 +88,46 @@ jobs:
                       ... on User { id }
                       ... on Organization { id }
                       ... on Mannequin { id }
+                    }
+                  }
+                  labels(first: 100) {
+                    nodes {
+                      id
+                      name
+                    }
+                  }
+                }
+                user(login: $owner) {
+                  projectV2(number: $projectNumber) {
+                    id
+                    fields(first: 50) {
+                      nodes {
+                        ... on ProjectV2SingleSelectField {
+                          id
+                          name
+                          options {
+                            id
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                organization(login: $owner) {
+                  projectV2(number: $projectNumber) {
+                    id
+                    fields(first: 50) {
+                      nodes {
+                        ... on ProjectV2SingleSelectField {
+                          id
+                          name
+                          options {
+                            id
+                            name
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -65,10 +139,13 @@ jobs:
                 'coding_agent_model_selection',
               ].join(','),
             };
-            const repoData = await copilotGitHub.graphql(repoNodeQuery, {
-              owner, repo, headers: copilotHeaders,
+            const bootstrap = await copilotGitHub.graphql(bootstrapQuery, {
+              owner,
+              repo,
+              projectNumber,
+              headers: copilotHeaders,
             });
-            const suggested = repoData.repository.suggestedActors.nodes;
+            const suggested = bootstrap.repository.suggestedActors.nodes;
             const copilotActor = suggested.find(a => a.login === "copilot-swe-agent");
             if (!copilotActor) {
               core.warning("copilot-swe-agent not found in suggestedActors – skipping.");
@@ -82,12 +159,74 @@ jobs:
               return;
             }
             const copilotId = copilotActor.id;
+            const labelIdsByName = new Map(
+              bootstrap.repository.labels.nodes.map(label => [label.name, label.id]),
+            );
+            const project =
+              bootstrap.user?.projectV2 ??
+              bootstrap.organization?.projectV2 ??
+              null;
+            const statusField =
+              project?.fields?.nodes?.find(field => field?.name === projectStatusFieldName) ??
+              null;
+            const statusOptionIdsByName = new Map(
+              (statusField?.options ?? []).map(option => [option.name, option.id]),
+            );
 
             core.info(`Copilot actor id: ${copilotId}`);
+            if (!project) {
+              core.warning(
+                `Project #${projectNumber} was not found for ${owner}; ` +
+                "skipping project status sync.",
+              );
+            } else if (!statusField) {
+              core.warning(
+                `Project #${projectNumber} is missing a '${projectStatusFieldName}' field; ` +
+                "skipping project status sync.",
+              );
+            }
 
             // ------------------------------------------------------------------
-            // 2. Fetch all open, unassigned issues (paginate with cursor).
+            // 2. Fetch all open issues (paginate with cursor) so dependency
+            //    labels, project Status, and auto-assignment all use the same
+            //    snapshot.
             // ------------------------------------------------------------------
+            const issueFields = `
+              id
+              number
+              title
+              state
+              assignees(first: 1) {
+                totalCount
+              }
+              labels(first: 100) {
+                nodes {
+                  id
+                  name
+                }
+              }
+              blockedBy(first: 100) {
+                nodes { number state }
+                pageInfo { hasNextPage endCursor }
+              }
+              blocking(first: 100) {
+                nodes { number state }
+                pageInfo { hasNextPage endCursor }
+              }
+              linkedPullRequests(first: 100) {
+                nodes { number state isDraft }
+                pageInfo { hasNextPage endCursor }
+              }
+              projectItems(first: 100) {
+                nodes {
+                  id
+                  project {
+                    id
+                    number
+                  }
+                }
+              }
+            `;
             const issueQuery = `
               query($owner: String!, $repo: String!, $after: String) {
                 repository(owner: $owner, name: $repo) {
@@ -95,42 +234,24 @@ jobs:
                     states: [OPEN]
                     first: 100
                     after: $after
-                    filterBy: { assignee: null }
                   ) {
                     pageInfo { hasNextPage endCursor }
                     nodes {
-                      id
-                      number
-                      title
-                      blockedBy(first: 100) {
-                        nodes { number state }
-                        pageInfo { hasNextPage endCursor }
-                      }
+                      ${issueFields}
                     }
                   }
                 }
               }
             `;
-
-            let candidates = [];
-            let after = null;
-            while (true) {
-              const data = await copilotGitHub.graphql(issueQuery, { owner, repo, after });
-              const conn = data.repository.issues;
-              candidates = candidates.concat(conn.nodes);
-              if (!conn.pageInfo.hasNextPage) break;
-              after = conn.pageInfo.endCursor;
-            }
-
-            core.info(`Open unassigned issues found: ${candidates.length}`);
-
-            // ------------------------------------------------------------------
-            // 3. For each candidate, determine whether it is unblocked.
-            //    An issue is unblocked when its blockedBy list is empty OR
-            //    every issue in it is CLOSED.
-            //    If blockedBy itself was truncated (hasNextPage), we must
-            //    paginate to avoid missing a real open blocker.
-            // ------------------------------------------------------------------
+            const issueByNumberQuery = `
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  issue(number: $number) {
+                    ${issueFields}
+                  }
+                }
+              }
+            `;
             const blockedByQuery = `
               query($id: ID!, $after: String) {
                 node(id: $id) {
@@ -143,7 +264,67 @@ jobs:
                 }
               }
             `;
+            const blockingQuery = `
+              query($id: ID!, $after: String) {
+                node(id: $id) {
+                  ... on Issue {
+                    blocking(first: 100, after: $after) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes { number state }
+                    }
+                  }
+                }
+              }
+            `;
+            const linkedPullRequestsQuery = `
+              query($id: ID!, $after: String) {
+                node(id: $id) {
+                  ... on Issue {
+                    linkedPullRequests(first: 100, after: $after) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes { number state isDraft }
+                    }
+                  }
+                }
+              }
+            `;
 
+            let issuesToProcess = [];
+            let after = null;
+            while (true) {
+              const data = await copilotGitHub.graphql(issueQuery, { owner, repo, after });
+              const conn = data.repository.issues;
+              issuesToProcess = issuesToProcess.concat(conn.nodes);
+              if (!conn.pageInfo.hasNextPage) break;
+              after = conn.pageInfo.endCursor;
+            }
+
+            if (context.eventName === "issues" && context.payload.action === "closed") {
+              const closedIssueNumber = context.payload.issue?.number;
+              if (typeof closedIssueNumber === "number") {
+                const data = await copilotGitHub.graphql(issueByNumberQuery, {
+                  owner,
+                  repo,
+                  number: closedIssueNumber,
+                });
+                if (data.repository.issue) {
+                  issuesToProcess.push(data.repository.issue);
+                }
+              }
+            }
+
+            const seenIssueIds = new Set();
+            issuesToProcess = issuesToProcess.filter(issue => {
+              if (seenIssueIds.has(issue.id)) return false;
+              seenIssueIds.add(issue.id);
+              return true;
+            });
+
+            core.info(`Issues to evaluate: ${issuesToProcess.length}`);
+
+            // ------------------------------------------------------------------
+            // 3. Helpers for paginated issue connections and GitHub mutations.
+            // ------------------------------------------------------------------
             const assignMutation = `
               mutation($assignableId: ID!, $actorIds: [ID!]!) {
                 replaceActorsForAssignable(input: {
@@ -156,31 +337,221 @@ jobs:
                 }
               }
             `;
+            const addLabelsMutation = `
+              mutation($labelableId: ID!, $labelIds: [ID!]!) {
+                addLabelsToLabelable(input: {
+                  labelableId: $labelableId
+                  labelIds: $labelIds
+                }) {
+                  clientMutationId
+                }
+              }
+            `;
+            const removeLabelsMutation = `
+              mutation($labelableId: ID!, $labelIds: [ID!]!) {
+                removeLabelsFromLabelable(input: {
+                  labelableId: $labelableId
+                  labelIds: $labelIds
+                }) {
+                  clientMutationId
+                }
+              }
+            `;
+            const updateProjectStatusMutation = `
+              mutation(
+                $projectId: ID!
+                $itemId: ID!
+                $fieldId: ID!
+                $singleSelectOptionId: String!
+              ) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $singleSelectOptionId }
+                }) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }
+            `;
 
-            for (const issue of candidates) {
-              let blockers = issue.blockedBy.nodes;
-              let pageInfo = issue.blockedBy.pageInfo;
-
-              // Paginate if the first page was truncated
-              let cursor = issue.blockedBy.pageInfo.endCursor;
+            const loadConnection = async (initial, query, extract) => {
+              let nodes = initial.nodes;
+              let pageInfo = initial.pageInfo;
+              let cursor = initial.pageInfo.endCursor;
               while (pageInfo.hasNextPage) {
-                const more = await copilotGitHub.graphql(blockedByQuery, {
-                  id: issue.id,
+                const more = await copilotGitHub.graphql(query, {
+                  id: initial.id,
                   after: cursor,
                 });
-                const conn = more.node.blockedBy;
-                blockers = blockers.concat(conn.nodes);
+                const conn = extract(more);
+                nodes = nodes.concat(conn.nodes);
                 pageInfo = conn.pageInfo;
                 cursor = conn.pageInfo.endCursor;
               }
+              return nodes;
+            };
 
-              const hasOpenBlocker = blockers.some(b => b.state === "OPEN");
+            const syncLabels = async (issue, desiredLabelNames) => {
+              const currentStatusLabelNames = issue.labels.nodes
+                .map(label => label.name)
+                .filter(name => desiredStatusLabels.includes(name));
+              const desiredSet = new Set(desiredLabelNames);
+              const currentSet = new Set(currentStatusLabelNames);
+              const toAddIds = desiredLabelNames
+                .filter(name => !currentSet.has(name))
+                .map(name => labelIdsByName.get(name))
+                .filter(Boolean);
+              const toRemoveIds = currentStatusLabelNames
+                .filter(name => !desiredSet.has(name))
+                .map(name => labelIdsByName.get(name))
+                .filter(Boolean);
+
+              for (const labelName of desiredLabelNames) {
+                if (!labelIdsByName.has(labelName)) {
+                  core.warning(
+                    `Repo label '${labelName}' is missing; skipping for #${issue.number}.`,
+                  );
+                }
+              }
+
+              if (toAddIds.length > 0) {
+                await copilotGitHub.graphql(addLabelsMutation, {
+                  labelableId: issue.id,
+                  labelIds: toAddIds,
+                });
+              }
+              if (toRemoveIds.length > 0) {
+                await copilotGitHub.graphql(removeLabelsMutation, {
+                  labelableId: issue.id,
+                  labelIds: toRemoveIds,
+                });
+              }
+            };
+
+            const syncProjectStatus = async (issue, desiredStatus) => {
+              if (!project || !statusField) return;
+              const item = issue.projectItems.nodes.find(
+                projectItem => projectItem.project.number === projectNumber,
+              );
+              if (!item) {
+                core.info(
+                  `Issue #${issue.number} is not on project #${projectNumber}; ` +
+                  "skipping status sync.",
+                );
+                return;
+              }
+              const optionId = statusOptionIdsByName.get(desiredStatus);
+              if (!optionId) {
+                core.warning(
+                  `Project #${projectNumber} is missing Status option '${desiredStatus}'; ` +
+                  `skipping #${issue.number}.`,
+                );
+                return;
+              }
+              await copilotGitHub.graphql(updateProjectStatusMutation, {
+                projectId: project.id,
+                itemId: item.id,
+                fieldId: statusField.id,
+                singleSelectOptionId: optionId,
+              });
+            };
+
+            const desiredProjectStatus = (issueState, hasOpenBlocker, openPullRequests) => {
+              if (issueState !== "OPEN") return "Done";
+              if (hasOpenBlocker) return "Blocked";
+              if (openPullRequests.some(pr => !pr.isDraft)) return "In Review";
+              if (openPullRequests.some(pr => pr.isDraft)) return "In Progress";
+              return "Ready";
+            };
+
+            // ------------------------------------------------------------------
+            // 4. Sync dependency labels + project Status, then assign any issue
+            //    that is still unblocked, unassigned, and not already tied to an
+            //    open PR.
+            // ------------------------------------------------------------------
+            for (const issue of issuesToProcess) {
+              const connectionContext = {
+                id: issue.id,
+                nodes: issue.blockedBy.nodes,
+                pageInfo: issue.blockedBy.pageInfo,
+              };
+              const blockers = await loadConnection(
+                connectionContext,
+                blockedByQuery,
+                data => data.node.blockedBy,
+              );
+              const blocking = await loadConnection(
+                {
+                  id: issue.id,
+                  nodes: issue.blocking.nodes,
+                  pageInfo: issue.blocking.pageInfo,
+                },
+                blockingQuery,
+                data => data.node.blocking,
+              );
+              const linkedPullRequests = await loadConnection(
+                {
+                  id: issue.id,
+                  nodes: issue.linkedPullRequests.nodes,
+                  pageInfo: issue.linkedPullRequests.pageInfo,
+                },
+                linkedPullRequestsQuery,
+                data => data.node.linkedPullRequests,
+              );
+
+              const openBlockers = blockers.filter(b => b.state === "OPEN");
+              const openBlocking = blocking.filter(b => b.state === "OPEN");
+              const openPullRequests = linkedPullRequests.filter(pr => pr.state === "OPEN");
+              const hasOpenBlocker = openBlockers.length > 0;
+              const desiredLabels = [];
+              if (issue.state === "OPEN") {
+                desiredLabels.push(hasOpenBlocker ? "status:blocked" : "status:ready");
+                if (openBlocking.length > 0) {
+                  desiredLabels.push("status:blocker");
+                }
+              }
+
+              try {
+                await syncLabels(issue, desiredLabels);
+                await syncProjectStatus(
+                  issue,
+                  desiredProjectStatus(issue.state, hasOpenBlocker, openPullRequests),
+                );
+              } catch (err) {
+                if (isTokenScopeError(err)) {
+                  throwScopeError("issue status sync", err);
+                }
+                core.warning(
+                  `Failed to sync labels/project status for #${issue.number}: ` +
+                  errorMessages(err).join(" | "),
+                );
+              }
+
+              if (issue.state !== "OPEN") {
+                continue;
+              }
               if (hasOpenBlocker) {
-                const openNums = blockers
-                  .filter(b => b.state === "OPEN")
+                const openNums = openBlockers
                   .map(b => "#" + b.number)
                   .join(", ");
                 core.info(`Issue #${issue.number} still blocked (${openNums})`);
+                continue;
+              }
+              if (openPullRequests.length > 0) {
+                const openPrNums = openPullRequests
+                  .map(pr => "#" + pr.number)
+                  .join(", ");
+                core.info(
+                  `Issue #${issue.number} already has open linked PR(s) ` +
+                  `(${openPrNums}) – not assigning`,
+                );
+                continue;
+              }
+              if (issue.assignees.totalCount > 0) {
+                core.info(`Issue #${issue.number} already assigned – not reassigning`);
                 continue;
               }
 
@@ -193,28 +564,13 @@ jobs:
                 });
                 core.info(`Assigned #${issue.number} to copilot-swe-agent`);
               } catch (err) {
-                const errorMessages = [
-                  err.message,
-                  ...(Array.isArray(err.errors) ? err.errors.map(e => e?.message) : []),
-                  typeof err.data === "string" ? err.data : "",
-                ].filter(Boolean);
-                const errorText = errorMessages.join("\n");
-                const rateLimited = /rate limit/i.test(errorText);
-                const tokenScopeError =
-                  (err.status === 403 && !rateLimited) ||
-                  errorText.includes("Resource not accessible by personal access token") ||
-                  errorText.includes("Resource not accessible by integration");
-                if (tokenScopeError) {
+                if (isTokenScopeError(err)) {
                   // A mis-scoped token will fail every remaining assignment too, so
                   // abort the whole run loudly instead of downgrading it to per-issue noise.
-                  throw new Error(
-                    "COPILOT_ASSIGN_TOKEN is configured but lacks GitHub's required " +
-                    "permissions for Copilot issue assignment " +
-                    "(metadata:read plus read/write actions, contents, " +
-                    "issues, and pull requests). " +
-                    `GitHub responded: ${errorMessages.join(" | ")}`,
-                  );
+                  throwScopeError("Copilot issue assignment", err);
                 }
-                core.warning(`Failed to assign #${issue.number}: ${errorMessages.join(" | ")}`);
+                core.warning(
+                  `Failed to assign #${issue.number}: ${errorMessages(err).join(" | ")}`,
+                );
               }
             }

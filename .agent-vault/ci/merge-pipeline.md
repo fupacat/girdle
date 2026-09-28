@@ -139,12 +139,14 @@ Mergify's queue.
   ready. Recoverable with a direct `gh pr ready <PR>` call; no code
   change needed, this is a PR-state action same as the nudges above.
 - `.github/workflows/auto-assign-copilot.yml` (issue #85's auto-assignment
-  automation) needs a dedicated PAT in the `COPILOT_ASSIGN_TOKEN` secret,
-  not the default `GITHUB_TOKEN` - Copilot assignment via
-  `replaceActorsForAssignable` requires a token with **Read access to
-  metadata**, and **Read and Write access to actions, code, issues, and
-  pull requests**. Discovered the hard way across PRs #90/#92 (token
-  bootstrap and scope-error-handling fixes) rather than known upfront.
+  automation, later extended to sync issue dependency labels and Project
+  Status) needs a dedicated PAT in the `COPILOT_ASSIGN_TOKEN` secret, not
+  the default `GITHUB_TOKEN` - the workflow calls both
+  `replaceActorsForAssignable` and `updateProjectV2ItemFieldValue`, so the
+  token needs **Read access to metadata**, and **Read and Write access to
+  actions, code, issues, pull requests, and repository projects**.
+  Discovered incrementally across PRs #90/#92 (token bootstrap and
+  scope-error-handling fixes) rather than known upfront.
 - The required-approval story is now two different mechanisms depending on
   PR type (Mergify self-approve for safe Dependabot bumps vs. Gitar/Copilot
   review for everything else) rather than one uniform rule - documented
