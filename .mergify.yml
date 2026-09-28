@@ -170,6 +170,7 @@ queue_rules:
     checks_timeout: 30m
     queue_conditions:
       - author=dependabot[bot]
+      - -conflict
       - or:
           - dependabot-update-type=version-update:semver-patch
           - dependabot-update-type=version-update:semver-minor
@@ -197,13 +198,20 @@ queue_rules:
     # thing left to wait on. Kept in merge_conditions too as a safety
     # net: Dependabot could still push a new commit within the same
     # major line after entry, and dismiss_stale_reviews_on_push would
-    # dismiss the approval that got it in.
+    # dismiss the approval that got it in. -conflict is also in
+    # queue_conditions explicitly (not just relying on the pull_request_
+    # rule's one-shot entry check): a PR that's conflict-free when the
+    # queue action first fires can become conflicting later, once other
+    # PRs ahead of it in the train merge - queue_conditions is what
+    # Mergify re-evaluates continuously to decide whether a PR stays
+    # eligible, so this is what actually catches that case.
     branch_protection_injection_mode: none
     merge_bot_account: fupacat
     max_checks_retries: 1
     checks_timeout: 30m
     queue_conditions:
       - author=dependabot[bot]
+      - -conflict
       - dependabot-update-type=version-update:semver-major
       - "#approved-reviews-by>=1"
     merge_conditions:
@@ -224,5 +232,6 @@ queue_rules:
     # and lets this queue handle the actual merge.
     queue_conditions:
       - author!=dependabot[bot]
+      - -conflict
 merge_queue:
   max_parallel_checks: 7
