@@ -150,3 +150,29 @@ def test_applicable_missing_category_result_counts_as_failing(monkeypatch):
     score = result.to_dict()["summary"]["category_scores"]["tests"]
     assert score["passed"] == 0
     assert score["outstanding"] == ["tests"]
+
+
+def test_hygiene_and_ecosystem_contributions_both_count(monkeypatch):
+    monkeypatch.setattr(
+        schema_mod,
+        "CHECK_REGISTRY",
+        {"shared": CheckEntry("shared", ("cat",), Difficulty.BASIC)},
+    )
+    eco = EcosystemResult(
+        id="py-pip",
+        language="python",
+        toolchain="pip",
+        root=".",
+        categories={},
+        applicable_categories=["shared"],
+    )
+    result = ScanResult(
+        repo_root=".",
+        scanned_at="now",
+        mode="static",
+        ecosystems=[eco],
+        hygiene=HygieneResult(checks={"shared": CategoryResult(Tier.CONFIGURED)}),
+    )
+    checks = result.to_dict()["checks"]["shared"]
+    assert checks["passed"] is False
+    assert checks["failing_in"] == ["py-pip"]

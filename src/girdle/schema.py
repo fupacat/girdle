@@ -23,11 +23,6 @@ BADGE_BY_DIFFICULTY = {
     Difficulty.INTERMEDIATE: "silver",
     Difficulty.ADVANCED: "gold",
 }
-DIFFICULTY_RANK = {
-    Difficulty.BASIC: 0,
-    Difficulty.INTERMEDIATE: 1,
-    Difficulty.ADVANCED: 2,
-}
 
 
 @dataclass
@@ -109,18 +104,13 @@ class ScanResult:
             if entry.reserved:
                 continue
 
-            if self.hygiene is not None and key in self.hygiene.checks:
-                passed = self.hygiene.checks[key].tier >= Tier.CONFIGURED
-                statuses[key] = {
-                    "passed": passed,
-                    "difficulty": entry.difficulty.value,
-                    "categories": list(entry.categories),
-                    "failing_in": [] if passed else ["hygiene"],
-                }
-                continue
-
             seen_in: list[str] = []
             failing_in: list[str] = []
+            if self.hygiene is not None and key in self.hygiene.checks:
+                seen_in.append("hygiene")
+                if self.hygiene.checks[key].tier < Tier.CONFIGURED:
+                    failing_in.append("hygiene")
+
             for eco in self.ecosystems:
                 cat = eco.categories.get(key)
                 if key in eco.applicable_categories:
