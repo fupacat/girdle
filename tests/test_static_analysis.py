@@ -76,11 +76,11 @@ def test_run_scan_surfaces_static_analysis_category(tmp_path: Path):
     assert eco.categories["static_analysis"].tier == Tier.CONFIGURED
 
 
-def test_run_scan_keeps_static_analysis_applicable_when_absent(tmp_path: Path):
+def test_run_scan_excludes_static_analysis_from_applicable_when_absent(tmp_path: Path):
     (tmp_path / "requirements.txt").write_text("pytest==8.0.0\n")
 
     result = run_scan(tmp_path)
 
     eco = result.ecosystems[0]
-    assert "static_analysis" in eco.applicable_categories
+    assert "static_analysis" not in eco.applicable_categories
     assert eco.categories["static_analysis"].tier == Tier.ABSENT
