@@ -200,10 +200,11 @@ def _ci_tool_names(root: Path) -> set[str]:
         r"\b.*\b(?:install|add|sync)\b"
     )
     ci_lines = [
-        line
+        segment
         for text in ci_texts
         for line in text.splitlines()
-        if not install_pattern.search(line)
+        for segment in re.split(r"&&|\|\||;|\|", line)
+        if not install_pattern.search(segment)
     ]
     found: set[str] = set()
     for tool, pattern in _CI_TOOL_PATTERNS.items():
