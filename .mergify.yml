@@ -63,11 +63,8 @@ pull_request_rules:
         name: Dependabot
 
   - name: label major Dependabot updates for manual review
-    # Major bumps carry real breaking-change risk - flag them for a
-    # reviewer to actually read the release notes and weigh them against
-    # how the dependency is used here, rather than a blanket
-    # auto-approve. See "queue major Dependabot updates pending review"
-    # below for how they merge once that real review lands.
+    # Major bumps carry real breaking-change risk - leave them for a human
+    # to look at and merge explicitly, rather than auto-merging.
     conditions:
       - author=dependabot[bot]
       - dependabot-update-type=version-update:semver-major
@@ -75,30 +72,6 @@ pull_request_rules:
       label:
         add:
           - dependency-major-review
-
-  - name: queue major Dependabot updates pending review
-    # Unlike the patch/minor/security rule above, this does NOT
-    # auto-approve - #approved-reviews-by>=1 has to come from an actual
-    # reviewer (Gitar, Copilot, or a human) reading the major version's
-    # release notes against this repo's actual usage, not Mergify
-    # rubber-stamping it. Gated here at queue *entry*, not left to
-    # merge_conditions: Mergify's queues form one ordered train across
-    # every queue_rules entry, not independent parallel queues - an
-    # unapproved PR sitting in Dependabot-major (which ranks ahead of
-    # default) would block every PR behind it queue-wide, indefinitely,
-    # since nothing times out a PR still waiting on review. Requiring
-    # the approval before entry means this queue only ever holds PRs
-    # that are already realistically about to merge - see
-    # Dependabot-major's checks_timeout for why a bounded wait is safe
-    # again once entry already implies a real review happened.
-    conditions:
-      - author=dependabot[bot]
-      - -conflict
-      - dependabot-update-type=version-update:semver-major
-      - "#approved-reviews-by>=1"
-    actions:
-      queue:
-        name: Dependabot-major
 
   - name: queue development PRs
     # Non-Dependabot PRs (human-authored, or agent-authored like this
@@ -135,50 +108,10 @@ queue_rules:
     branch_protection_injection_mode: merge
     queue_conditions:
       - author=dependabot[bot]
-      - -conflict
       - or:
           - dependabot-update-type=version-update:semver-patch
           - dependabot-update-type=version-update:semver-minor
           - dependabot-update-type=security
-    merge_conditions:
-      - check-success=test
-      - check-success=SonarCloud Code Analysis
-      - check-success=Gitar
-      - "#approved-reviews-by>=1"
-
-  - name: Dependabot-major
-    # Same draft_pr/merge_bot_account setup as the Dependabot queue
-    # above (major bumps have the same Gitar/SonarCloud-don't-run-on-
-    # Dependabot's-own-branch problem). #approved-reviews-by>=1 is
-    # required at entry (queue_conditions), not just the merge gate -
-    # Mergify's queues form one ordered train across every queue_rules
-    # entry, so an unapproved PR sitting here (ranked ahead of default)
-    # would otherwise block every PR behind it, queue-wide, with no
-    # timeout to clear it (caught live by Gitar's review on #58). No
-    # auto-approve rule feeds this condition (see "queue major
-    # Dependabot updates pending review"), so entry only happens once a
-    # real reviewer has actually looked at the release notes - which
-    # means checks_timeout can go back to a CI-scaled bound like the
-    # Dependabot queue's, since by the time a PR is here CI is the only
-    # thing left to wait on. Kept in merge_conditions too as a safety
-    # net: Dependabot could still push a new commit within the same
-    # major line after entry, and dismiss_stale_reviews_on_push would
-    # dismiss the approval that got it in. -conflict is also in
-    # queue_conditions explicitly (not just relying on the pull_request_
-    # rule's one-shot entry check): a PR that's conflict-free when the
-    # queue action first fires can become conflicting later, once other
-    # PRs ahead of it in the train merge - queue_conditions is what
-    # Mergify re-evaluates continuously to decide whether a PR stays
-    # eligible, so this is what actually catches that case.
-    branch_protection_injection_mode: none
-    merge_bot_account: fupacat
-    max_checks_retries: 1
-    checks_timeout: 30m
-    queue_conditions:
-      - author=dependabot[bot]
-      - -conflict
-      - dependabot-update-type=version-update:semver-major
-      - "#approved-reviews-by>=1"
     merge_conditions:
       - check-success=test
       - check-success=SonarCloud Code Analysis
@@ -197,6 +130,7 @@ queue_rules:
     # and lets this queue handle the actual merge.
     queue_conditions:
       - author!=dependabot[bot]
-      - -conflict
 merge_queue:
   max_parallel_checks: 7
+merge_protections_settings:
+  auto_merge_conditions: true
