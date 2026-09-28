@@ -6,8 +6,8 @@ top-level section, same pattern as platform.py, and for the same reason:
 it's a different kind of signal, not blended into overall_min/overall_avg.
 
 Most checks are local file reads only. LICENSE scoring is the one exception:
-it is visibility-conditional, so it first uses GitHub Actions'
-``GITHUB_REPOSITORY_VISIBILITY`` env var when available and otherwise makes a
+it is visibility-conditional, so it checks the ``GITHUB_REPOSITORY_VISIBILITY``
+environment variable, then the GitHub Actions event payload, before making a
 best-effort ``gh repo view --json visibility`` probe. If visibility can't be
 determined, the check renders as not applicable rather than guessing.
 """
@@ -56,6 +56,13 @@ def _detect_repo_visibility(root: Path) -> str | None:
     visibility = os.environ.get(REPO_VISIBILITY_ENV, "").strip().casefold()
     if visibility in VISIBILITY_VALUES:
         return visibility
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    if event_path:
+        event = _read_json(Path(event_path)) or {}
+        repo = event.get("repository") if isinstance(event, dict) else None
+        vis = str((repo or {}).get("visibility") or "").casefold()
+        if vis in VISIBILITY_VALUES:
+            return vis
     if shutil.which("gh") is None:
         return None
     try:
@@ -231,20 +238,13 @@ LICENSE_SIGNATURES = {
     ),
 }
 LICENSE_ALIASES = {
-    "mit": "MIT",
-    "mit license": "MIT",
-    "apache 2 0": "Apache-2.0",
-    "apache license 2 0": "Apache-2.0",
-    "apache-2.0": "Apache-2.0",
-    "isc": "ISC",
-    "isc license": "ISC",
-    "bsd-2-clause": "BSD-2-Clause",
-    "bsd 2 clause": "BSD-2-Clause",
-    "bsd-3-clause": "BSD-3-Clause",
-    "bsd 3 clause": "BSD-3-Clause",
-    "mpl-2.0": "MPL-2.0",
-    "mozilla public license 2 0": "MPL-2.0",
-    "unlicense": "Unlicense",
+    _normalize_text(k): v for k, v in {
+        "MIT": "MIT", "MIT License": "MIT", "Apache-2.0": "Apache-2.0",
+        "Apache License 2.0": "Apache-2.0", "ISC": "ISC", "ISC License": "ISC",
+        "BSD-2-Clause": "BSD-2-Clause", "BSD-3-Clause": "BSD-3-Clause",
+        "MPL-2.0": "MPL-2.0", "Mozilla Public License 2.0": "MPL-2.0",
+        "Unlicense": "Unlicense",
+    }.items()
 }
 
 MIN_NONTRIVIAL_CHARS = 40
