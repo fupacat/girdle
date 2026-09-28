@@ -114,15 +114,15 @@ def check_precommit(root: Path) -> CategoryResult:
                 "Add a .pre-commit-config.yaml to run fast local checks before commits."
             ),
         )
-    hook_ids = _precommit_hook_ids(root)
+    hook_values = _precommit_hook_values(root)
     ci_tools = _ci_tool_names(root)
-    # A tool found in CI but absent from every pre-commit hook id is a parity gap:
+    # A tool found in CI but absent from every pre-commit hook id or entry is a parity gap:
     # local commits silently under-enforce what CI actually gates on.
     missing = sorted(
         tool for tool in ci_tools
         if not any(
-            hook_id == tool or hook_id.startswith(tool + "-")
-            for hook_id in hook_ids
+            re.search(rf"\b{re.escape(tool)}\b", hook_value)
+            for hook_value in hook_values
         )
     )
     if missing:
@@ -159,20 +159,27 @@ _CI_TOOL_PATTERNS: dict[str, str] = {
 }
 
 
-def _precommit_hook_ids(root: Path) -> set[str]:
-    """Return the set of all hook ``id`` values in .pre-commit-config.yaml."""
+def _precommit_hook_values(root: Path) -> set[str]:
+    """Return hook ids and entries from .pre-commit-config.yaml."""
     text = _read_text(root / ".pre-commit-config.yaml") or ""
     try:
         data = yaml.safe_load(text) or {}
     except yaml.YAMLError:
         return set()
-    ids: set[str] = set()
+    if not isinstance(data, dict):
+        return set()
+    values: set[str] = set()
     for repo in data.get("repos") or []:
+        if not isinstance(repo, dict):
+            continue
         for hook in repo.get("hooks") or []:
-            hook_id = hook.get("id")
-            if hook_id:
-                ids.add(hook_id)
-    return ids
+            if not isinstance(hook, dict):
+                continue
+            for key in ("id", "entry"):
+                value = hook.get(key)
+                if isinstance(value, str):
+                    values.add(value)
+    return values
 
 
 def _ci_tool_names(root: Path) -> set[str]:
@@ -188,9 +195,19 @@ def _ci_tool_names(root: Path) -> set[str]:
         text = _read_text(root / alt)
         if text:
             ci_texts.append(text)
+    install_pattern = re.compile(
+        r"\b(?:pip|npm|npx|yarn|pnpm|uv|poetry|pipenv|conda|cargo|gem|bundle|dotnet)"
+        r"\b.*\b(?:install|add|sync)\b"
+    )
+    ci_lines = [
+        line
+        for text in ci_texts
+        for line in text.splitlines()
+        if not install_pattern.search(line)
+    ]
     found: set[str] = set()
     for tool, pattern in _CI_TOOL_PATTERNS.items():
-        if any(re.search(pattern, t) for t in ci_texts):
+        if any(re.search(pattern, line) for line in ci_lines):
             found.add(tool)
     return found
 
@@ -254,14 +271,13 @@ def _codex_local_environment_configured(root: Path) -> bool:
     return codex_dir.is_dir() and any(codex_dir.iterdir())
 
 
-def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> CategoryResult:
+def check_agent_sandbox_bootstrap(root: Path) -> CategoryResult:
     """Whether an agent's isolated execution sandbox (GitHub Copilot coding
     agent, Claude Code cloud/worktree sessions, OpenAI Codex's local
     desktop environment) gets wired into the same local enforcement
-    pre-commit gives a human contributor. Conditional on pre-commit itself
-    being configured - same shape as scan.py's coverage gate check: nothing
-    to bootstrap into an empty sandbox otherwise, so checking this in
-    isolation would be noise, not a finding.
+    pre-commit gives a human contributor. Conditional on the config file's
+    presence: there is nothing to bootstrap into an empty sandbox otherwise,
+    so checking this in isolation would be noise, not a finding.
 
     Codex's *cloud* environment setup script is deliberately not checked -
     it's configured through OpenAI's own web UI
@@ -269,7 +285,7 @@ def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> Cate
     so it's invisible to a local file scan and would be dishonest to score.
     The local desktop environment (.codex/) is different and is checked.
     """
-    if precommit.tier != Tier.CONFIGURED:
+    if not (root / ".pre-commit-config.yaml").exists():
         return CategoryResult(
             Tier.ABSENT,
             reason=(
@@ -415,7 +431,7 @@ def build_hygiene(root: Path, languages: set[str]) -> HygieneResult:
             "editorconfig": check_editorconfig(root),
             "gitattributes": check_gitattributes(root),
             "precommit": precommit,
-            "agent_sandbox_bootstrap": check_agent_sandbox_bootstrap(root, precommit),
+            "agent_sandbox_bootstrap": check_agent_sandbox_bootstrap(root),
             "gitignore": check_gitignore(root, languages),
             "codeowners": check_codeowners(root),
             "agent_instructions": check_agent_instructions(root),
