@@ -33,7 +33,6 @@ src/girdle/checks.py | python | 88L | Difficulty, CheckEntry, checks_by_difficul
 src/girdle/cli.py | python | 409L | main, scan, dashboard, badge, index, align, audit_cmd, _print_audit_human, _print_category, _print_ecosystem, _print_summary, _print_human, _print_hygiene, _print_platform, notes, notes_check, notes_ack, notes_index
 src/girdle/coverage_gate.py | python | 141L | _ci_texts, _first_existing_name, _codecov_gate, _sonar_gate, _diff_cover_gate, _gate_in_text, detect_gate
 src/girdle/coverage_parse.py | python | 45L | _first_match, parse_percentage
-src/girdle/dashboard.py | python | 24L | render_dashboard
 src/girdle/detectors/_util.py | python | 63L | read_json, read_toml, read_text, scan_ci
 src/girdle/detectors/base.py | python | 44L | Fingerprint, Detector
 src/girdle/detectors/js_common.py | python | 151L | _install_verb, detect_variants, scan_tests, scan_lint, scan_coverage, scan_ci, is_lockfile_gitignored, run_commands
@@ -71,11 +70,11 @@ tests/test_recommendations.py | python | 86L | test_python_pip_recommendation_na
 tests/test_runner.py | python | 32L | test_missing_binary_is_not_ran, test_successful_command, test_failing_command, test_timeout
 tests/test_rust.py | python | 46L | test_detect_none_without_cargo_toml, test_bin_crate_missing_lock_is_absent_and_applicable, test_lib_crate_missing_lock_is_excluded_from_applicable, test_lib_crate_with_committed_lock_is_applicable_and_configured, test_inline_test_detected
 tests/test_scan_verify.py | python | 60L | _FakeDetector, _fp, test_verify_upgrades_to_verified_on_success, test_verify_keeps_configured_on_failure, test_verify_skips_absent_categories, test_verify_noop_without_run_commands, test_verify_static_mode_adds_generic_hint_not_execution
-tests/test_scoring.py | python | 65L | _eco, test_category_min_is_gated_by_weakest, test_inapplicable_categories_excluded_from_min, test_scan_result_overall_min_is_weakest_ecosystem, test_percentages_multi_category_and_overall_distinct
+tests/test_scoring.py | python | 76L | _eco, test_category_min_is_gated_by_weakest, test_inapplicable_categories_excluded_from_min, test_scan_result_overall_min_is_weakest_ecosystem, test_percentages_multi_category_and_overall_distinct, test_overall_percentage_none_when_no_applicable_checks
 tests/test_util_scan_ci.py | python | 52L | test_github_actions_match, test_gitlab_fallback, test_azure_fallback, test_absent_when_no_ci, test_no_match_in_workflow, test_gradle_pattern_matches_gradlew_and_gradle
 tests/test_vault.py | python | 375L | _git, _init_repo, _write_example, _write_note, test_load_note_parses_frontmatter, test_current_hash_symbol_level, test_current_hash_missing_symbol_is_none, test_current_hash_file_level_no_symbol, test_load_all_notes_skips_reserved_names, test_ack_records_current_hash_and_stages, test_check_blocks_when_note_not_updated, test_check_auto_reconciles_when_note_staged_too, test_check_skips_notes_without_watches, test_check_does_not_reconcile_when_only_stale_marker_was_staged, test_reconcile_raises_on_dangling_watch, test_ack_raises_on_dangling_watch, test_check_blocks_dangling_watch_even_when_note_staged, test_check_blocks_point_in_time_type_with_watches, test_ack_resolves_relative_root_and_note_path, test_render_vault_index, test_load_note_without_frontmatter, test_load_all_notes_no_vault_dir, test_current_hash_unsupported_extension_with_symbol, test_check_leaves_unchanged_notes_alone, test_check_auto_reconciles_brand_new_note_never_committed, test_inject_vault_index_separator_variants, test_inject_vault_index_creates_and_replaces_block
 tests/test_vendor_exclusion.py | python | 49L | test_python_ignores_test_files_inside_venv, test_python_still_finds_real_top_level_tests, test_go_ignores_test_files_inside_vendor, test_rust_ignores_rs_files_inside_target
-# ... truncated to fit 4000-token budget (49/65 files shown)
+# ... truncated to fit 4000-token budget (48/65 files shown)
 ```
 
 <!-- girdle:index:end -->

@@ -118,7 +118,7 @@ class ScanResult:
         }
 
     @property
-    def overall_percentage(self) -> float:
+    def overall_percentage(self) -> float | None:
         total = 0
         passed = 0
         for entry in CHECK_REGISTRY.values():
@@ -129,7 +129,7 @@ class ScanResult:
             if check_passed:
                 passed += 1
         if total == 0:
-            return 0.0
+            return None
         return round((passed / total) * 100, 2)
 
     @property

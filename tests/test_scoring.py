@@ -63,3 +63,14 @@ def test_percentages_multi_category_and_overall_distinct(monkeypatch):
         "empty_category": None,
     }
     assert result.overall_percentage == 33.33
+
+
+def test_overall_percentage_none_when_no_applicable_checks(monkeypatch):
+    monkeypatch.setattr(
+        "girdle.schema.CHECK_REGISTRY",
+        {
+            "unseen": CheckEntry("unseen", ("empty_category",), Difficulty.BASIC),
+        },
+    )
+    result = ScanResult(repo_root=".", scanned_at="now", mode="static")
+    assert result.overall_percentage is None
