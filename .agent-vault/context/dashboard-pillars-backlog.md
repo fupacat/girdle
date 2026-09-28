@@ -14,21 +14,19 @@ so the record of what was considered and why survives.
 
 ## New checks (surfaced while calibrating difficulty tiers)
 
-- [ ] **Malicious/poisoned agent instructions detection** - checking
-  AGENTS.md/CLAUDE.md/etc. for injection-style content (hidden
-  instructions, suspicious encoded blocks). Routes through the same
-  active-harm/red bucket as secrets detection, not the percentage/badge
-  model.
-- [ ] **SAST/static-analysis-configured check** - distinct from `lint`.
-  Girdle dogfoods SonarCloud itself but doesn't score "does a repo have
-  CodeQL/Semgrep/similar configured" as its own category today.
+- [in-progress] **Malicious/poisoned agent instructions detection** -
+  [issue #80](https://github.com/fupacat/girdle/issues/80), unassigned
+  (depends on #73). Routes through the same active-harm/red bucket as
+  secrets detection, not the percentage/badge model.
+- [in-progress] **SAST/static-analysis-configured check** -
+  [issue #79](https://github.com/fupacat/girdle/issues/79), unassigned
+  (depends on #73). Distinct from `lint`.
 
 ## New pillars (from the Factory.ai Agent Readiness comparison)
 
-- [ ] **Build System** - confirm whether girdle already scores
-  deterministic build commands under an existing per-ecosystem check, or
-  whether this is a genuine gap. Lowest-effort item on this list - a
-  verification question, not new design.
+- [in-progress] **Build System** - [issue #78](https://github.com/fupacat/girdle/issues/78),
+  unassigned (depends on #73). Confirm whether girdle already scores
+  deterministic build commands, or whether this is a genuine gap.
 - [ ] **Debugging & Observability** (structured logging, tracing,
   metrics) - genuine gap, no existing girdle category. Needs its own
   design pass (what's deterministically checkable here - structured
@@ -45,23 +43,24 @@ so the record of what was considered and why survives.
   of referenced names/paths, not command-syntax validation - see the
   brainstorm note), implementation not started.
 - [ ] Per-category "adequate"/"aligned" checks for README, CONTRIBUTING,
-  CODEOWNERS, `.gitignore`, dependency monitoring, LICENSE, agent
-  instructions, agent sandbox bootstrap, structural index - bars are
-  defined (brainstorm note), none implemented yet.
-- [ ] Three more alignment-check candidates, surfaced while enumerating
-  every existing category against the code directly (not previously
-  named anywhere): `ci_gating` vs. `tests` (does the CI-detected test
-  command match `tests`'s own configured command?), `reproducibility`
-  (does the lockfile match the manifest - no version drift?), and
-  `precommit` vs. CI (does pre-commit wire the *same* checks CI actually
-  runs, or a silently diverging subset?).
+  CODEOWNERS, `.gitignore`, dependency monitoring, agent instructions,
+  agent sandbox bootstrap, structural index - bars are defined
+  (brainstorm note), none implemented yet. LICENSE moved to its own
+  filed issue, see below.
+- [in-progress] Three alignment-check candidates, surfaced while
+  enumerating every existing category against the code directly:
+  `ci_gating` vs. `tests` - [issue #81](https://github.com/fupacat/girdle/issues/81);
+  `reproducibility` lockfile drift - [issue #82](https://github.com/fupacat/girdle/issues/82);
+  `precommit` vs. CI - [issue #83](https://github.com/fupacat/girdle/issues/83).
+  All unassigned, depend on #74.
+- [in-progress] LICENSE presence/adequate/aligned, including the
+  `licensee`-style deterministic license-text fingerprinting question -
+  [issue #84](https://github.com/fupacat/girdle/issues/84), unassigned
+  (depends on #73).
 - [ ] `platform.py`'s branch-protection/ruleset checks don't fit the tier
   model at all today - separate `PlatformResult` structure, not
   `CategoryResult`/tier-based. Decide whether to unify it into the same
   category/tier system or leave it as its own thing.
-- [ ] `licensee`-style deterministic license-text fingerprinting -
-  evaluate whether a suitable library exists for girdle's Python stack,
-  or whether this means shelling out / vendoring license-text data.
 - [ ] Design/decision-notes category - needs its own lower-confidence
   presentation design (can't use the same flat absent/configured/aligned
   claim as everything else - see brainstorm note's reasoning).
@@ -92,14 +91,15 @@ so the record of what was considered and why survives.
   `absent`), badge colors only once a badge tier is earned, red reserved
   specifically for active-harm findings (secrets, malicious agent
   instructions) rather than mere incompleteness.
-- [ ] The actual percentage/badge-tier dashboard implementation - this is
-  now the real scope, superseding the smaller "Option A" color-only fix
-  below. Needs: per-category and overall percentage computation
-  (checks can belong to multiple categories, double-counting is
-  intentional), the three-tier check-difficulty system (basic/
-  intermediate/advanced, draft assignment in the brainstorm note), the
-  neutral/red/badge color states, and the per-category "what's left"
-  outstanding-items list the user asked for as the actionable output.
+- [in-progress] The actual percentage/badge-tier dashboard
+  implementation - filed as [issue #72](https://github.com/fupacat/girdle/issues/72)
+  (tracking) with four ordered sub-issues:
+  [#73](https://github.com/fupacat/girdle/issues/73) (check registry,
+  assigned to Copilot), [#74](https://github.com/fupacat/girdle/issues/74)
+  (percentage computation), [#75](https://github.com/fupacat/girdle/issues/75)
+  (color-state logic), [#76](https://github.com/fupacat/girdle/issues/76)
+  (dashboard template) - each depends on the previous merging, so only
+  #73 is assigned so far.
 
 ## Already unblocked / in motion
 
