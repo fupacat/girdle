@@ -194,7 +194,7 @@ jobs:
                 core.info(`Assigned #${issue.number} to copilot-swe-agent`);
               } catch (err) {
                 if (err.message.includes("Resource not accessible by personal access token")) {
-                  core.warning(
+                  core.setFailed(
                     "COPILOT_ASSIGN_TOKEN is configured but lacks GitHub's required " +
                     "permissions for Copilot issue assignment " +
                     "(metadata:read plus read/write actions, contents, issues, and pull requests).",
