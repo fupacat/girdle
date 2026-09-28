@@ -117,6 +117,8 @@ issue-filing and assignment work done directly all session.
 
 ## Related
 
+- [[.agent-vault/decisions/workstream-visibility-labels-and-project|workstream-visibility-labels-and-project]] -
+  the extracted ADR anchor for the settled labels+Project decision.
 - [[.agent-vault/brainstorm/dashboard-scoring-tiers-2026-09-28|dashboard-scoring-tiers-2026-09-28]] -
   the initiative whose #72 chain prompted this discussion; kept separate
   per this note's own reasoning about not conflating initiatives.
