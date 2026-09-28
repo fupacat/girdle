@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from girdle.detectors.base import Fingerprint
 from girdle.detectors.dotnet import DotNetDetector
 from girdle.schema import Tier
 
@@ -62,9 +61,8 @@ def test_test_sdk_reference_detected(tmp_path: Path):
     assert result["tests"].tier == Tier.CONFIGURED
 
 
-def test_build_run_command_omitted_without_detectable_build_files(tmp_path: Path):
-    det = DotNetDetector()
-    fp = Fingerprint(id="dotnet", language="dotnet", toolchain="nuget", root=tmp_path, variants=[])
-    assert "build" not in det.applicable_categories(fp)
-    assert "build" not in det.scan(fp, mode="static")
-    assert "build" not in det.run_commands(fp)
+def test_nested_project_detected(tmp_path: Path):
+    nested = tmp_path / "src" / "App"
+    nested.mkdir(parents=True)
+    (nested / "App.csproj").write_text(CSPROJ_PINNED)
+    assert DotNetDetector().detect(tmp_path) is not None

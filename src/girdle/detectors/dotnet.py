@@ -26,19 +26,14 @@ PACKAGES_LOCK_JSON = "packages.lock.json"
 
 class DotNetDetector:
     def detect(self, root: Path) -> Fingerprint | None:
-        project_files = list(root.glob(CSPROJ_GLOB)) + list(root.glob(FSPROJ_GLOB))
-        sln_files = list(root.glob("*.sln"))
-        if not project_files and not sln_files:
+        if not self._build_evidence(root):
             return None
         return Fingerprint(
             id="dotnet", language="dotnet", toolchain="nuget", root=root, variants=[]
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        categories = ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
-        if self._build_evidence(fp.root):
-            categories.insert(3, "build")
-        return categories
+        return ["tests", "lint", "coverage", "build", "reproducibility", "ci_gating"]
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
@@ -46,12 +41,11 @@ class DotNetDetector:
             read_text(p) or "" for p in rglob_excluding(root, CSPROJ_GLOB, FSPROJ_GLOB)
         ]
         combined = "\n".join(project_texts)
-        build = self._scan_build(root)
         return {
             "tests": self._scan_tests(root, combined),
             "lint": self._scan_lint(root),
             "coverage": self._scan_coverage(root, combined),
-            **({"build": build} if build.tier != Tier.ABSENT else {}),
+            "build": self._scan_build(root),
             "reproducibility": self._scan_reproducibility(root, combined),
             "ci_gating": self._scan_ci(root),
         }
@@ -59,9 +53,7 @@ class DotNetDetector:
     def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
         # Analyzers run as part of the build, not a separate lint invocation;
         # no standalone lint command to declare here.
-        commands = {"tests": ["dotnet", "test"]}
-        if self._build_evidence(fp.root):
-            commands["build"] = ["dotnet", "build"]
+        commands = {"tests": ["dotnet", "test"], "build": ["dotnet", "build"]}
         project_texts = [
             read_text(p) or "" for p in rglob_excluding(fp.root, CSPROJ_GLOB, FSPROJ_GLOB)
         ]
@@ -126,12 +118,6 @@ class DotNetDetector:
 
     def _scan_build(self, root: Path) -> CategoryResult:
         evidence = self._build_evidence(root)
-        if not evidence:
-            return CategoryResult(
-                Tier.ABSENT,
-                reason="no .csproj/.fsproj or .sln file found to define a build entry point",
-                recommendation="Add a .csproj/.fsproj project or a .sln solution file.",
-            )
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
     def _build_evidence(self, root: Path) -> list[str]:
