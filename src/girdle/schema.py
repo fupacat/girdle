@@ -86,7 +86,7 @@ class ScanResult:
         return all(tier >= Tier.CONFIGURED for tier in tiers)
 
     @property
-    def category_percentages(self) -> dict[str, float]:
+    def category_percentages(self) -> dict[str, float | None]:
         categories: list[str] = []
         seen: set[str] = set()
         for entry in CHECK_REGISTRY.values():
@@ -112,7 +112,7 @@ class ScanResult:
             category: (
                 round((passed[category] / totals[category]) * 100, 2)
                 if totals[category]
-                else 0.0
+                else None
             )
             for category in categories
         }

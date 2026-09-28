@@ -60,6 +60,6 @@ def test_percentages_multi_category_and_overall_distinct(monkeypatch):
     assert result.category_percentages == {
         "category_a": 50.0,
         "category_b": 50.0,
-        "empty_category": 0.0,
+        "empty_category": None,
     }
     assert result.overall_percentage == 33.33
