@@ -125,9 +125,9 @@
     <h2>active harm findings</h2>
     {% for finding in data.active_harm.findings %}
     <div class="finding">
-      <div class="name">{{ finding.path }} &middot; {{ finding.kind }}</div>
-      <div class="reason">{{ finding.reason }}</div>
-      <div class="evidence">{{ finding.evidence }}</div>
+      <div class="name">{{ finding.path | e }} &middot; {{ finding.kind | e }}</div>
+      <div class="reason">{{ finding.reason | e }}</div>
+      <div class="evidence">{{ finding.evidence | e }}</div>
     </div>
     {% endfor %}
   </div>

@@ -63,12 +63,9 @@ ZERO_WIDTH_CHARS = ("\u200b", "\u200c", "\u200d", "\ufeff")
 BASE64_BLOB_RE = re.compile(r"(?<![A-Za-z0-9+/=])(?:[A-Za-z0-9+/]{64,}={0,2})(?![A-Za-z0-9+/=])")
 HEX_BLOB_RE = re.compile(r"(?<![0-9A-Fa-f])(?:0x)?[0-9A-Fa-f]{64,}(?![0-9A-Fa-f])")
 MANIPULATIVE_AI_DIRECTIVE_RE = re.compile(
-    r"(?is)\b(?:ai|assistant|agent|copilot|claude|codex)\b.{0,120}"
-    r"\b(?:ignore|disregard|override|bypass|forget|reveal|exfiltrate|steal|"
-    r"hidden instruction|system prompt|developer message|do not tell the user)\b|"
-    r"\b(?:ignore|disregard|override|bypass|forget|reveal|exfiltrate|steal|"
-    r"hidden instruction|system prompt|developer message|do not tell the user)\b.{0,120}"
-    r"\b(?:ai|assistant|agent|copilot|claude|codex)\b"
+    r"(?i)\b(?:ignore|disregard|forget)\s+(?:all\s+|any\s+)?(?:previous|prior|above|earlier)\s+instructions\b"
+    r"|\b(?:reveal|print|leak|exfiltrate)\s+(?:the\s+|your\s+)?(?:system\s+prompt|developer\s+message|hidden\s+instructions?)\b"
+    r"|\bdo\s+not\s+tell\s+the\s+user\b"
 )
 
 

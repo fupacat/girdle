@@ -17,7 +17,11 @@ so the record of what was considered and why survives.
 - [in-progress] **Malicious/poisoned agent instructions detection** -
   [issue #80](https://github.com/fupacat/girdle/issues/80), unassigned
   (depends on #73). Routes through the same active-harm/red bucket as
-  secrets detection, not the percentage/badge model.
+  secrets detection, not the percentage/badge model. `find_agent_instruction_hazards`
+  scans discovered instruction files for zero-width Unicode characters,
+  unusually long base64-like or hex-like blobs, and concrete manipulative
+  directives: requests to ignore prior instructions, reveal system/developer
+  messages or hidden instructions, or conceal information from the user.
 - [in-progress] **SAST/static-analysis-configured check** -
   [issue #79](https://github.com/fupacat/girdle/issues/79), unassigned
   (depends on #73). Distinct from `lint`.
