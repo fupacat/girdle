@@ -66,6 +66,9 @@ FOLDER_FOR_TYPE: dict[str, str] = {
     "environment": "environment",
     "deployment": "deployment",
 }
+assert set(FOLDER_FOR_TYPE) == set(NOTE_TYPES), (
+    "FOLDER_FOR_TYPE and NOTE_TYPES are out of sync - update both together"
+)
 
 
 class DanglingWatchError(Exception):
