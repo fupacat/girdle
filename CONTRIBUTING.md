@@ -21,13 +21,19 @@ girdle index . --check AGENTS.md
 girdle notes check .
 ```
 
-All six also run automatically on commit via `.pre-commit-config.yaml`
-(see the README's "Enforcement hooks" section) and again in CI on
-push/PR - though CI's notes check is read-only verification (no staged
-files in a clean checkout, so nothing auto-reconciles there), catching
-a `--no-verify` bypass of the local hook rather than re-running its
-auto-reconcile behavior. `mdformat` (no `--check`) rewrites files
-in place; the pre-commit hook does this for you, same as `ruff --fix`.
+All six also run automatically on local `git commit` via
+`.pre-commit-config.yaml` (see the README's "Enforcement hooks" section)
+and again in CI on push/PR - though CI's notes check is read-only
+verification (no staged files in a clean checkout, so nothing
+auto-reconciles there), catching a `--no-verify` bypass of the local
+hook rather than re-running its auto-reconcile behavior. `mdformat` (no
+`--check`) rewrites files in place; the pre-commit hook does this for
+you, same as `ruff --fix`.
+
+For GitHub Copilot coding-agent commits specifically, do **not** assume
+the local pre-commit hook is an enforced gate: those commits are not
+guaranteed to be created via local `git commit`. Treat CI status checks
+as the authoritative enforcement boundary for agent-authored commits.
 
 ## Branch protection
 

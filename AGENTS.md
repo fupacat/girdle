@@ -12,6 +12,10 @@ scoring behavior, not this file).
 
 Run checks: `pytest` / `ruff check .`.
 
+Copilot coding-agent commits are not guaranteed to go through local
+`git commit`, so treat CI as the real enforcement gate; local
+pre-commit hooks are still useful for in-sandbox manual checks.
+
 Repo-scoped design rationale, decisions, and reference notes live in
 `.agent-vault/` (schema: `.agent-vault/SCHEMA.md`) — separate from this file
 (operational instructions) and from the structural index below (mechanically
