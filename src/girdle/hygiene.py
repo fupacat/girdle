@@ -23,7 +23,7 @@ from girdle.tiers import CategoryResult, Tier
 def _read_text(path: Path) -> str | None:
     try:
         return path.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return None
 
 
@@ -100,6 +100,7 @@ def find_agent_instruction_hazards(root: Path) -> list[dict[str, str]]:
         text = _read_text(path)
         if text is None:
             continue
+        text = text.removeprefix("\ufeff")
         rel = path.relative_to(root).as_posix()
 
         seen_zero_width = sorted({f"U+{ord(ch):04X}" for ch in text if ch in ZERO_WIDTH_CHARS})
@@ -135,6 +136,8 @@ def find_agent_instruction_hazards(root: Path) -> list[dict[str, str]]:
         ):
             match = pattern.search(text)
             if match is None:
+                continue
+            if kind == "suspicious_base64_blob" and HEX_BLOB_RE.fullmatch(match.group(0)):
                 continue
             findings.append(
                 {
