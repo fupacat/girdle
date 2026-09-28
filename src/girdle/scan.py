@@ -23,7 +23,7 @@ def _run_detector(detector: Detector, repo_root: Path, mode: str) -> EcosystemRe
     if fp is None:
         return None
     categories = detector.scan(fp, mode)
-    categories["static_analysis"] = scan_static_analysis(fp.root)
+    categories["static_analysis"] = scan_static_analysis(repo_root)
     _verify(detector, fp, categories, mode)
     _check_coverage_gate(fp, categories)
     applicable = detector.applicable_categories(fp)
