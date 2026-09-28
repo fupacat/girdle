@@ -16,7 +16,9 @@ SEMGREP_CONFIG_NAMES = (".semgrep.yml", ".semgrep.yaml", "semgrep.yml", "semgrep
 SONAR_CONFIG_NAMES = ("sonar-project.properties", ".sonarcloud.properties")
 
 CODEQL_CI_PATTERN = re.compile(r"github/codeql-action(?:/|@)")
-SEMGREP_CI_PATTERN = re.compile(r"returntocorp/semgrep-action|\bsemgrep(?:-agent)?\s+(?:ci|scan)\b")
+SEMGREP_CI_PATTERN = re.compile(
+    r"(?:returntocorp|semgrep)/semgrep-action|\bsemgrep(?:-agent)?\s+(?:ci|scan)\b"
+)
 SONAR_CI_PATTERN = re.compile(
     r"sonarcloud-github-action|sonarqube-scan-action|sonarsource/sonar-scan-action|"
     r"\bsonar-scanner\b",

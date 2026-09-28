@@ -35,6 +35,15 @@ def test_semgrep_config_detected(tmp_path: Path):
     assert cat.evidence == [".semgrep.yml"]
 
 
+def test_semgrep_workflow_detected_with_current_action_name(tmp_path: Path):
+    _wf(tmp_path, "steps:\n  - uses: semgrep/semgrep-action@v1\n")
+
+    cat = scan_static_analysis(tmp_path)
+
+    assert cat.tier == Tier.CONFIGURED
+    assert cat.evidence == [".github/workflows/ci.yml: runs Semgrep"]
+
+
 def test_sonar_scan_with_config_detected(tmp_path: Path):
     (tmp_path / "sonar-project.properties").write_text("sonar.projectKey=demo\n")
     _wf(tmp_path, "steps:\n  - uses: SonarSource/sonarqube-scan-action@v4\n")
