@@ -553,6 +553,8 @@ being introduced as a visibly incomplete preview.
 
 ## Related
 
+- [[.agent-vault/decisions/dashboard-scoring-percentage-model|dashboard-scoring-percentage-model]] -
+  the extracted ADR anchor for the settled scoring model.
 - [[merge-pipeline]] - a similarly-shaped "make the
   settled reasoning discoverable, not just chat history" note, same
   session's broader documentation pass.
