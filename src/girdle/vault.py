@@ -290,9 +290,12 @@ def check(root: Path) -> CheckResult:
 
         if note.type is not None:
             expected_folder = FOLDER_FOR_TYPE[note.type]
-            # The note must live directly inside .agent-vault/<folder>/
-            # (not in a sub-subfolder of it - just check the parent name).
-            actual_folder = note.file_path.parent.name
+            # Determine the first path component under .agent-vault/ - notes
+            # may sit in sub-subfolders, but the top-level bucket is what
+            # determines type. E.g. .agent-vault/context/sub/note.md → "context".
+            vault_root = root / VAULT_DIR
+            rel_to_vault = note.file_path.relative_to(vault_root)
+            actual_folder = rel_to_vault.parts[0]
             if actual_folder != expected_folder:
                 result.blocking.append(
                     f"{rel}: type '{note.type}' should be in "
