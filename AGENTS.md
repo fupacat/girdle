@@ -36,7 +36,6 @@ src/girdle/coverage_parse.py | python | 45L | _first_match, parse_percentage
 src/girdle/dashboard.py | python | 24L | render_dashboard
 src/girdle/detectors/_util.py | python | 63L | read_json, read_toml, read_text, scan_ci
 src/girdle/detectors/base.py | python | 44L | Fingerprint, Detector
-src/girdle/detectors/dotnet.py | python | 157L | DotNetDetector
 src/girdle/detectors/js_common.py | python | 151L | _install_verb, detect_variants, scan_tests, scan_lint, scan_coverage, scan_ci, is_lockfile_gitignored, run_commands
 src/girdle/detectors/python_common.py | python | 123L | scan_tests, scan_lint, scan_coverage, coverage_command, scan_ci, is_lockfile_gitignored, lint_command, test_command
 src/girdle/fsutil.py | python | 34L | walk_excluding, rglob_excluding
@@ -45,7 +44,7 @@ src/girdle/indexer.py | python | 413L | _parser, _text, _name_of, _defs_python, 
 src/girdle/platform.py | python | 297L | PlatformResult, compute_recommendations, _run, extract_protection_facts, _apply_pull_request_rule, _apply_status_checks_rule, _apply_non_fast_forward_rule, _apply_deletion_rule, extract_ruleset_facts, _merge_facts, _fetch_classic_protection, _fetch_ruleset_facts, check_platform
 src/girdle/runner.py | python | 61L | RunOutcome, run_check
 src/girdle/scan.py | python | 139L | _run_detector, run_scan, _check_coverage_gate, _mark_static_hint, _run_and_record, _verify
-src/girdle/schema.py | python | 119L | EcosystemResult, ScanResult
+src/girdle/schema.py | python | 186L | EcosystemResult, ScanResult
 src/girdle/tiers.py | python | 45L | Tier, CategoryResult
 src/girdle/vault.py | python | 353L | DanglingWatchError, _describe_watch, WatchEntry, Note, _IndentedDumper, _parse_frontmatter, _render_frontmatter, load_note, load_all_notes, current_hash, _note_rel, _write_note, _git_add, _staged_files, _content_signature, _head_signature, _meaningfully_edited, reconcile, CheckResult, check, ack, render_vault_index, inject_vault_index
 tests/test_align.py | python | 163L | test_editorconfig_derives_from_black, test_editorconfig_derives_from_ruff_format, test_editorconfig_no_formatter_no_plan, test_editorconfig_appends_without_touching_existing_content, test_editorconfig_skips_glob_already_present, test_editorconfig_js_prettier_json, test_editorconfig_js_unparseable_config_is_skipped, test_editorconfig_rust_from_rustfmt_toml, test_gitattributes_no_eol_signal_no_plan, test_gitattributes_propagates_prettier_eol, test_gitattributes_conflict_when_formatters_disagree, test_gitattributes_existing_text_auto_left_alone, test_gitattributes_appends_to_existing_file, test_gitignore_adds_missing_patterns, test_gitignore_already_covered_no_plan, test_gitignore_multi_language_union, test_apply_plan_writes_file, test_apply_plan_noop_when_no_content, test_build_align_plans_returns_three_plans
@@ -72,11 +71,11 @@ tests/test_recommendations.py | python | 86L | test_python_pip_recommendation_na
 tests/test_runner.py | python | 32L | test_missing_binary_is_not_ran, test_successful_command, test_failing_command, test_timeout
 tests/test_rust.py | python | 46L | test_detect_none_without_cargo_toml, test_bin_crate_missing_lock_is_absent_and_applicable, test_lib_crate_missing_lock_is_excluded_from_applicable, test_lib_crate_with_committed_lock_is_applicable_and_configured, test_inline_test_detected
 tests/test_scan_verify.py | python | 60L | _FakeDetector, _fp, test_verify_upgrades_to_verified_on_success, test_verify_keeps_configured_on_failure, test_verify_skips_absent_categories, test_verify_noop_without_run_commands, test_verify_static_mode_adds_generic_hint_not_execution
-tests/test_scoring.py | python | 32L | _eco, test_category_min_is_gated_by_weakest, test_inapplicable_categories_excluded_from_min, test_scan_result_overall_min_is_weakest_ecosystem
+tests/test_scoring.py | python | 65L | _eco, test_category_min_is_gated_by_weakest, test_inapplicable_categories_excluded_from_min, test_scan_result_overall_min_is_weakest_ecosystem, test_percentages_multi_category_and_overall_distinct
 tests/test_util_scan_ci.py | python | 52L | test_github_actions_match, test_gitlab_fallback, test_azure_fallback, test_absent_when_no_ci, test_no_match_in_workflow, test_gradle_pattern_matches_gradlew_and_gradle
 tests/test_vault.py | python | 375L | _git, _init_repo, _write_example, _write_note, test_load_note_parses_frontmatter, test_current_hash_symbol_level, test_current_hash_missing_symbol_is_none, test_current_hash_file_level_no_symbol, test_load_all_notes_skips_reserved_names, test_ack_records_current_hash_and_stages, test_check_blocks_when_note_not_updated, test_check_auto_reconciles_when_note_staged_too, test_check_skips_notes_without_watches, test_check_does_not_reconcile_when_only_stale_marker_was_staged, test_reconcile_raises_on_dangling_watch, test_ack_raises_on_dangling_watch, test_check_blocks_dangling_watch_even_when_note_staged, test_check_blocks_point_in_time_type_with_watches, test_ack_resolves_relative_root_and_note_path, test_render_vault_index, test_load_note_without_frontmatter, test_load_all_notes_no_vault_dir, test_current_hash_unsupported_extension_with_symbol, test_check_leaves_unchanged_notes_alone, test_check_auto_reconciles_brand_new_note_never_committed, test_inject_vault_index_separator_variants, test_inject_vault_index_creates_and_replaces_block
 tests/test_vendor_exclusion.py | python | 49L | test_python_ignores_test_files_inside_venv, test_python_still_finds_real_top_level_tests, test_go_ignores_test_files_inside_vendor, test_rust_ignores_rs_files_inside_target
-# ... truncated to fit 4000-token budget (50/65 files shown)
+# ... truncated to fit 4000-token budget (49/65 files shown)
 ```
 
 <!-- girdle:index:end -->
