@@ -18,9 +18,22 @@ jobs:
     steps:
       - name: Find and assign unblocked issues
         uses: actions/github-script@v7
+        env:
+          COPILOT_ASSIGN_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Use the PAT when present; otherwise allow the warning path to run.
+          github-token: ${{ secrets.COPILOT_ASSIGN_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
+            if (!process.env.COPILOT_ASSIGN_TOKEN) {
+              core.warning(
+                "COPILOT_ASSIGN_TOKEN is not configured; skipping Copilot auto-assignment. " +
+                "Set a user token with the Copilot issue-assignment permissions " +
+                "described in GitHub's API docs.",
+              );
+              return;
+            }
+
+            const copilotGitHub = github;
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
 
@@ -46,7 +59,7 @@ jobs:
               }
             `;
             const copilotHeaders = { 'GraphQL-Features': 'issues_copilot_assignment_api_support' };
-            const repoData = await github.graphql(repoNodeQuery, {
+            const repoData = await copilotGitHub.graphql(repoNodeQuery, {
               owner, repo, headers: copilotHeaders,
             });
             const suggested = repoData.repository.suggestedActors.nodes;
@@ -96,7 +109,7 @@ jobs:
             let candidates = [];
             let after = null;
             while (true) {
-              const data = await github.graphql(issueQuery, { owner, repo, after });
+              const data = await copilotGitHub.graphql(issueQuery, { owner, repo, after });
               const conn = data.repository.issues;
               candidates = candidates.concat(conn.nodes);
               if (!conn.pageInfo.hasNextPage) break;
@@ -145,7 +158,7 @@ jobs:
               // Paginate if the first page was truncated
               let cursor = issue.blockedBy.pageInfo.endCursor;
               while (pageInfo.hasNextPage) {
-                const more = await github.graphql(blockedByQuery, {
+                const more = await copilotGitHub.graphql(blockedByQuery, {
                   id: issue.id,
                   after: cursor,
                 });
@@ -167,7 +180,7 @@ jobs:
 
               core.info(`Issue #${issue.number} is unblocked – assigning to Copilot`);
               try {
-                await github.graphql(assignMutation, {
+                await copilotGitHub.graphql(assignMutation, {
                   assignableId: issue.id,
                   actorIds: [copilotId],
                   headers: copilotHeaders,
