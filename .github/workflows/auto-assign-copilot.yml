@@ -197,6 +197,8 @@ jobs:
                   err.message.includes("Resource not accessible by personal access token") ||
                   err.message.includes("Resource not accessible by integration");
                 if (tokenScopeError) {
+                  // A mis-scoped token will fail every remaining assignment too, so
+                  // abort the whole run loudly instead of downgrading it to per-issue noise.
                   throw new Error(
                     "COPILOT_ASSIGN_TOKEN is configured but lacks GitHub's required " +
                     "permissions for Copilot issue assignment " +
