@@ -105,7 +105,22 @@
     <h2>detected ecosystems</h2>
     <ul class="list">
       {% for eco in data.ecosystems %}
-      <li>{{ eco.language }}/{{ eco.toolchain }} ({{ eco.id }}, root={{ eco.root }}){% if eco.variants %} — {{ eco.variants | join(', ') }}{% endif %}</li>
+      <li>
+        {{ eco.language }}/{{ eco.toolchain }} ({{ eco.id }}, root={{ eco.root }}){% if eco.variants %} — {{ eco.variants | join(', ') }}{% endif %}
+        <ul>
+          {% for name, category in eco.categories.items() %}
+          <li>
+            {{ name.replace('_', ' ') }}: {{ category.status }} (tier {{ category.tier }})
+            {% if category.evidence %}
+            <div class="cat-meta">Evidence: {{ category.evidence | join(', ') }}</div>
+            {% endif %}
+            {% if category.recommendation %}
+            <div class="cat-outstanding">Recommendation: {{ category.recommendation }}</div>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </li>
       {% endfor %}
     </ul>
   </div>
