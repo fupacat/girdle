@@ -31,7 +31,7 @@ src/girdle/audit.py | python | 184L | AuditFinding, AuditResult, _invoke_agent, 
 src/girdle/badge.py | python | 39L | badge_url, badge_markdown, badge_endpoint
 src/girdle/checks.py | python | 89L | Difficulty, CheckEntry, checks_by_difficulty
 src/girdle/cli.py | python | 409L | main, scan, dashboard, badge, index, align, audit_cmd, _print_audit_human, _print_category, _print_ecosystem, _print_summary, _print_human, _print_hygiene, _print_platform, notes, notes_check, notes_ack, notes_index
-src/girdle/coverage_gate.py | python | 114L | _codecov_gate, _sonar_gate, _diff_cover_gate, _gate_in_text, detect_gate
+src/girdle/coverage_gate.py | python | 113L | _codecov_gate, _sonar_gate, _diff_cover_gate, _gate_in_text, detect_gate
 src/girdle/coverage_parse.py | python | 45L | _first_match, parse_percentage
 src/girdle/detectors/_util.py | python | 128L | read_json, read_toml, read_text, _ci_texts, _first_existing_name, scan_static_analysis, scan_ci
 src/girdle/detectors/js_common.py | python | 151L | _install_verb, detect_variants, scan_tests, scan_lint, scan_coverage, scan_ci, is_lockfile_gitignored, run_commands

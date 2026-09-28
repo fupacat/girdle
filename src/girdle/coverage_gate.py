@@ -37,7 +37,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from girdle.detectors._util import _ci_texts, _first_existing_name, read_text
+from girdle.detectors._util import SONAR_CONFIG_NAMES, _ci_texts, _first_existing_name, read_text
 
 CODECOV_UPLOAD_PATTERN = re.compile(r"codecov/codecov-action|codecov\.io/bash|\bcodecov\b")
 COVERALLS_PATTERN = re.compile(r"coverallsapp/github-action|\bcoveralls\b")
@@ -48,7 +48,6 @@ SONAR_CI_PATTERN = re.compile(
     r"\bsonar-scanner\b",
     re.IGNORECASE,
 )
-SONAR_CONFIG_NAMES = ("sonar-project.properties", ".sonarcloud.properties")
 SONAR_REPORT_PATH_PATTERN = re.compile(r"reportPaths", re.IGNORECASE)
 
 def _codecov_gate(root: Path, codecov_cfg: str | None, label: str, text: str) -> str | None:
