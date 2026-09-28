@@ -133,8 +133,8 @@ def test_check_maps_to_expected_category(key, expected_category):
 # Total count
 # ---------------------------------------------------------------------------
 
-def test_registry_covers_all_15_categories():
-    """Registry must cover the 15 categories enumerated in the design doc."""
+def test_registry_covers_all_16_categories():
+    """Registry must cover all 16 categories enumerated in the design doc."""
     expected_categories = {
         "readme", "gitignore", "license", "contributing",
         "tests", "lint", "coverage", "ci_gating", "codeowners",
