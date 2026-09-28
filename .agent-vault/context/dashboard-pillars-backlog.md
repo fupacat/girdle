@@ -95,11 +95,24 @@ so the record of what was considered and why survives.
   implementation - filed as [issue #72](https://github.com/fupacat/girdle/issues/72)
   (tracking) with four ordered sub-issues:
   [#73](https://github.com/fupacat/girdle/issues/73) (check registry,
-  assigned to Copilot), [#74](https://github.com/fupacat/girdle/issues/74)
+  assigned to Copilot, PR #77 open), [#74](https://github.com/fupacat/girdle/issues/74)
   (percentage computation), [#75](https://github.com/fupacat/girdle/issues/75)
   (color-state logic), [#76](https://github.com/fupacat/girdle/issues/76)
-  (dashboard template) - each depends on the previous merging, so only
-  #73 is assigned so far.
+  (dashboard template). All dependency links are now real GitHub
+  `blockedBy` relations (set via `addBlockedBy`, verified against the
+  live GraphQL schema), not just prose - see
+  [issue #85](https://github.com/fupacat/girdle/issues/85) below.
+- [in-progress] **Auto-assign unblocked issues to Copilot on a timer** -
+  [issue #85](https://github.com/fupacat/girdle/issues/85), assigned to
+  Copilot. A scheduled GH Actions workflow that queries `blockedBy` on
+  open unassigned issues and assigns anything unblocked - once this
+  lands, moving the #72 chain forward stops needing manual
+  reassignment after each merge. Researched first: GitHub's
+  `blockedBy`/`blocking` `IssueConnection` fields and the
+  `addBlockedBy`/`removeBlockedBy` mutations are real and confirmed via
+  direct schema introspection (search results disagreed with each other
+  on the mutation name - `addIssueDependency` does not exist despite
+  appearing in some sources).
 
 ## Already unblocked / in motion
 
