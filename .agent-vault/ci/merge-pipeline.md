@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 64be81d0d656276ab6c46e8171b171c012f927553c911701c1dee1080a798cb9
+    hash: 87dff0a8072fe5336f2b062cf20face3aac6dd9699223198cfc75fa6488a5d8f
 stale: false
 ---
 
@@ -131,13 +131,23 @@ Mergify's queue.
   (a webhook/queue race, possibly tied to rapid successive commits)
   isn't visible from this side and wasn't pinned down further - the
   symptom and the fix are what's actionable, not the mechanism.
-- **A third, also-distinct gap observed the same session**: Copilot can
-  finish a PR (approved, all checks green) while never firing the
+- **A third, also-distinct gap, recurring**: Copilot can finish a PR
+  (approved, all checks green) while never firing the
   `review_requested`/`ready_for_review` event `auto-merge-copilot.yml`
-  depends on to promote it out of draft - confirmed on PR #92, zero runs
-  of that workflow existed for its branch despite the PR being fully
-  ready. Recoverable with a direct `gh pr ready <PR>` call; no code
-  change needed, this is a PR-state action same as the nudges above.
+  depends on to promote it out of draft - first seen on PR #92, recurred
+  on PR #114 (zero runs of the workflow existed for its branch despite a
+  `review_requested` event appearing in the PR's own timeline; `CI` and
+  other `pull_request`-triggered workflows fired normally in the same
+  window, ruling out a general Actions outage). GitHub exposes no
+  authoritative "Copilot finished coding" event - `review_requested` is an
+  inferred proxy that other actors (CODEOWNERS auto-request, a teammate,
+  Gitar's review flow) can also fire, and delivery to Actions isn't
+  guaranteed. `auto-merge-copilot.yml` now has a second job
+  (`fallback-sweep`, `schedule`-triggered every 15 minutes) that promotes
+  any open Copilot-authored draft PR whose title no longer starts with
+  `[WIP]` (Copilot's in-progress marker) and whose latest commit is at
+  least 30 minutes old, independent of whether the event-driven job ever
+  ran - the reactive job stays as the fast path, the sweep is the backstop.
 - `.github/workflows/auto-assign-copilot.yml` (issue #85's auto-assignment
   automation, later extended to sync issue dependency labels and Project
   Status) needs a dedicated PAT in the `COPILOT_ASSIGN_TOKEN` secret, not
@@ -152,6 +162,39 @@ Mergify's queue.
   review for everything else) rather than one uniform rule - documented
   here and in `.mergify.yml`'s own rule comments so it isn't rediscovered
   from scratch.
+- Copilot coding-agent PRs stacked against a moving `master` routinely drift
+  into genuine content conflicts (not just a stale branch) as earlier PRs
+  in the same batch merge - the "Keep PRs up to date" `update` rule can't
+  fix that, and it doesn't self-resolve by dequeuing/requeuing either
+  (confirmed live: requeuing PR #93 left it stuck on the unmet `-conflict`
+  condition). Mergify's `conflict` pull-request attribute updates reactively
+  off GitHub webhooks, so a `pull_request_rules` entry conditioned on
+  `conflict` + `author=Copilot` reacts within seconds rather than needing a
+  polling GitHub Actions workflow - it comments `@copilot` on the affected
+  PR (Copilot's coding agent watches for mentions on PRs it authored and
+  pushes fix commits in response, including conflict resolution) and adds
+  a `conflict-nudged` label so the rule doesn't re-fire on every subsequent
+  webhook while still conflicting; a second rule clears the label once
+  `conflict` goes false again, so a future conflict can re-trigger the
+  nudge. The GitHub author `login` for these PRs is `Copilot` (a Bot-type
+  user) - not `copilot-swe-agent[bot]` or `app/copilot-swe-agent`, both of
+  which Mergify's `author=` condition rejects.
+- The `@copilot` nudge comment above initially posted as `mergify[bot]` and
+  was silently ignored - confirmed live on PRs #93/#98/#100, 16+ minutes
+  with zero response, versus ~3.5 minutes for an identical mention posted
+  by a human. GitHub's own docs explain why: "Copilot only responds to
+  comments from people who have write access to the repository," and a
+  GitHub App's own identity (`mergify[bot]`) doesn't count as a person with
+  collaborator write access, regardless of the App's actual installation
+  permissions. The rule now uses `bot_account: fupacat` on the `comment`
+  action so the mention posts as a real collaborator - Eric explicitly
+  approved this after Claude Code's classifier flagged the config change as
+  identity-weakening (automation posting under his name without a human
+  step each time). A dedicated automation user account (e.g.
+  `girdle-automation`), invited as a collaborator and authorized in
+  Mergify, is deferred to the backlog as the non-impersonating long-term
+  fix - `bot_account` only works with a real User-type GitHub account with
+  collaborator write access, not another bot/App identity.
 - `.mergify.yml`, `.gitar/config/`, and `.gitar/review/` are kept in-repo
   rather than dashboard-only wherever Gitar/Mergify support it, specifically
   because a dashboard-only setting drifted once already (a Mergify

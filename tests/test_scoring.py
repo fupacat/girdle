@@ -60,12 +60,11 @@ def test_percentages_multi_category_and_overall_distinct(monkeypatch):
     assert result.category_percentages == {
         "category_a": 50.0,
         "category_b": 50.0,
-        "empty_category": None,
     }
-    assert result.overall_percentage == 33.33
+    assert result.overall_percentage == 33.3
 
 
-def test_overall_percentage_none_when_no_applicable_checks(monkeypatch):
+def test_overall_percentage_zero_when_no_applicable_checks(monkeypatch):
     monkeypatch.setattr(
         "girdle.schema.CHECK_REGISTRY",
         {
@@ -73,7 +72,7 @@ def test_overall_percentage_none_when_no_applicable_checks(monkeypatch):
         },
     )
     result = ScanResult(repo_root=".", scanned_at="now", mode="static")
-    assert result.overall_percentage is None
+    assert result.overall_percentage == 0.0
 
 
 def test_ecosystem_checks_use_registry_categories_not_key_name(monkeypatch):
@@ -194,6 +193,21 @@ def test_crossing_difficulty_threshold_earns_badge_state(monkeypatch):
                 "advanced": CategoryResult(Tier.ABSENT),
             }
         ),
+    )
+    score = result.to_dict()["summary"]["category_scores"]["cat"]
+    assert score["state"] == "silver"
+
+
+def test_intermediate_only_category_can_earn_silver(monkeypatch):
+    monkeypatch.setattr(
+        "girdle.schema.CHECK_REGISTRY",
+        {"x": CheckEntry("x", ("cat",), Difficulty.INTERMEDIATE)},
+    )
+    result = ScanResult(
+        repo_root=".",
+        scanned_at="now",
+        mode="static",
+        hygiene=HygieneResult(checks={"x": CategoryResult(Tier.CONFIGURED)}),
     )
     score = result.to_dict()["summary"]["category_scores"]["cat"]
     assert score["state"] == "silver"

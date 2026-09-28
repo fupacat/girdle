@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 
-from girdle.checks import CHECK_REGISTRY, CheckEntry, Difficulty
+from girdle.checks import CHECK_REGISTRY, Difficulty
 from girdle.hygiene import HygieneResult
 from girdle.platform import PlatformResult
 from girdle.tiers import CategoryResult, Tier
@@ -82,7 +82,7 @@ class ScanResult:
     @property
     def overall_percentage(self) -> float | None:
         score = self._overall_score(self.check_statuses)
-        return score["percentage"] if score["total"] else None
+        return score["percentage"]
 
     @property
     def overall_min(self) -> int:
@@ -168,7 +168,9 @@ class ScanResult:
         earned: str | None = None
         for difficulty in (Difficulty.BASIC, Difficulty.INTERMEDIATE, Difficulty.ADVANCED):
             tier_keys = [k for k in keys if Difficulty(statuses[k]["difficulty"]) == difficulty]
-            if not tier_keys or not all(statuses[k]["passed"] for k in tier_keys):
+            if not tier_keys:
+                continue
+            if not all(statuses[k]["passed"] for k in tier_keys):
                 break
             earned = BADGE_BY_DIFFICULTY[difficulty]
         return earned
