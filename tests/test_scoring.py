@@ -57,7 +57,18 @@ def test_ecosystem_category_percentages_count_shared_checks_per_category(monkeyp
     assert eco.overall_percentage == 66.67
 
 
-def test_ecosystem_category_percentages_return_zero_for_empty_category():
+def test_ecosystem_category_percentages_return_zero_for_empty_category(monkeypatch):
+    monkeypatch.setitem(
+        CHECK_REGISTRY,
+        "tests",
+        CheckEntry("tests", ("tests",), Difficulty.INTERMEDIATE),
+    )
+    monkeypatch.setitem(
+        CHECK_REGISTRY,
+        "lint",
+        CheckEntry("lint", ("lint",), Difficulty.INTERMEDIATE),
+    )
+
     eco = EcosystemResult(
         id="x",
         language="x",

@@ -149,9 +149,11 @@ class ScanResult:
 
     @property
     def overall_percentage(self) -> float:
-        results: list[CategoryResult] = []
+        seen: dict[tuple[str, str], CategoryResult] = {}
         for eco in self.ecosystems:
-            results.extend(eco.applicable_checks.values())
+            for check_key, result in eco.applicable_checks.items():
+                seen[(eco.id, check_key)] = result
+        results = list(seen.values())
         if self.hygiene is not None:
             results.extend(self.hygiene.checks.values())
         return _percentage(results)
