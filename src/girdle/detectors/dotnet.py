@@ -46,11 +46,12 @@ class DotNetDetector:
             read_text(p) or "" for p in rglob_excluding(root, CSPROJ_GLOB, FSPROJ_GLOB)
         ]
         combined = "\n".join(project_texts)
+        build = self._scan_build(root)
         return {
             "tests": self._scan_tests(root, combined),
             "lint": self._scan_lint(root),
             "coverage": self._scan_coverage(root, combined),
-            "build": self._scan_build(root),
+            **({"build": build} if build.tier != Tier.ABSENT else {}),
             "reproducibility": self._scan_reproducibility(root, combined),
             "ci_gating": self._scan_ci(root),
         }

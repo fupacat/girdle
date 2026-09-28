@@ -66,4 +66,5 @@ def test_build_run_command_omitted_without_detectable_build_files(tmp_path: Path
     det = DotNetDetector()
     fp = Fingerprint(id="dotnet", language="dotnet", toolchain="nuget", root=tmp_path, variants=[])
     assert "build" not in det.applicable_categories(fp)
+    assert "build" not in det.scan(fp, mode="static")
     assert "build" not in det.run_commands(fp)
