@@ -26,7 +26,7 @@ def _run_detector(detector: Detector, repo_root: Path, mode: str) -> EcosystemRe
     categories["static_analysis"] = scan_static_analysis(repo_root)
     _verify(detector, fp, categories, mode)
     _check_coverage_gate(fp, categories)
-    applicable = list(dict.fromkeys([*detector.applicable_categories(fp), "static_analysis"]))
+    applicable = detector.applicable_categories(fp)
     return EcosystemResult(
         id=fp.id,
         language=fp.language,

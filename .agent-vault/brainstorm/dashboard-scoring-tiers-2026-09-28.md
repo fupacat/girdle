@@ -452,9 +452,9 @@ session - not yet final/exhaustive as new checks get added):
   `editorconfig`/`gitattributes`, `precommit`
 - **Advanced/rare**: SAST/static-analysis-configured (distinct from
   `lint`, and now reported as the `static_analysis` check for each detected
-  ecosystem). It is included in `applicable_categories`, so a missing SAST
-  setup currently does cap an ecosystem's minimum score the same way the
-  other scored categories do. Other checks in this tier: `agent_instructions`,
+  ecosystem). It is excluded from `applicable_categories`, so a missing SAST
+  setup does not cap an ecosystem's minimum score. Other checks in this tier:
+  `agent_instructions`,
   `agent_sandbox_bootstrap`, `reproducibility`, structural index,
   design/decision notes, Debugging & Observability, Task Discovery
 
