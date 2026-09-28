@@ -25,15 +25,22 @@ jobs:
             const repo  = context.repo.repo;
 
             // ------------------------------------------------------------------
-            // 1. Discover the node-id of the copilot-swe-agent bot actor
-            //    via suggestedActors(capabilities: [CAN_BE_ASSIGNED]).
+            // 1. Discover the assignable node-id of the copilot-swe-agent
+            //    actor via suggestedActors(capabilities: [CAN_BE_ASSIGNED]).
             // ------------------------------------------------------------------
             const repoNodeQuery = `
               query($owner: String!, $repo: String!) {
                 repository(owner: $owner, name: $repo) {
                   id
                   suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 100) {
-                    nodes { login id }
+                    nodes {
+                      __typename
+                      login
+                      ... on Bot { id }
+                      ... on User { id }
+                      ... on Organization { id }
+                      ... on Mannequin { id }
+                    }
                   }
                 }
               }
@@ -48,8 +55,14 @@ jobs:
               core.warning("copilot-swe-agent not found in suggestedActors – skipping.");
               return;
             }
+            if (!copilotActor.id) {
+              core.warning(
+                `copilot-swe-agent was returned as ${copilotActor.__typename}` +
+                " without an assignable id – skipping.",
+              );
+              return;
+            }
             const copilotId = copilotActor.id;
-            const repoId    = repoData.repository.id;
 
             core.info(`Copilot actor id: ${copilotId}`);
 
