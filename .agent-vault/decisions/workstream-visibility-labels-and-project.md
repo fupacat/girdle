@@ -55,8 +55,8 @@ per-initiative grouping.
 
 ## Reference
 
-Full reasoning:
-[[.agent-vault/brainstorm/workstream-visibility-2026-09-28|workstream-visibility-2026-09-28]].
+Full reasoning is captured in this ADR (the originating brainstorm was not
+committed to the vault).
 [Project #3](https://github.com/users/fupacat/projects/3), created and
 linked directly (GitHub object setup, not code). Implementation:
 `.github/workflows/auto-assign-copilot.yml` (issues #106, #107) - no
