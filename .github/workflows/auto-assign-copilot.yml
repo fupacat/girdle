@@ -97,34 +97,19 @@ jobs:
                     }
                   }
                 }
-                user(login: $owner) {
-                  projectV2(number: $projectNumber) {
-                    id
-                    fields(first: 50) {
-                      nodes {
-                        ... on ProjectV2SingleSelectField {
-                          id
-                          name
-                          options {
+                repositoryOwner(login: $owner) {
+                  ... on ProjectV2Owner {
+                    projectV2(number: $projectNumber) {
+                      id
+                      fields(first: 50) {
+                        nodes {
+                          ... on ProjectV2SingleSelectField {
                             id
                             name
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                organization(login: $owner) {
-                  projectV2(number: $projectNumber) {
-                    id
-                    fields(first: 50) {
-                      nodes {
-                        ... on ProjectV2SingleSelectField {
-                          id
-                          name
-                          options {
-                            id
-                            name
+                            options {
+                              id
+                              name
+                            }
                           }
                         }
                       }
@@ -162,10 +147,7 @@ jobs:
             const labelIdsByName = new Map(
               bootstrap.repository.labels.nodes.map(label => [label.name, label.id]),
             );
-            const project =
-              bootstrap.user?.projectV2 ??
-              bootstrap.organization?.projectV2 ??
-              null;
+            const project = bootstrap.repositoryOwner?.projectV2 ?? null;
             const statusField =
               project?.fields?.nodes?.find(field => field?.name === projectStatusFieldName) ??
               null;
@@ -213,7 +195,7 @@ jobs:
                 nodes { number state }
                 pageInfo { hasNextPage endCursor }
               }
-              linkedPullRequests(first: 100) {
+              closedByPullRequestsReferences(first: 100, includeClosedPrs: true) {
                 nodes { number state isDraft }
                 pageInfo { hasNextPage endCursor }
               }
@@ -223,6 +205,9 @@ jobs:
                   project {
                     id
                     number
+                  }
+                  fieldValueByName(name: "${projectStatusFieldName}") {
+                    ... on ProjectV2ItemFieldSingleSelectValue { optionId }
                   }
                 }
               }
@@ -280,7 +265,11 @@ jobs:
               query($id: ID!, $after: String) {
                 node(id: $id) {
                   ... on Issue {
-                    linkedPullRequests(first: 100, after: $after) {
+                    closedByPullRequestsReferences(
+                      first: 100,
+                      after: $after,
+                      includeClosedPrs: true
+                    ) {
                       pageInfo { hasNextPage endCursor }
                       nodes { number state isDraft }
                     }
@@ -434,7 +423,7 @@ jobs:
             const syncProjectStatus = async (issue, desiredStatus) => {
               if (!project || !statusField) return;
               const item = issue.projectItems.nodes.find(
-                projectItem => projectItem.project.number === projectNumber,
+                projectItem => projectItem.project.id === project.id,
               );
               if (!item) {
                 core.info(
@@ -451,6 +440,7 @@ jobs:
                 );
                 return;
               }
+              if (item.fieldValueByName?.optionId === optionId) return;
               await copilotGitHub.graphql(updateProjectStatusMutation, {
                 projectId: project.id,
                 itemId: item.id,
@@ -495,11 +485,11 @@ jobs:
               const linkedPullRequests = await loadConnection(
                 {
                   id: issue.id,
-                  nodes: issue.linkedPullRequests.nodes,
-                  pageInfo: issue.linkedPullRequests.pageInfo,
+                  nodes: issue.closedByPullRequestsReferences.nodes,
+                  pageInfo: issue.closedByPullRequestsReferences.pageInfo,
                 },
                 linkedPullRequestsQuery,
-                data => data.node.linkedPullRequests,
+                data => data.node.closedByPullRequestsReferences,
               );
 
               const openBlockers = blockers.filter(b => b.state === "OPEN");
