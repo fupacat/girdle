@@ -57,4 +57,54 @@ class JsNpmDetector:
                 reason=f"{PACKAGE_LOCK_JSON} exists but is gitignored (not committed)",
                 recommendation=f"Remove {PACKAGE_LOCK_JSON} from .gitignore and commit it.",
             )
+        drift = _check_lockfile_drift(root)
+        if drift:
+            missing = ", ".join(sorted(drift)[:5])
+            return CategoryResult(
+                Tier.ABSENT,
+                evidence=[PACKAGE_LOCK_JSON],
+                reason=(
+                    f"manifest/lockfile drift: {len(drift)} package(s) missing"
+                    f" from lockfile: {missing}"
+                ),
+                recommendation=(
+                    "Run `npm install` to regenerate the lockfile"
+                    " from the current package.json."
+                ),
+            )
         return CategoryResult(Tier.CONFIGURED, evidence=[PACKAGE_LOCK_JSON])
+
+
+def _check_lockfile_drift(root: Path) -> list[str]:
+    """Return package names declared in package.json but absent from package-lock.json."""
+    pkg_data = read_json(root / "package.json") or {}
+    lock_data = read_json(root / PACKAGE_LOCK_JSON)
+    if lock_data is None:
+        return []
+
+    # Collect declared dependency names from the manifest.
+    declared: set[str] = set()
+    for section in ("dependencies", "devDependencies", "optionalDependencies"):
+        declared.update((pkg_data.get(section) or {}).keys())
+
+    if not declared:
+        return []
+
+    # Build the set of package names in the lockfile.
+    # v2/v3 lockfiles use a "packages" section with keys like "node_modules/pkg"
+    # or "node_modules/@scope/pkg" (and "" for the root entry).
+    # v1 lockfiles use a "dependencies" section with bare package names.
+    locked: set[str] = set()
+    packages = lock_data.get("packages")
+    if isinstance(packages, dict):
+        for key in packages:
+            if key == "":
+                continue
+            # Strip "node_modules/" prefix (handles nested: "node_modules/a/node_modules/b" -> "b")
+            name = key.split("node_modules/")[-1]
+            locked.add(name)
+    dependencies = lock_data.get("dependencies")
+    if isinstance(dependencies, dict):
+        locked.update(dependencies.keys())
+
+    return [pkg for pkg in declared if pkg not in locked]
