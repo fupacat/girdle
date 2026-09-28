@@ -55,7 +55,9 @@ class DotNetDetector:
     def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
         # Analyzers run as part of the build, not a separate lint invocation;
         # no standalone lint command to declare here.
-        commands = {"tests": ["dotnet", "test"], "build": ["dotnet", "build"]}
+        commands = {"tests": ["dotnet", "test"]}
+        if self._build_evidence(fp.root):
+            commands["build"] = ["dotnet", "build"]
         project_texts = [
             read_text(p) or "" for p in rglob_excluding(fp.root, CSPROJ_GLOB, FSPROJ_GLOB)
         ]
@@ -119,11 +121,7 @@ class DotNetDetector:
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
 
     def _scan_build(self, root: Path) -> CategoryResult:
-        evidence = []
-        if any(rglob_excluding(root, CSPROJ_GLOB, FSPROJ_GLOB)):
-            evidence.append("*.csproj/*.fsproj")
-        if any(root.glob("*.sln")):
-            evidence.append("*.sln")
+        evidence = self._build_evidence(root)
         if not evidence:
             return CategoryResult(
                 Tier.ABSENT,
@@ -131,6 +129,14 @@ class DotNetDetector:
                 recommendation="Add a .csproj/.fsproj project or a .sln solution file.",
             )
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
+
+    def _build_evidence(self, root: Path) -> list[str]:
+        evidence = []
+        if any(rglob_excluding(root, CSPROJ_GLOB, FSPROJ_GLOB)):
+            evidence.append("*.csproj/*.fsproj")
+        if any(root.glob("*.sln")):
+            evidence.append("*.sln")
+        return evidence
 
     def _scan_reproducibility(self, root: Path, combined: str) -> CategoryResult:
         has_lockfile = (root / PACKAGES_LOCK_JSON).exists() or any(
