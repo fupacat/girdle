@@ -154,8 +154,9 @@ pull_request_rules:
     # reaches Copilot. TODO(backlog): replace with a dedicated automation
     # user account (e.g. girdle-automation) once one is provisioned and
     # authorized in Mergify, so these nudges don't read as Eric personally
-    # asking each time - deferred for now, fupacat unblocks the currently
-    # stuck PRs immediately with no new account to provision.
+    # asking each time - deferred for now. NOTE: PRs already labelled
+    # conflict-nudged (e.g. #93/#98/#100) must have that label removed
+    # manually to be re-nudged under this account.
     conditions:
       - conflict
       - author=Copilot
