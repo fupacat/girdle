@@ -146,7 +146,11 @@ class ScanResult:
 
             seen_in: list[str] = []
             failing_in: list[str] = []
-            if self.hygiene is not None and key in self.hygiene.checks:
+            if (
+                self.hygiene is not None
+                and key in self.hygiene.checks
+                and self.hygiene.is_applicable(key)
+            ):
                 seen_in.append("hygiene")
                 if self.hygiene.checks[key].tier < Tier.CONFIGURED:
                     failing_in.append("hygiene")

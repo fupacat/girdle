@@ -87,10 +87,11 @@ def _detect_repo_visibility(root: Path) -> str | None:
 
 def _detect_license_id(text: str) -> str | None:
     normalized = _normalize_text(text)
-    for spdx_id in ("BSD-3-Clause", "BSD-2-Clause"):
-        if all(_normalize_text(phrase) in normalized for phrase in LICENSE_SIGNATURES[spdx_id]):
-            return spdx_id
-    for spdx_id, phrases in LICENSE_SIGNATURES.items():
+    if all(_normalize_text(phrase) in normalized for phrase in LICENSE_SIGNATURES["BSD-2-Clause"]):
+        if re.search(r"\b3 neither the name of .+? nor the names of", normalized):
+            return "BSD-3-Clause"
+        return "BSD-2-Clause"
+    for spdx_id, phrases in LICENSE_SIGNATURES.items()
         if spdx_id in {"BSD-3-Clause", "BSD-2-Clause"}:
             continue
         if all(_normalize_text(phrase) in normalized for phrase in phrases):
