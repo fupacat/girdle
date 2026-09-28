@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
+from functools import cached_property
 
 from girdle.checks import CHECK_REGISTRY, Difficulty
 from girdle.hygiene import HygieneResult
@@ -102,7 +103,7 @@ class ScanResult:
                     worst = (int(cat.tier), name)
         return worst[1] if worst else None
 
-    @property
+    @cached_property
     def check_statuses(self) -> dict[str, dict]:
         statuses: dict[str, dict] = {}
         for key, entry in CHECK_REGISTRY.items():
@@ -122,9 +123,12 @@ class ScanResult:
             seen_in: list[str] = []
             failing_in: list[str] = []
             for eco in self.ecosystems:
-                if key not in eco.applicable_categories and key not in eco.categories:
-                    continue
                 cat = eco.categories.get(key)
+                if key in eco.applicable_categories:
+                    seen_in.append(eco.id)
+                    if cat is None or cat.tier < Tier.CONFIGURED:
+                        failing_in.append(eco.id)
+                    continue
                 if cat is None:
                     continue
                 seen_in.append(eco.id)
@@ -157,7 +161,7 @@ class ScanResult:
                 earned = BADGE_BY_DIFFICULTY[difficulty]
         return earned
 
-    @property
+    @cached_property
     def category_scores(self) -> dict[str, dict]:
         statuses = self.check_statuses
         per_category: dict[str, list[str]] = defaultdict(list)
@@ -195,7 +199,7 @@ class ScanResult:
             }
         return scores
 
-    @property
+    @cached_property
     def overall_score(self) -> dict:
         statuses = self.check_statuses
         keys = sorted(statuses.keys())
