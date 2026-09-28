@@ -131,13 +131,22 @@ Mergify's queue.
   (a webhook/queue race, possibly tied to rapid successive commits)
   isn't visible from this side and wasn't pinned down further - the
   symptom and the fix are what's actionable, not the mechanism.
-- **A third, also-distinct gap observed the same session**: Copilot can
-  finish a PR (approved, all checks green) while never firing the
+- **A third, also-distinct gap, recurring**: Copilot can finish a PR
+  (approved, all checks green) while never firing the
   `review_requested`/`ready_for_review` event `auto-merge-copilot.yml`
-  depends on to promote it out of draft - confirmed on PR #92, zero runs
-  of that workflow existed for its branch despite the PR being fully
-  ready. Recoverable with a direct `gh pr ready <PR>` call; no code
-  change needed, this is a PR-state action same as the nudges above.
+  depends on to promote it out of draft - first seen on PR #92, recurred
+  on PR #114 (zero runs of the workflow existed for its branch despite a
+  `review_requested` event appearing in the PR's own timeline; `CI` and
+  other `pull_request`-triggered workflows fired normally in the same
+  window, ruling out a general Actions outage). GitHub exposes no
+  authoritative "Copilot finished coding" event - `review_requested` is an
+  inferred proxy that other actors (CODEOWNERS auto-request, a teammate,
+  Gitar's review flow) can also fire, and delivery to Actions isn't
+  guaranteed. `auto-merge-copilot.yml` now has a second job
+  (`fallback-sweep`, `schedule`-triggered every 15 minutes) that promotes
+  any open Copilot-authored draft PR whose latest commit is at least 10
+  minutes old, independent of whether the event-driven job ever ran - the
+  reactive job stays as the fast path, the sweep is the backstop.
 - `.github/workflows/auto-assign-copilot.yml` (issue #85's auto-assignment
   automation, later extended to sync issue dependency labels and Project
   Status) needs a dedicated PAT in the `COPILOT_ASSIGN_TOKEN` secret, not
