@@ -78,3 +78,7 @@ itself.
   `parse_agent_output`'s outer-layer parsing breaks - this is an external
   contract girdle doesn't control, unlike everything else in its normal
   zero-auth checks.
+
+## Related
+
+- [[.agent-vault/decisions/girdle-audit-command-design|girdle-audit-command-design]]

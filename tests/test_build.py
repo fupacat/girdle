@@ -60,7 +60,7 @@ def test_dotnet_build_configured_and_verifiable(tmp_path: Path):
     result = det.scan(fp, mode="static")
     assert "build" in det.applicable_categories(fp)
     assert result["build"].tier == Tier.CONFIGURED
-    assert det.run_commands(fp)["build"] == ["dotnet", "build"]
+    assert det.run_commands(fp)["build"] == ["dotnet", "build", str(tmp_path / "App.csproj")]
 
 
 def test_js_build_requires_explicit_build_script(tmp_path: Path):
