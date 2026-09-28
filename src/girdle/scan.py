@@ -27,8 +27,6 @@ def _run_detector(detector: Detector, repo_root: Path, mode: str) -> EcosystemRe
     _verify(detector, fp, categories, mode)
     _check_coverage_gate(fp, categories)
     applicable = detector.applicable_categories(fp)
-    if "static_analysis" not in applicable:
-        applicable = [*applicable, "static_analysis"]
     return EcosystemResult(
         id=fp.id,
         language=fp.language,

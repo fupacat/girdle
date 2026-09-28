@@ -47,12 +47,12 @@ def test_sonar_scan_with_config_detected(tmp_path: Path):
     ]
 
 
-def test_run_scan_surfaces_static_analysis_category(tmp_path: Path):
+def test_run_scan_surfaces_static_analysis_without_affecting_applicability(tmp_path: Path):
     (tmp_path / "requirements.txt").write_text("pytest==8.0.0\n")
     _wf(tmp_path, "jobs:\n  analyze:\n    steps:\n      - uses: github/codeql-action/analyze@v4\n")
 
     result = run_scan(tmp_path)
 
     eco = result.ecosystems[0]
-    assert "static_analysis" in eco.applicable_categories
+    assert "static_analysis" not in eco.applicable_categories
     assert eco.categories["static_analysis"].tier == Tier.CONFIGURED
