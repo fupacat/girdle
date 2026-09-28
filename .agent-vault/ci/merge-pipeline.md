@@ -131,6 +131,20 @@ Mergify's queue.
   (a webhook/queue race, possibly tied to rapid successive commits)
   isn't visible from this side and wasn't pinned down further - the
   symptom and the fix are what's actionable, not the mechanism.
+- **A third, also-distinct gap observed the same session**: Copilot can
+  finish a PR (approved, all checks green) while never firing the
+  `review_requested`/`ready_for_review` event `auto-merge-copilot.yml`
+  depends on to promote it out of draft - confirmed on PR #92, zero runs
+  of that workflow existed for its branch despite the PR being fully
+  ready. Recoverable with a direct `gh pr ready <PR>` call; no code
+  change needed, this is a PR-state action same as the nudges above.
+- `.github/workflows/auto-assign-copilot.yml` (issue #85's auto-assignment
+  automation) needs a dedicated PAT in the `COPILOT_ASSIGN_TOKEN` secret,
+  not the default `GITHUB_TOKEN` - Copilot assignment via
+  `replaceActorsForAssignable` requires a token with **Read access to
+  metadata**, and **Read and Write access to actions, code, issues, and
+  pull requests**. Discovered the hard way across PRs #90/#92 (token
+  bootstrap and scope-error-handling fixes) rather than known upfront.
 - The required-approval story is now two different mechanisms depending on
   PR type (Mergify self-approve for safe Dependabot bumps vs. Gitar/Copilot
   review for everything else) rather than one uniform rule - documented
