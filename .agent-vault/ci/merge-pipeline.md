@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 3a72a1782cb19e99b6c6e8ea965c029d0bdbce3f2ab6d4f3caf0cbbdd779684e
+    hash: 79c29a4037a4de0ce4b2ba3ee0a2ec143f59d0b29c5c405a463bea7f3c984d3f
 stale: false
 ---
 
@@ -179,6 +179,22 @@ Mergify's queue.
   nudge. The GitHub author `login` for these PRs is `Copilot` (a Bot-type
   user) - not `copilot-swe-agent[bot]` or `app/copilot-swe-agent`, both of
   which Mergify's `author=` condition rejects.
+- The `@copilot` nudge comment above initially posted as `mergify[bot]` and
+  was silently ignored - confirmed live on PRs #93/#98/#100, 16+ minutes
+  with zero response, versus ~3.5 minutes for an identical mention posted
+  by a human. GitHub's own docs explain why: "Copilot only responds to
+  comments from people who have write access to the repository," and a
+  GitHub App's own identity (`mergify[bot]`) doesn't count as a person with
+  collaborator write access, regardless of the App's actual installation
+  permissions. The rule now uses `bot_account: fupacat` on the `comment`
+  action so the mention posts as a real collaborator - Eric explicitly
+  approved this after Claude Code's classifier flagged the config change as
+  identity-weakening (automation posting under his name without a human
+  step each time). A dedicated automation user account (e.g.
+  `girdle-automation`), invited as a collaborator and authorized in
+  Mergify, is deferred to the backlog as the non-impersonating long-term
+  fix - `bot_account` only works with a real User-type GitHub account with
+  collaborator write access, not another bot/App identity.
 - `.mergify.yml`, `.gitar/config/`, and `.gitar/review/` are kept in-repo
   rather than dashboard-only wherever Gitar/Mergify support it, specifically
   because a dashboard-only setting drifted once already (a Mergify
