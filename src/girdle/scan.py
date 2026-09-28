@@ -143,7 +143,9 @@ def _check_ci_tests_alignment(
         text = read_text(ci_file) or ""
         lines = text.splitlines()
         for index, line in enumerate(lines):
-            execution = re.match(r"(?:-\s*)?(?:run|script)\s*:\s*(.*)", line.strip())
+            execution = re.match(
+                r"(?:-\s*)?(?:run|script|bash|pwsh|powershell)\s*:\s*(.*)", line.strip()
+            )
             if execution is None:
                 continue
             execution_lines = [execution.group(1)]
