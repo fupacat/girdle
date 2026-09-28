@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 64be81d0d656276ab6c46e8171b171c012f927553c911701c1dee1080a798cb9
+    hash: 3a72a1782cb19e99b6c6e8ea965c029d0bdbce3f2ab6d4f3caf0cbbdd779684e
 stale: false
 ---
 
@@ -152,6 +152,23 @@ Mergify's queue.
   review for everything else) rather than one uniform rule - documented
   here and in `.mergify.yml`'s own rule comments so it isn't rediscovered
   from scratch.
+- Copilot coding-agent PRs stacked against a moving `master` routinely drift
+  into genuine content conflicts (not just a stale branch) as earlier PRs
+  in the same batch merge - the "Keep PRs up to date" `update` rule can't
+  fix that, and it doesn't self-resolve by dequeuing/requeuing either
+  (confirmed live: requeuing PR #93 left it stuck on the unmet `-conflict`
+  condition). Mergify's `conflict` pull-request attribute updates reactively
+  off GitHub webhooks, so a `pull_request_rules` entry conditioned on
+  `conflict` + `author=Copilot` reacts within seconds rather than needing a
+  polling GitHub Actions workflow - it comments `@copilot` on the affected
+  PR (Copilot's coding agent watches for mentions on PRs it authored and
+  pushes fix commits in response, including conflict resolution) and adds
+  a `conflict-nudged` label so the rule doesn't re-fire on every subsequent
+  webhook while still conflicting; a second rule clears the label once
+  `conflict` goes false again, so a future conflict can re-trigger the
+  nudge. The GitHub author `login` for these PRs is `Copilot` (a Bot-type
+  user) - not `copilot-swe-agent[bot]` or `app/copilot-swe-agent`, both of
+  which Mergify's `author=` condition rejects.
 - `.mergify.yml`, `.gitar/config/`, and `.gitar/review/` are kept in-repo
   rather than dashboard-only wherever Gitar/Mergify support it, specifically
   because a dashboard-only setting drifted once already (a Mergify

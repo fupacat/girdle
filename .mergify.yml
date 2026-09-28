@@ -135,6 +135,42 @@ pull_request_rules:
     actions:
       queue:
         name: default
+
+  - name: nudge Copilot when a PR goes into conflict
+    # Copilot's own PRs pile up behind each other and drift into conflict
+    # with master as earlier ones merge - the "Keep PRs up to date" rule
+    # above can't fix that (a real diff conflict, not just a stale branch),
+    # and dequeuing wasn't resolving it either. Mergify already recomputes
+    # `conflict` reactively off GitHub's webhooks, so this reacts within
+    # seconds rather than needing a polling workflow. Copilot coding agent
+    # watches for @-mentions on PRs it authored and pushes fix commits in
+    # response, including conflict resolution.
+    conditions:
+      - conflict
+      - author=Copilot
+      - -label=conflict-nudged
+      - -closed
+      - -draft
+    actions:
+      comment:
+        message: >-
+          @copilot This PR has a merge conflict with `master`. Please rebase
+          onto the latest `master` and resolve the conflicting changes.
+      label:
+        add:
+          - conflict-nudged
+
+  - name: clear conflict-nudged label once resolved
+    # Lets a PR get re-nudged if it drifts into conflict again later -
+    # no -draft here, clearing a stale label is harmless regardless of
+    # draft state.
+    conditions:
+      - -conflict
+      - label=conflict-nudged
+    actions:
+      label:
+        remove:
+          - conflict-nudged
 queue_rules:
   - name: Dependabot
     # branch_protection_injection_mode: merge - the default ("queue")
