@@ -68,10 +68,9 @@ def test_category_with_zero_applicable_checks_is_safe(monkeypatch):
         {"x": CheckEntry("x", ("empty",), Difficulty.BASIC)},
     )
     result = ScanResult(repo_root=".", scanned_at="now", mode="static")
-    score = result.to_dict()["summary"]["category_scores"]["empty"]
-    assert score["total"] == 0
-    assert score["percentage"] == 0.0
-    assert score["state"] == "neutral"
+    data = result.to_dict()["summary"]
+    assert "empty" not in data["category_scores"]
+    assert data["overall_percentage"] == 0.0
 
 
 def test_zero_percent_is_neutral_state(monkeypatch):

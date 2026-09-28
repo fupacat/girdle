@@ -110,7 +110,7 @@
         <ul>
           {% for name, category in eco.categories.items() %}
           <li>
-            {{ name.replace('_', ' ') }}: {{ category.status }} (tier {{ category.tier }})
+            {{ name.replace('_', ' ') }}: {{ category['status'] }} (tier {{ category['tier'] }})
             {% if category.evidence %}
             <div class="cat-meta">Evidence: {{ category.evidence | join(', ') }}</div>
             {% endif %}

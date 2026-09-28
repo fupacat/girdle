@@ -165,14 +165,7 @@ class ScanResult:
             for category in status["categories"]:
                 per_category[category].append(key)
 
-        all_categories = sorted(
-            {
-                category
-                for entry in CHECK_REGISTRY.values()
-                if not entry.reserved
-                for category in entry.categories
-            }
-        )
+        all_categories = sorted(per_category.keys())
         scores: dict[str, dict] = {}
         for category in all_categories:
             keys = sorted(per_category.get(category, []))
