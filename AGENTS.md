@@ -25,7 +25,7 @@ edit the note in the same commit as the code it watches.
 
 <!-- girdle:index:start -->
 
-````
+```
 src/girdle/align.py | python | 325L | AlignPlan, _python_formatter, _js_formatter, _js_formatter_skip_note, _prettier_settings, _rust_formatter, _detect_python, _detect_js, _detect_rust, detect_formatters, _parse_editorconfig_sections, _render_section, plan_editorconfig, plan_gitattributes, plan_gitignore, build_align_plans, apply_plan
 src/girdle/audit.py | python | 184L | AuditFinding, AuditResult, _invoke_agent, parse_agent_output, audit_file, discover_instruction_files, run_audit
 src/girdle/badge.py | python | 39L | badge_url, badge_markdown, badge_endpoint
@@ -68,4 +68,3 @@ tests/test_vendor_exclusion.py | python | 49L | test_python_ignores_test_files_i
 # ... truncated to fit 4000-token budget (43/65 files shown)```
 
 <!-- girdle:index:end -->
-````
