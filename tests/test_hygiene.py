@@ -258,6 +258,7 @@ def test_license_pyproject_file_form_is_aligned(tmp_path: Path):
 def test_license_to_dict_marks_not_applicable(tmp_path: Path):
     data = build_hygiene(tmp_path, languages=set(), repo_visibility="internal").to_dict()
     assert data["license"]["applicable"] is False
+    assert data["license"]["status"] == "n/a"
 
 
 def test_codeowners_found_in_github_dir(tmp_path: Path):

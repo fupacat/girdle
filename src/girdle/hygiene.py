@@ -192,13 +192,6 @@ LICENSE_SIGNATURES = {
         "with or without fee is hereby granted",
         'the software is provided "as is" and the author disclaims all warranties',
     ),
-    "BSD-2-Clause": (
-        "redistribution and use in source and binary forms with or without modification are "
-        "permitted provided that the following conditions are met",
-        "1 redistributions of source code must retain the above copyright notice",
-        "2 redistributions in binary form must reproduce the above copyright notice",
-        'this software is provided by the copyright holders and contributors "as is"',
-    ),
     "BSD-3-Clause": (
         "redistribution and use in source and binary forms with or without modification are "
         "permitted provided that the following conditions are met",
@@ -207,6 +200,13 @@ LICENSE_SIGNATURES = {
         "3 neither the name of the copyright holder nor the names of its contributors may be "
         "used to endorse or promote products derived from this software without specific prior "
         "written permission",
+        'this software is provided by the copyright holders and contributors "as is"',
+    ),
+    "BSD-2-Clause": (
+        "redistribution and use in source and binary forms with or without modification are "
+        "permitted provided that the following conditions are met",
+        "1 redistributions of source code must retain the above copyright notice",
+        "2 redistributions in binary form must reproduce the above copyright notice",
         'this software is provided by the copyright holders and contributors "as is"',
     ),
     "MPL-2.0": (
@@ -250,10 +250,15 @@ class HygieneResult:
         return True if self.applicable_checks is None else name in self.applicable_checks
 
     def to_dict(self) -> dict:
-        return {
-            name: {**cat.to_dict(), "applicable": self.is_applicable(name)}
-            for name, cat in self.checks.items()
-        }
+        result = {}
+        for name, cat in self.checks.items():
+            data = cat.to_dict()
+            applicable = self.is_applicable(name)
+            if not applicable:
+                data["status"] = "n/a"
+            data["applicable"] = applicable
+            result[name] = data
+        return result
 
 
 def _first_existing(root: Path, candidates: tuple[str, ...]) -> Path | None:
@@ -518,9 +523,9 @@ def check_dependency_monitoring(root: Path) -> CategoryResult:
 def check_license(root: Path, visibility: str | None) -> CategoryResult:
     if visibility != "public":
         reason = (
-            "repo is not public; LICENSE check not scored"
+            "not applicable: repo is not public; LICENSE check not scored"
             if visibility in {"private", "internal"}
-            else "repo visibility could not be determined; LICENSE check not scored"
+            else "not applicable: repo visibility could not be determined; LICENSE check not scored"
         )
         return CategoryResult(Tier.ABSENT, reason=reason)
 
