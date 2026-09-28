@@ -1,3 +1,4 @@
+from girdle.checks import CHECK_REGISTRY, CheckEntry, Difficulty
 from girdle.schema import CategoryResult, EcosystemResult, ScanResult, Tier
 
 
@@ -30,3 +31,96 @@ def test_scan_result_overall_min_is_weakest_ecosystem():
     result = ScanResult(repo_root=".", scanned_at="now", mode="static", ecosystems=[good, bad])
     assert result.overall_min == 0
     assert result.weakest_category == "tests"
+
+
+def test_ecosystem_category_percentages_count_shared_checks_per_category(monkeypatch):
+    monkeypatch.setitem(
+        CHECK_REGISTRY,
+        "shared",
+        CheckEntry("shared", ("tests", "lint"), Difficulty.INTERMEDIATE),
+    )
+
+    eco = EcosystemResult(
+        id="x",
+        language="x",
+        toolchain="x",
+        root=".",
+        categories={
+            "tests": CategoryResult(Tier.CONFIGURED),
+            "lint": CategoryResult(Tier.ABSENT),
+            "shared": CategoryResult(Tier.CONFIGURED),
+        },
+        applicable_categories=["tests", "lint"],
+    )
+
+    assert eco.category_percentages == {"tests": 100.0, "lint": 50.0}
+    assert eco.overall_percentage == 66.67
+
+
+def test_ecosystem_category_percentages_return_zero_for_empty_category():
+    eco = EcosystemResult(
+        id="x",
+        language="x",
+        toolchain="x",
+        root=".",
+        categories={"tests": CategoryResult(Tier.CONFIGURED)},
+        applicable_categories=["tests", "lint"],
+    )
+
+    assert eco.category_percentages == {"tests": 100.0, "lint": 0.0}
+    assert eco.overall_percentage == 100.0
+
+
+def test_scan_result_overall_percentage_dedupes_shared_checks_within_overall(monkeypatch):
+    monkeypatch.setitem(
+        CHECK_REGISTRY,
+        "shared",
+        CheckEntry("shared", ("tests", "lint"), Difficulty.INTERMEDIATE),
+    )
+
+    eco = EcosystemResult(
+        id="x",
+        language="x",
+        toolchain="x",
+        root=".",
+        categories={
+            "tests": CategoryResult(Tier.CONFIGURED),
+            "lint": CategoryResult(Tier.ABSENT),
+            "shared": CategoryResult(Tier.CONFIGURED),
+        },
+        applicable_categories=["tests", "lint"],
+    )
+
+    result = ScanResult(repo_root=".", scanned_at="now", mode="static", ecosystems=[eco])
+
+    assert result.category_percentages["tests"] == 100.0
+    assert result.category_percentages["lint"] == 50.0
+    assert result.overall_percentage == 66.67
+
+
+def test_scan_result_overall_percentage_counts_checks_not_ecosystem_averages():
+    first = EcosystemResult(
+        id="a",
+        language="x",
+        toolchain="x",
+        root=".",
+        categories={"tests": CategoryResult(Tier.CONFIGURED)},
+        applicable_categories=["tests"],
+    )
+    second = EcosystemResult(
+        id="b",
+        language="x",
+        toolchain="x",
+        root=".",
+        categories={
+            "tests": CategoryResult(Tier.ABSENT),
+            "lint": CategoryResult(Tier.ABSENT),
+        },
+        applicable_categories=["tests", "lint"],
+    )
+
+    result = ScanResult(repo_root=".", scanned_at="now", mode="static", ecosystems=[first, second])
+
+    assert first.overall_percentage == 100.0
+    assert second.overall_percentage == 0.0
+    assert result.overall_percentage == 33.33
