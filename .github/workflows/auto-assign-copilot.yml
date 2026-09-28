@@ -38,7 +38,8 @@ jobs:
                 }
               }
             `;
-            const repoData = await github.graphql(repoNodeQuery, { owner, repo });
+            const copilotHeaders = { 'GraphQL-Features': 'issues_copilot_assignment_api_support' };
+            const repoData = await github.graphql(repoNodeQuery, { owner, repo, headers: copilotHeaders });
             const suggested = repoData.repository.suggestedActors.nodes;
             const copilotActor = suggested.find(a => a.login === "copilot-swe-agent");
             if (!copilotActor) {
@@ -69,7 +70,7 @@ jobs:
                       title
                       blockedBy(first: 100) {
                         nodes { number state }
-                        pageInfo { hasNextPage }
+                        pageInfo { hasNextPage endCursor }
                       }
                     }
                   }
@@ -154,6 +155,7 @@ jobs:
                 await github.graphql(assignMutation, {
                   assignableId: issue.id,
                   actorIds: [copilotId],
+                  headers: copilotHeaders,
                 });
                 core.info(`Assigned #${issue.number} to copilot-swe-agent`);
               } catch (err) {
