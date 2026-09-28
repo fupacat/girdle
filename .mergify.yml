@@ -17,6 +17,7 @@ pull_request_rules:
       - or:
           - dependabot-update-type=version-update:semver-patch
           - dependabot-update-type=version-update:semver-minor
+          - dependabot-update-type=version-update:semver-major
           - dependabot-update-type=security
     actions:
       comment:
