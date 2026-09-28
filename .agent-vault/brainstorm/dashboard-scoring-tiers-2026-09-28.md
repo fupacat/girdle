@@ -329,7 +329,11 @@ previously named anywhere in this note, added to the backlog:
   match the `tests` category's own configured command?
 
 - `reproducibility`: does the lockfile actually match the manifest (no
-  version drift between e.g. `package.json` and `package-lock.json`)?
+  version drift between e.g. `package.json` and `package-lock.json`)? The
+  Python drift check canonicalizes package names per PEP 503 (hyphens,
+  underscores, and periods are equivalent); npm checks dependencies,
+  devDependencies, and optionalDependencies, but excludes peerDependencies
+  because npm does not reliably lock them as root dependencies.
 
 - `precommit` vs. CI: does pre-commit wire the *same* checks CI actually
   runs, or a silently diverging subset?
@@ -549,6 +553,8 @@ being introduced as a visibly incomplete preview.
 
 ## Related
 
+- [[.agent-vault/decisions/dashboard-scoring-percentage-model|dashboard-scoring-percentage-model]] -
+  the extracted ADR anchor for the settled scoring model.
 - [[merge-pipeline]] - a similarly-shaped "make the
   settled reasoning discoverable, not just chat history" note, same
   session's broader documentation pass.

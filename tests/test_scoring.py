@@ -1,4 +1,3 @@
-from girdle import schema as schema_mod
 from girdle.checks import CheckEntry, Difficulty
 from girdle.hygiene import HygieneResult
 from girdle.schema import CategoryResult, EcosystemResult, ScanResult, Tier
@@ -35,10 +34,99 @@ def test_scan_result_overall_min_is_weakest_ecosystem():
     assert result.weakest_category == "tests"
 
 
+def test_percentages_multi_category_and_overall_distinct(monkeypatch):
+    monkeypatch.setattr(
+        "girdle.schema.CHECK_REGISTRY",
+        {
+            "shared": CheckEntry("shared", ("category_a", "category_b"), Difficulty.BASIC),
+            "a_only": CheckEntry("a_only", ("category_a",), Difficulty.BASIC),
+            "b_only": CheckEntry("b_only", ("category_b",), Difficulty.BASIC),
+            "unseen": CheckEntry("unseen", ("empty_category",), Difficulty.BASIC),
+        },
+    )
+    result = ScanResult(
+        repo_root=".",
+        scanned_at="now",
+        mode="static",
+        hygiene=HygieneResult(
+            checks={
+                "shared": CategoryResult(Tier.CONFIGURED),
+                "a_only": CategoryResult(Tier.ABSENT),
+                "b_only": CategoryResult(Tier.ABSENT),
+            }
+        ),
+    )
+
+    assert result.category_percentages == {
+        "category_a": 50.0,
+        "category_b": 50.0,
+        "empty_category": None,
+    }
+    assert result.overall_percentage == 33.33
+
+
+def test_overall_percentage_none_when_no_applicable_checks(monkeypatch):
+    monkeypatch.setattr(
+        "girdle.schema.CHECK_REGISTRY",
+        {
+            "unseen": CheckEntry("unseen", ("empty_category",), Difficulty.BASIC),
+        },
+    )
+    result = ScanResult(repo_root=".", scanned_at="now", mode="static")
+    assert result.overall_percentage is None
+
+
+def test_ecosystem_checks_use_registry_categories_not_key_name(monkeypatch):
+    monkeypatch.setattr(
+        "girdle.schema.CHECK_REGISTRY",
+        {
+            "custom_tests_check": CheckEntry("custom_tests_check", ("tests",), Difficulty.BASIC),
+        },
+    )
+    result = ScanResult(
+        repo_root=".",
+        scanned_at="now",
+        mode="static",
+        ecosystems=[_eco(tests=2, lint=0, repro=0, ci=0, applicable=["tests"])],
+    )
+
+    assert result.category_percentages == {"tests": 100.0}
+    assert result.overall_percentage == 100.0
+
+
+def test_ecosystem_falls_back_when_key_result_not_applicable(monkeypatch):
+    monkeypatch.setattr(
+        "girdle.schema.CHECK_REGISTRY",
+        {
+            "custom_tests_check": CheckEntry("custom_tests_check", ("tests",), Difficulty.BASIC),
+        },
+    )
+    result = ScanResult(
+        repo_root=".",
+        scanned_at="now",
+        mode="static",
+        ecosystems=[
+            EcosystemResult(
+                id="x",
+                language="x",
+                toolchain="x",
+                root=".",
+                categories={
+                    "custom_tests_check": CategoryResult(Tier.ABSENT),
+                    "tests": CategoryResult(Tier.CONFIGURED),
+                },
+                applicable_categories=["tests"],
+            )
+        ],
+    )
+
+    assert result.category_percentages == {"tests": 100.0}
+    assert result.overall_percentage == 100.0
+
+
 def test_percentage_scoring_distinguishes_overall_from_category_double_counting(monkeypatch):
     monkeypatch.setattr(
-        schema_mod,
-        "CHECK_REGISTRY",
+        "girdle.schema.CHECK_REGISTRY",
         {
             "a": CheckEntry("a", ("cat1", "cat2"), Difficulty.BASIC),
             "b": CheckEntry("b", ("cat1",), Difficulty.INTERMEDIATE),
@@ -63,8 +151,7 @@ def test_percentage_scoring_distinguishes_overall_from_category_double_counting(
 
 def test_category_with_zero_applicable_checks_is_safe(monkeypatch):
     monkeypatch.setattr(
-        schema_mod,
-        "CHECK_REGISTRY",
+        "girdle.schema.CHECK_REGISTRY",
         {"x": CheckEntry("x", ("empty",), Difficulty.BASIC)},
     )
     result = ScanResult(repo_root=".", scanned_at="now", mode="static")
@@ -75,8 +162,7 @@ def test_category_with_zero_applicable_checks_is_safe(monkeypatch):
 
 def test_zero_percent_is_neutral_state(monkeypatch):
     monkeypatch.setattr(
-        schema_mod,
-        "CHECK_REGISTRY",
+        "girdle.schema.CHECK_REGISTRY",
         {"x": CheckEntry("x", ("cat",), Difficulty.BASIC)},
     )
     result = ScanResult(
@@ -90,8 +176,7 @@ def test_zero_percent_is_neutral_state(monkeypatch):
 
 def test_crossing_difficulty_threshold_earns_badge_state(monkeypatch):
     monkeypatch.setattr(
-        schema_mod,
-        "CHECK_REGISTRY",
+        "girdle.schema.CHECK_REGISTRY",
         {
             "basic": CheckEntry("basic", ("cat",), Difficulty.BASIC),
             "intermediate": CheckEntry("intermediate", ("cat",), Difficulty.INTERMEDIATE),
@@ -116,8 +201,7 @@ def test_crossing_difficulty_threshold_earns_badge_state(monkeypatch):
 
 def test_active_harm_forces_red_state(monkeypatch):
     monkeypatch.setattr(
-        schema_mod,
-        "CHECK_REGISTRY",
+        "girdle.schema.CHECK_REGISTRY",
         {"x": CheckEntry("x", ("cat",), Difficulty.BASIC)},
     )
     result = ScanResult(
@@ -134,8 +218,7 @@ def test_active_harm_forces_red_state(monkeypatch):
 
 def test_applicable_missing_category_result_counts_as_failing(monkeypatch):
     monkeypatch.setattr(
-        schema_mod,
-        "CHECK_REGISTRY",
+        "girdle.schema.CHECK_REGISTRY",
         {"tests": CheckEntry("tests", ("tests",), Difficulty.INTERMEDIATE)},
     )
     eco = EcosystemResult(
@@ -154,8 +237,7 @@ def test_applicable_missing_category_result_counts_as_failing(monkeypatch):
 
 def test_hygiene_and_ecosystem_contributions_both_count(monkeypatch):
     monkeypatch.setattr(
-        schema_mod,
-        "CHECK_REGISTRY",
+        "girdle.schema.CHECK_REGISTRY",
         {"shared": CheckEntry("shared", ("cat",), Difficulty.BASIC)},
     )
     eco = EcosystemResult(

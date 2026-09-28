@@ -331,8 +331,24 @@ _VAULT_INDEX_BLOCK_PATTERN = re.compile(
 
 
 def render_vault_index(root: Path, notes: list[Note]) -> str:
-    lines = []
+    by_type: dict[str, list[Note]] = {t: [] for t in NOTE_TYPES}
+    untyped: list[Note] = []
     for note in notes:
+        if note.type in by_type:
+            by_type[note.type].append(note)
+        else:
+            untyped.append(note)
+
+    lines = []
+    for note_type, typed_notes in by_type.items():
+        if typed_notes:
+            for note in typed_notes:
+                rel = _note_rel(root, note)
+                watches = "; ".join(_describe_watch(w) for w in note.watches) or "-"
+                lines.append(f"{rel} | {note_type} | stale={note.stale} | watches: {watches}")
+        else:
+            lines.append(f"(none) | {note_type}")
+    for note in untyped:
         rel = _note_rel(root, note)
         watches = "; ".join(_describe_watch(w) for w in note.watches) or "-"
         lines.append(f"{rel} | {note.type or '?'} | stale={note.stale} | watches: {watches}")
