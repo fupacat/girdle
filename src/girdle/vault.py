@@ -54,6 +54,23 @@ NOTE_TYPES = (
 # of these is a configuration error, not something check() should enforce.
 POINT_IN_TIME_TYPES = ("decision", "research", "brainstorm")
 
+# Maps each declared type to the subfolder it must live in under .agent-vault/.
+FOLDER_FOR_TYPE: dict[str, str] = {
+    "decision": "decisions",
+    "context": "context",
+    "research": "research",
+    "brainstorm": "brainstorm",
+    "data-model": "data-models",
+    "diagram": "diagrams",
+    "ci": "ci",
+    "environment": "environment",
+    "deployment": "deployment",
+}
+if set(FOLDER_FOR_TYPE) != set(NOTE_TYPES):
+    raise RuntimeError(
+        "FOLDER_FOR_TYPE and NOTE_TYPES are out of sync - update both together"
+    )
+
 
 class DanglingWatchError(Exception):
     """Raised by reconcile()/ack() when asked to record a hash for a watch
@@ -268,6 +285,36 @@ def check(root: Path) -> CheckResult:
     for note in load_all_notes(root):
         rel = _note_rel(root, note)
 
+        if note.type is not None and note.type not in NOTE_TYPES:
+            result.blocking.append(
+                f"{rel}: unrecognized type '{note.type}' "
+                f"(expected one of: {', '.join(NOTE_TYPES)})"
+            )
+            continue
+
+        if note.type is not None:
+            expected_folder = FOLDER_FOR_TYPE[note.type]
+            # Determine the first path component under .agent-vault/ - notes
+            # may sit in sub-subfolders, but the top-level bucket is what
+            # determines type. E.g. .agent-vault/context/sub/note.md → "context".
+            vault_root = root / VAULT_DIR
+            rel_to_vault = note.file_path.relative_to(vault_root)
+            if len(rel_to_vault.parts) < 2:
+                result.blocking.append(
+                    f"{rel}: type '{note.type}' should be in "
+                    f".agent-vault/{expected_folder}/ but the note is at the vault root "
+                    "(notes must be placed in a subfolder)"
+                )
+                continue
+            actual_folder = rel_to_vault.parts[0]
+            if actual_folder != expected_folder:
+                result.blocking.append(
+                    f"{rel}: type '{note.type}' should be in "
+                    f".agent-vault/{expected_folder}/ but found in "
+                    f".agent-vault/{actual_folder}/"
+                )
+                continue
+
         if note.type in POINT_IN_TIME_TYPES and note.watches:
             result.blocking.append(
                 f"{rel}: type '{note.type}' is point-in-time and must not declare "
@@ -331,8 +378,24 @@ _VAULT_INDEX_BLOCK_PATTERN = re.compile(
 
 
 def render_vault_index(root: Path, notes: list[Note]) -> str:
-    lines = []
+    by_type: dict[str, list[Note]] = {t: [] for t in NOTE_TYPES}
+    untyped: list[Note] = []
     for note in notes:
+        if note.type in by_type:
+            by_type[note.type].append(note)
+        else:
+            untyped.append(note)
+
+    lines = []
+    for note_type, typed_notes in by_type.items():
+        if typed_notes:
+            for note in typed_notes:
+                rel = _note_rel(root, note)
+                watches = "; ".join(_describe_watch(w) for w in note.watches) or "-"
+                lines.append(f"{rel} | {note_type} | stale={note.stale} | watches: {watches}")
+        else:
+            lines.append(f"(none) | {note_type}")
+    for note in untyped:
         rel = _note_rel(root, note)
         watches = "; ".join(_describe_watch(w) for w in note.watches) or "-"
         lines.append(f"{rel} | {note.type or '?'} | stale={note.stale} | watches: {watches}")
