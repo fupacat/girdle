@@ -167,9 +167,12 @@ def _check_poetry_drift(root: Path) -> list[str]:
 
     lock_text = read_text(root / POETRY_LOCK) or ""
     locked = set(re.findall(r'^name\s*=\s*"([^"]+)"', lock_text, re.MULTILINE))
-    locked_normalized = {n.lower().replace("-", "_") for n in locked}
+    locked_normalized = {re.sub(r"[-_.]+", "-", n).lower() for n in locked}
 
-    return [pkg for pkg in declared if pkg.lower().replace("-", "_") not in locked_normalized]
+    return [
+        pkg for pkg in declared
+        if re.sub(r"[-_.]+", "-", pkg).lower() not in locked_normalized
+    ]
 
 
 def _check_pip_drift(root: Path, req_lines: list[str]) -> list[str]:
@@ -185,7 +188,8 @@ def _check_pip_drift(root: Path, req_lines: list[str]) -> list[str]:
 
     # Extract bare package name from PEP 508 specifier (e.g. "requests>=2.0" -> "requests")
     def _name(spec: str) -> str:
-        return re.split(r"[><=!;\[ ]", spec.strip())[0].lower().replace("-", "_")
+        m = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", spec)
+        return re.sub(r"[-_.]+", "-", m.group(1)).lower() if m else ""
 
     declared = {_name(d) for d in raw_deps if d.strip()}
     if not declared:

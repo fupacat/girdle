@@ -84,7 +84,7 @@ def _check_lockfile_drift(root: Path) -> list[str]:
 
     # Collect declared dependency names from the manifest.
     declared: set[str] = set()
-    for section in ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies"):
+    for section in ("dependencies", "devDependencies", "optionalDependencies"):
         declared.update((pkg_data.get(section) or {}).keys())
 
     if not declared:
