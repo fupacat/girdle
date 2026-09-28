@@ -76,9 +76,9 @@
       <div class="label">Ecosystems</div>
       <div class="value">{{ data.summary.ecosystem_count }}</div>
     </div>
-    <div class="summary-card">
+    <div class="summary-card{% if data.summary.has_active_harm %} absent{% endif %}">
       <div class="label">Weakest overall tier</div>
-      <div class="value">{{ data.summary.overall_min | tier_label }}</div>
+      <div class="value">{% if data.summary.has_active_harm %}harm detected{% else %}{{ data.summary.overall_min | tier_label }}{% endif %}</div>
     </div>
     <div class="summary-card">
       <div class="label">Weakest category</div>

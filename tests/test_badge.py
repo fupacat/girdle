@@ -1,8 +1,8 @@
 from girdle.badge import badge_endpoint, badge_markdown, badge_url
 
 
-def _data(overall_min: int) -> dict:
-    return {"summary": {"overall_min": overall_min}}
+def _data(overall_min: int, *, has_active_harm: bool = False) -> dict:
+    return {"summary": {"overall_min": overall_min, "has_active_harm": has_active_harm}}
 
 
 def test_badge_url_absent():
@@ -52,3 +52,15 @@ def test_badge_endpoint_custom_label():
     endpoint = badge_endpoint(_data(0), label="my-repo")
     assert endpoint["label"] == "my-repo"
     assert endpoint["message"] == "absent"
+
+
+def test_badge_url_active_harm_overrides_to_red():
+    url = badge_url(_data(2, has_active_harm=True))
+    assert "harm%20detected" in url
+    assert url.endswith("-e05252")
+
+
+def test_badge_endpoint_active_harm_overrides_to_red():
+    endpoint = badge_endpoint(_data(2, has_active_harm=True))
+    assert endpoint["message"] == "harm detected"
+    assert endpoint["color"] == "e05252"

@@ -60,8 +60,16 @@ DEPENDENCY_MONITORING_LOCATIONS = (
 
 MIN_NONTRIVIAL_CHARS = 40
 ZERO_WIDTH_CHARS = ("\u200b", "\u200c", "\u200d", "\ufeff")
-BASE64_BLOB_RE = re.compile(r"(?<![A-Za-z0-9+/=])(?:[A-Za-z0-9+/]{64,}={0,2})(?![A-Za-z0-9+/=])")
-HEX_BLOB_RE = re.compile(r"(?<![0-9A-Fa-f])(?:0x)?[0-9A-Fa-f]{64,}(?![0-9A-Fa-f])")
+BASE64_BLOB_RE = re.compile(
+    r"(?<![A-Za-z0-9+/=])"
+    r"(?:[A-Za-z0-9+/]{64,}={0,2})"
+    r"(?![A-Za-z0-9+/=])"
+)
+HEX_BLOB_RE = re.compile(
+    r"(?<![0-9A-Fa-f])"
+    r"(?:0x)?[0-9A-Fa-f]{64,}"
+    r"(?![0-9A-Fa-f])"
+)
 MANIPULATIVE_AI_DIRECTIVE_RE = re.compile(
     r"(?i)\b(?:ignore|disregard|forget)\s+(?:all\s+|any\s+)?(?:previous|prior|above|earlier)\s+instructions\b"
     r"|\b(?:reveal|print|leak|exfiltrate)\s+(?:the\s+|your\s+)?(?:system\s+prompt|developer\s+message|hidden\s+instructions?)\b"
@@ -100,7 +108,6 @@ def find_agent_instruction_hazards(root: Path) -> list[dict[str, str]]:
         text = _read_text(path)
         if text is None:
             continue
-        text = text.removeprefix("\ufeff")
         rel = path.relative_to(root).as_posix()
 
         seen_zero_width = sorted({f"U+{ord(ch):04X}" for ch in text if ch in ZERO_WIDTH_CHARS})
