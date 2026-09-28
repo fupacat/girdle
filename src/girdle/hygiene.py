@@ -91,7 +91,7 @@ def _detect_license_id(text: str) -> str | None:
         if re.search(r"\b3 neither the name of .+? nor the names of", normalized):
             return "BSD-3-Clause"
         return "BSD-2-Clause"
-    for spdx_id, phrases in LICENSE_SIGNATURES.items()
+    for spdx_id, phrases in LICENSE_SIGNATURES.items():
         if spdx_id in {"BSD-3-Clause", "BSD-2-Clause"}:
             continue
         if all(_normalize_text(phrase) in normalized for phrase in phrases):
