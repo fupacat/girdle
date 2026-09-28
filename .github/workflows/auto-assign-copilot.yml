@@ -6,7 +6,7 @@ on:
   issues:
     types: [opened, reopened, closed]
   pull_request:
-    types: [ready_for_review, converted_to_draft, closed]
+    types: [opened, reopened, edited, ready_for_review, converted_to_draft, closed]
 
 permissions:
   contents: read
@@ -87,7 +87,7 @@ jobs:
             //    linked repository project board.
             // ------------------------------------------------------------------
             const bootstrapQuery = `
-              query($owner: String!, $repo: String!, $projectNumber: Int!) {
+              query($owner: String!, $repo: String!) {
                 repository(owner: $owner, name: $repo) {
                   suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 100) {
                     nodes {
@@ -106,6 +106,10 @@ jobs:
                     }
                   }
                 }
+              }
+            `;
+            const projectQuery = `
+              query($owner: String!, $projectNumber: Int!) {
                 repositoryOwner(login: $owner) {
                   __typename
                   ... on User {
@@ -154,30 +158,32 @@ jobs:
             const bootstrap = await copilotGitHub.graphql(bootstrapQuery, {
               owner,
               repo,
-              projectNumber,
               headers: copilotHeaders,
             });
+            let project = null;
+            if (projectNumber > 0) {
+              try {
+                const p = await copilotGitHub.graphql(projectQuery, { owner, projectNumber });
+                project = p.repositoryOwner?.projectV2 ?? null;
+              } catch (err) {
+                project = err.data?.repositoryOwner?.projectV2 ?? null;
+                if (isTokenScopeError(err)) throwScopeError("project lookup", err);
+              }
+            }
             const suggested = bootstrap.repository.suggestedActors.nodes;
             const copilotActor = suggested.find(a => a.login === "copilot-swe-agent");
+            const copilotId = copilotActor?.id ?? null;
             if (!copilotActor) {
-              core.warning("copilot-swe-agent not found in suggestedActors – skipping.");
-              return;
-            }
-            if (!copilotActor.id) {
+              core.warning("copilot-swe-agent not found in suggestedActors – skipping assignment.");
+            } else if (!copilotId) {
               core.warning(
                 `copilot-swe-agent was returned as ${copilotActor.__typename}` +
-                " without an assignable id – skipping.",
+                " without an assignable id – skipping assignment.",
               );
-              return;
             }
-            const copilotId = copilotActor.id;
             const labelIdsByName = new Map(
               bootstrap.repository.labels.nodes.map(label => [label.name, label.id]),
             );
-            const project =
-              projectNumber > 0
-                ? (bootstrap.repositoryOwner?.projectV2 ?? null)
-                : null;
             const statusField =
               project?.fields?.nodes?.find(field => field?.name === projectStatusFieldName) ??
               null;
@@ -185,7 +191,7 @@ jobs:
               (statusField?.options ?? []).map(option => [option.name, option.id]),
             );
 
-            core.info(`Copilot actor id: ${copilotId}`);
+            if (copilotId) core.info(`Copilot actor id: ${copilotId}`);
             if (projectNumber > 0 && !project) {
               core.warning(
                 `Project #${projectNumber} was not found for ${owner}; ` +
@@ -572,6 +578,10 @@ jobs:
               }
               if (issue.assignees.totalCount > 0) {
                 core.info(`Issue #${issue.number} already assigned – not reassigning`);
+                continue;
+              }
+              if (!copilotId) {
+                core.info(`Copilot actor unavailable – skipping assignment for #${issue.number}`);
                 continue;
               }
 
