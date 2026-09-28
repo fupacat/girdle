@@ -73,6 +73,14 @@ pull_request_rules:
         add:
           - dependency-major-review
 
+  - name: Keep PRs up to date
+    conditions:
+      - -draft
+      - "#commits-behind>=1"
+      - author!=dependabot[bot]
+    actions:
+      update: null
+
   - name: queue development PRs
     # Non-Dependabot PRs (human-authored, or agent-authored like this
     # session's own ci/* branches) already get Gitar/SonarCloud checks
@@ -106,6 +114,8 @@ queue_rules:
     # merge_bot_account is needed - Mergify merges under its own identity
     # once the real ruleset is satisfied.
     branch_protection_injection_mode: merge
+    max_checks_retries: 1
+    checks_timeout: 30m
     queue_conditions:
       - author=dependabot[bot]
       - or:
