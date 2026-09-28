@@ -106,7 +106,7 @@ jobs:
                       id
                       number
                       assignees(first: 1) { totalCount }
-                      labels(first: 10, query: "status:") {
+                      labels(first: 100) {
                         nodes { name }
                       }
                       blockedBy(first: 100) {
@@ -287,7 +287,11 @@ jobs:
                 }
               }
 
-              const currentStatusLabels = new Set(issue.labels.nodes.map(l => l.name));
+              const currentStatusLabels = new Set(
+                issue.labels.nodes
+                  .map(l => l.name)
+                  .filter(name => statusLabels.includes(name)),
+              );
               const desiredStatusLabels = new Set();
               if (hasOpenBlocker) desiredStatusLabels.add("status:blocked");
               if (!hasOpenBlocker && isUnassigned) desiredStatusLabels.add("status:ready");
