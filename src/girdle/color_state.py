@@ -1,24 +1,19 @@
-"""Display color-state logic for dashboard percentages.
+"""Display badge color state based on passed checks and difficulty bands.
 
-Given a percentage (0–100 float, or None when absent) and an active-harm
-flag, returns the display state:
-
-- **neutral** – default; nothing earned yet, including 0% / absent.  Never
-  a warning color for mere incompleteness.
-- **bronze / silver / gold** – badge tiers earned once the percentage
-  crosses the threshold corresponding to a check-difficulty band (BASIC →
-  bronze, BASIC + INTERMEDIATE → silver, all non-reserved → gold).
+- **neutral** – default; no applicable checks or no badge tier earned yet.
+  Never a warning color for mere incompleteness.
+- **bronze / silver / gold** – tiers earned by passing every check in the
+  corresponding difficulty bands: BASIC, BASIC + INTERMEDIATE, or all
+  non-reserved checks, respectively.
 - **red** – reserved exclusively for active-harm findings (committed
-  secrets, poisoned agent instructions).  Fires regardless of percentage;
-  is never a point on the badge scale.
+  secrets, poisoned agent instructions).  It overrides the badge scale.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from enum import Enum
 
-from girdle.checks import CHECK_REGISTRY, CheckEntry, Difficulty
+from girdle.checks import CheckEntry, Difficulty
 
 
 class DisplayState(str, Enum):
@@ -29,83 +24,31 @@ class DisplayState(str, Enum):
     RED = "red"
 
 
-def _badge_thresholds(
-    entries: Iterable[CheckEntry] | None = None,
-) -> tuple[float, float, float]:
-    """Return *(bronze, silver, gold)* percentage thresholds from the live registry.
-
-    Thresholds are derived by asking: "what percentage would you score if
-    every non-reserved check of at most difficulty *D* passed?"
-
-    - **Bronze** – all BASIC checks passing.
-    - **Silver** – all BASIC + INTERMEDIATE checks passing.
-    - **Gold** – 100 % (every non-reserved check passing).
-
-    When *entries* is provided, thresholds are derived only from those checks;
-    otherwise the full registry is used. Reserved checks are excluded so the
-    thresholds reflect only real, actionable checks.
-    """
-    active = [
-        e
-        for e in (entries if entries is not None else CHECK_REGISTRY.values())
-        if not e.reserved
-    ]
-    total = len(active)
-    if total == 0:
-        return (0.0, 0.0, 100.0)
-    basic = sum(1 for e in active if e.difficulty is Difficulty.BASIC)
-    basic_and_intermediate = sum(
-        1 for e in active
-        if e.difficulty in (Difficulty.BASIC, Difficulty.INTERMEDIATE)
-    )
-    bronze = round(basic / total * 100, 2)
-    silver = round(basic_and_intermediate / total * 100, 2)
-    return (bronze, silver, 100.0)
-
-
-BRONZE_THRESHOLD, SILVER_THRESHOLD, GOLD_THRESHOLD = _badge_thresholds()
-
-
-def display_state(
-    percentage: float | None,
-    *,
-    active_harm: bool = False,
-    entries: Iterable[CheckEntry] | None = None,
+def badge_state(
+    results: dict[CheckEntry, bool], *, active_harm: bool = False
 ) -> DisplayState:
-    """Return the display state for a dashboard percentage and active-harm flag.
+    """Return the badge state earned by passed checks and their difficulty.
 
-    Thresholds are recomputed from the live registry on each call via
-    :func:`_badge_thresholds`, so the function always reflects the current
-    ``CHECK_REGISTRY`` (relevant when tests patch the registry).  The
-    module-level constants :data:`BRONZE_THRESHOLD`, :data:`SILVER_THRESHOLD`,
-    and :data:`GOLD_THRESHOLD` are provided as a convenience for callers that
-    need to display or compare the thresholds directly.
-
-    Args:
-        percentage: Overall or per-category percentage (0–100), or ``None``
-            when no applicable checks exist.
-        active_harm: ``True`` when an active-harm finding (secrets,
-            malicious/poisoned agent instructions) is present.  Forces
-            :attr:`DisplayState.RED` regardless of *percentage*.
-        entries: Applicable checks for this scan, when thresholds should be
-            derived from only the checks included in *percentage*.
+    Reserved checks do not contribute to badge tiers. A tier is earned only
+    when every non-reserved check in its difficulty band has passed.
     """
     if active_harm:
         return DisplayState.RED
-    bronze, silver, gold = _badge_thresholds(entries)
-    if percentage is None or percentage <= 0 or percentage < bronze:
+    live = {entry: passed for entry, passed in results.items() if not entry.reserved}
+
+    def band_ok(levels: tuple[Difficulty, ...]) -> bool:
+        band = [passed for entry, passed in live.items() if entry.difficulty in levels]
+        return bool(band) and all(band)
+
+    if not live or not any(live.values()):
         return DisplayState.NEUTRAL
-    if percentage < silver:
-        return DisplayState.BRONZE
-    if percentage < gold:
+    if all(live.values()):
+        return DisplayState.GOLD
+    if band_ok((Difficulty.BASIC, Difficulty.INTERMEDIATE)):
         return DisplayState.SILVER
-    return DisplayState.GOLD
+    if band_ok((Difficulty.BASIC,)):
+        return DisplayState.BRONZE
+    return DisplayState.NEUTRAL
 
 
-__all__ = [
-    "DisplayState",
-    "display_state",
-    "BRONZE_THRESHOLD",
-    "SILVER_THRESHOLD",
-    "GOLD_THRESHOLD",
-]
+__all__ = ["DisplayState", "badge_state"]

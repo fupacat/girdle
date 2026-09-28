@@ -18,7 +18,10 @@ and overall, not a rigid 3-rung ladder. Categories are many-to-many
 groupings of checks (a check can count toward multiple categories, and
 double-counting is intentional weighting, not deduplicated). Check
 difficulty (basic/intermediate/advanced) is a static property of the check
-itself, independent of category, and gates badge levels. Color model:
+itself, independent of category, and gates badge levels by passed checks at
+difficulty bands, not by arbitrary percentage thresholds: bronze requires
+all BASIC checks to pass, silver requires all BASIC and INTERMEDIATE checks
+to pass, and gold requires all non-reserved checks to pass. Color model:
 neutral by default (including a category at 0%), badge colors only once a
 tier is earned, red reserved specifically for active-harm findings
 (secrets, malicious agent instructions) - never for mere incompleteness.
