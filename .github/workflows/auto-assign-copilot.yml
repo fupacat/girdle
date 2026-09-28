@@ -197,13 +197,12 @@ jobs:
                   err.message,
                   ...(Array.isArray(err.errors) ? err.errors.map(e => e?.message) : []),
                   typeof err.data === "string" ? err.data : "",
-                ]
-                  .filter(Boolean)
-                  .join("\n");
+                ].filter(Boolean);
+                const errorText = errorMessages.join("\n");
                 const tokenScopeError =
                   err.status === 403 ||
-                  errorMessages.includes("Resource not accessible by personal access token") ||
-                  errorMessages.includes("Resource not accessible by integration");
+                  errorText.includes("Resource not accessible by personal access token") ||
+                  errorText.includes("Resource not accessible by integration");
                 if (tokenScopeError) {
                   // A mis-scoped token will fail every remaining assignment too, so
                   // abort the whole run loudly instead of downgrading it to per-issue noise.
@@ -213,6 +212,6 @@ jobs:
                     "(metadata:read plus read/write actions, contents, issues, and pull requests).",
                   );
                 }
-                core.warning(`Failed to assign #${issue.number}: ${errorMessages}`);
+                core.warning(`Failed to assign #${issue.number}: ${errorMessages.join(" | ")}`);
               }
             }
