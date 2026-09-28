@@ -127,6 +127,26 @@ def scan_build(pkg_data: dict) -> CategoryResult:
     )
 
 
+def js_applicable_categories(root: Path) -> list[str]:
+    """Base applicable-categories list for a JS/TS ecosystem detector.
+
+    Inserts ``"build"`` after ``"coverage"`` when the project's
+    ``package.json`` declares an explicit ``scripts.build`` entry.
+    """
+    categories = ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
+    pkg_data = read_json(root / "package.json") or {}
+    if has_build_script(pkg_data):
+        categories.insert(3, "build")
+    return categories
+
+
+def js_build_scan_entry(pkg_data: dict) -> dict:
+    """Return ``{"build": <CategoryResult>}`` when a build script exists, else ``{}``."""
+    if has_build_script(pkg_data):
+        return {"build": scan_build(pkg_data)}
+    return {}
+
+
 def scan_ci(root: Path, run_pattern: str, run_label: str) -> CategoryResult:
     wf_dir = root / ".github" / "workflows"
     if wf_dir.exists():
