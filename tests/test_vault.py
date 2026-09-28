@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from girdle.vault import (
+    NOTE_TYPES,
     DanglingWatchError,
     WatchEntry,
     ack,
@@ -305,15 +306,11 @@ def test_render_vault_index_shows_empty_types(tmp_path: Path):
     notes = load_all_notes(tmp_path)
     text = render_vault_index(tmp_path, notes)
     # All 9 schema types must appear, populated or not
-    from girdle.vault import NOTE_TYPES
-
     for note_type in NOTE_TYPES:
         assert note_type in text, f"type '{note_type}' missing from vault index"
     # Types with no notes should show the explicit empty marker
-    empty_types = {
-        "decision", "research", "brainstorm", "data-model",
-        "diagram", "ci", "environment", "deployment",
-    }
+    populated_types = {n.type for n in notes if n.type in NOTE_TYPES}
+    empty_types = set(NOTE_TYPES) - populated_types
     for note_type in empty_types:
         assert f"(none) | {note_type}" in text, f"empty marker missing for type '{note_type}'"
 
