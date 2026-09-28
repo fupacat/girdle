@@ -122,10 +122,12 @@ def _check_ci_tests_alignment(
     cmd_str = " ".join(test_cmd)
     # Build a search term from the first non-wrapper token of the test command.
     # Only strip leading wrapper tokens (e.g. "poetry run pytest" → "pytest").
-    skip_prefixes = {"poetry", "run", "pipenv"}
+    skip_prefixes = {"poetry", "run", "pipenv", "uv", "conda"}
     remaining = list(test_cmd)
     while remaining and remaining[0] in skip_prefixes:
         remaining.pop(0)
+        if remaining and remaining[0] in {"-n", "--name", "-p", "--prefix"}:
+            del remaining[:2]
     if not remaining:
         return
     search_term = Path(remaining[0]).name
