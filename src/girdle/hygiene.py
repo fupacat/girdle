@@ -17,6 +17,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import yaml
+
 from girdle.tiers import CategoryResult, Tier
 
 
@@ -112,7 +114,85 @@ def check_precommit(root: Path) -> CategoryResult:
                 "Add a .pre-commit-config.yaml to run fast local checks before commits."
             ),
         )
+    hook_ids = _precommit_hook_ids(root)
+    ci_tools = _ci_tool_names(root)
+    # A tool found in CI but absent from every pre-commit hook id is a parity gap:
+    # local commits silently under-enforce what CI actually gates on.
+    missing = sorted(
+        tool for tool in ci_tools
+        if not any(
+            hook_id == tool or hook_id.startswith(tool + "-")
+            for hook_id in hook_ids
+        )
+    )
+    if missing:
+        tools_str = ", ".join(missing)
+        return CategoryResult(
+            Tier.ABSENT,
+            evidence=[".pre-commit-config.yaml"],
+            reason=(
+                f"CI runs {tools_str} but pre-commit does not: local commits "
+                "under-enforce what CI gates on"
+            ),
+            recommendation=(
+                f"Add pre-commit hooks for: {tools_str} so local commits enforce "
+                "the same checks CI does."
+            ),
+        )
     return CategoryResult(Tier.CONFIGURED, evidence=[".pre-commit-config.yaml"])
+
+
+# Tool name → regex pattern used to detect it in CI workflow text.
+# Keys are also the substrings matched against pre-commit hook IDs:
+# a hook whose `id` contains the tool name counts as covering it
+# (e.g. hook id "ruff-format" covers tool "ruff").
+_CI_TOOL_PATTERNS: dict[str, str] = {
+    "ruff": r"\bruff\b",
+    "mypy": r"\bmypy\b",
+    "pytest": r"\bpytest\b",
+    "black": r"\bblack\b",
+    "flake8": r"\bflake8\b",
+    "pylint": r"\bpylint\b",
+    "eslint": r"\beslint\b",
+    "prettier": r"\bprettier\b",
+    "bandit": r"\bbandit\b",
+}
+
+
+def _precommit_hook_ids(root: Path) -> set[str]:
+    """Return the set of all hook ``id`` values in .pre-commit-config.yaml."""
+    text = _read_text(root / ".pre-commit-config.yaml") or ""
+    try:
+        data = yaml.safe_load(text) or {}
+    except yaml.YAMLError:
+        return set()
+    ids: set[str] = set()
+    for repo in data.get("repos") or []:
+        for hook in repo.get("hooks") or []:
+            hook_id = hook.get("id")
+            if hook_id:
+                ids.add(hook_id)
+    return ids
+
+
+def _ci_tool_names(root: Path) -> set[str]:
+    """Return the subset of _CI_TOOL_PATTERNS keys found in any CI config."""
+    ci_texts: list[str] = []
+    wf_dir = root / ".github" / "workflows"
+    if wf_dir.exists():
+        for wf in wf_dir.glob("*.y*ml"):
+            text = _read_text(wf)
+            if text:
+                ci_texts.append(text)
+    for alt in (".gitlab-ci.yml", "azure-pipelines.yml"):
+        text = _read_text(root / alt)
+        if text:
+            ci_texts.append(text)
+    found: set[str] = set()
+    for tool, pattern in _CI_TOOL_PATTERNS.items():
+        if any(re.search(pattern, t) for t in ci_texts):
+            found.add(tool)
+    return found
 
 
 COPILOT_SETUP_STEPS = ".github/workflows/copilot-setup-steps.yml"
