@@ -86,8 +86,13 @@ jobs:
             core.info(`Copilot actor id: ${copilotId}`);
 
             // ------------------------------------------------------------------
-            // 2. Fetch all open, unassigned issues (paginate with cursor).
+            // 2. Fetch all open issues (paginate with cursor).
             // ------------------------------------------------------------------
+            const statusLabels = [
+              "status:blocked",
+              "status:ready",
+              "status:blocker",
+            ];
             const issueQuery = `
               query($owner: String!, $repo: String!, $after: String) {
                 repository(owner: $owner, name: $repo) {
@@ -95,14 +100,20 @@ jobs:
                     states: [OPEN]
                     first: 100
                     after: $after
-                    filterBy: { assignee: null }
                   ) {
                     pageInfo { hasNextPage endCursor }
                     nodes {
                       id
                       number
-                      title
+                      assignees(first: 1) { totalCount }
+                      labels(first: 10, query: "status:") {
+                        nodes { name }
+                      }
                       blockedBy(first: 100) {
+                        nodes { number state }
+                        pageInfo { hasNextPage endCursor }
+                      }
+                      blocking(first: 100) {
                         nodes { number state }
                         pageInfo { hasNextPage endCursor }
                       }
@@ -112,20 +123,20 @@ jobs:
               }
             `;
 
-            let candidates = [];
+            let issues = [];
             let after = null;
             while (true) {
               const data = await copilotGitHub.graphql(issueQuery, { owner, repo, after });
               const conn = data.repository.issues;
-              candidates = candidates.concat(conn.nodes);
+              issues = issues.concat(conn.nodes);
               if (!conn.pageInfo.hasNextPage) break;
               after = conn.pageInfo.endCursor;
             }
 
-            core.info(`Open unassigned issues found: ${candidates.length}`);
+            core.info(`Open issues found: ${issues.length}`);
 
             // ------------------------------------------------------------------
-            // 3. For each candidate, determine whether it is unblocked.
+            // 3. For each open issue, determine blocker state and status labels.
             //    An issue is unblocked when its blockedBy list is empty OR
             //    every issue in it is CLOSED.
             //    If blockedBy itself was truncated (hasNextPage), we must
@@ -136,6 +147,18 @@ jobs:
                 node(id: $id) {
                   ... on Issue {
                     blockedBy(first: 100, after: $after) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes { number state }
+                    }
+                  }
+                }
+              }
+            `;
+            const blockingQuery = `
+              query($id: ID!, $after: String) {
+                node(id: $id) {
+                  ... on Issue {
+                    blocking(first: 100, after: $after) {
                       pageInfo { hasNextPage endCursor }
                       nodes { number state }
                     }
@@ -157,64 +180,117 @@ jobs:
               }
             `;
 
-            for (const issue of candidates) {
-              let blockers = issue.blockedBy.nodes;
-              let pageInfo = issue.blockedBy.pageInfo;
+            const collectDependencyNodes = async (issueId, connectionName, seedConnection) => {
+              let nodes = [...seedConnection.nodes];
+              let pageInfo = seedConnection.pageInfo;
 
               // Paginate if the first page was truncated
-              let cursor = issue.blockedBy.pageInfo.endCursor;
+              let cursor = seedConnection.pageInfo.endCursor;
               while (pageInfo.hasNextPage) {
-                const more = await copilotGitHub.graphql(blockedByQuery, {
-                  id: issue.id,
+                const query = connectionName === "blockedBy" ? blockedByQuery : blockingQuery;
+                const more = await copilotGitHub.graphql(query, {
+                  id: issueId,
                   after: cursor,
                 });
-                const conn = more.node.blockedBy;
-                blockers = blockers.concat(conn.nodes);
+                const conn = more.node[connectionName];
+                nodes = nodes.concat(conn.nodes);
                 pageInfo = conn.pageInfo;
                 cursor = conn.pageInfo.endCursor;
               }
+              return nodes;
+            };
+
+            const syncStatusLabels = async (issueNumber, currentLabels, desiredLabels) => {
+              for (const name of statusLabels) {
+                if (desiredLabels.has(name) && !currentLabels.has(name)) {
+                  await copilotGitHub.rest.issues.addLabels({
+                    owner,
+                    repo,
+                    issue_number: issueNumber,
+                    labels: [name],
+                  });
+                  core.info(`Issue #${issueNumber}: added ${name}`);
+                }
+              }
+              for (const name of statusLabels) {
+                if (!desiredLabels.has(name) && currentLabels.has(name)) {
+                  try {
+                    await copilotGitHub.rest.issues.removeLabel({
+                      owner,
+                      repo,
+                      issue_number: issueNumber,
+                      name,
+                    });
+                    core.info(`Issue #${issueNumber}: removed ${name}`);
+                  } catch (err) {
+                    if (err.status !== 404) throw err;
+                  }
+                }
+              }
+            };
+
+            for (const issue of issues) {
+              const blockers = await collectDependencyNodes(
+                issue.id,
+                "blockedBy",
+                issue.blockedBy,
+              );
+              const blockedIssues = await collectDependencyNodes(
+                issue.id,
+                "blocking",
+                issue.blocking,
+              );
 
               const hasOpenBlocker = blockers.some(b => b.state === "OPEN");
+              const isBlockingOpenIssue = blockedIssues.some(b => b.state === "OPEN");
+              let isUnassigned = issue.assignees.totalCount === 0;
               if (hasOpenBlocker) {
                 const openNums = blockers
                   .filter(b => b.state === "OPEN")
                   .map(b => "#" + b.number)
                   .join(", ");
                 core.info(`Issue #${issue.number} still blocked (${openNums})`);
-                continue;
+              } else if (isUnassigned) {
+                core.info(`Issue #${issue.number} is unblocked – assigning to Copilot`);
+                try {
+                  await copilotGitHub.graphql(assignMutation, {
+                    assignableId: issue.id,
+                    actorIds: [copilotId],
+                    headers: copilotHeaders,
+                  });
+                  isUnassigned = false;
+                  core.info(`Assigned #${issue.number} to copilot-swe-agent`);
+                } catch (err) {
+                  const errorMessages = [
+                    err.message,
+                    ...(Array.isArray(err.errors) ? err.errors.map(e => e?.message) : []),
+                    typeof err.data === "string" ? err.data : "",
+                  ].filter(Boolean);
+                  const errorText = errorMessages.join("\n");
+                  const rateLimited = /rate limit/i.test(errorText);
+                  const tokenScopeError =
+                    (err.status === 403 && !rateLimited) ||
+                    errorText.includes("Resource not accessible by personal access token") ||
+                    errorText.includes("Resource not accessible by integration");
+                  if (tokenScopeError) {
+                    // A mis-scoped token will fail every remaining assignment too, so
+                    // abort the whole run loudly instead of downgrading it to per-issue noise.
+                    throw new Error(
+                      "COPILOT_ASSIGN_TOKEN is configured but lacks GitHub's required " +
+                      "permissions for Copilot issue assignment " +
+                      "(metadata:read plus read/write actions, contents, " +
+                      "issues, and pull requests). " +
+                      `GitHub responded: ${errorMessages.join(" | ")}`,
+                    );
+                  }
+                  core.warning(`Failed to assign #${issue.number}: ${errorMessages.join(" | ")}`);
+                }
               }
 
-              core.info(`Issue #${issue.number} is unblocked – assigning to Copilot`);
-              try {
-                await copilotGitHub.graphql(assignMutation, {
-                  assignableId: issue.id,
-                  actorIds: [copilotId],
-                  headers: copilotHeaders,
-                });
-                core.info(`Assigned #${issue.number} to copilot-swe-agent`);
-              } catch (err) {
-                const errorMessages = [
-                  err.message,
-                  ...(Array.isArray(err.errors) ? err.errors.map(e => e?.message) : []),
-                  typeof err.data === "string" ? err.data : "",
-                ].filter(Boolean);
-                const errorText = errorMessages.join("\n");
-                const rateLimited = /rate limit/i.test(errorText);
-                const tokenScopeError =
-                  (err.status === 403 && !rateLimited) ||
-                  errorText.includes("Resource not accessible by personal access token") ||
-                  errorText.includes("Resource not accessible by integration");
-                if (tokenScopeError) {
-                  // A mis-scoped token will fail every remaining assignment too, so
-                  // abort the whole run loudly instead of downgrading it to per-issue noise.
-                  throw new Error(
-                    "COPILOT_ASSIGN_TOKEN is configured but lacks GitHub's required " +
-                    "permissions for Copilot issue assignment " +
-                    "(metadata:read plus read/write actions, contents, " +
-                    "issues, and pull requests). " +
-                    `GitHub responded: ${errorMessages.join(" | ")}`,
-                  );
-                }
-                core.warning(`Failed to assign #${issue.number}: ${errorMessages.join(" | ")}`);
-              }
+              const currentStatusLabels = new Set(issue.labels.nodes.map(l => l.name));
+              const desiredStatusLabels = new Set();
+              if (hasOpenBlocker) desiredStatusLabels.add("status:blocked");
+              if (!hasOpenBlocker && isUnassigned) desiredStatusLabels.add("status:ready");
+              if (isBlockingOpenIssue) desiredStatusLabels.add("status:blocker");
+              await syncStatusLabels(issue.number, currentStatusLabels, desiredStatusLabels);
             }
