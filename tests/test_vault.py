@@ -299,6 +299,25 @@ def test_render_vault_index(tmp_path: Path):
     assert "stale=False" in text
 
 
+def test_render_vault_index_shows_empty_types(tmp_path: Path):
+    _write_example(tmp_path)
+    _write_note(tmp_path, note_hash="abc123")
+    notes = load_all_notes(tmp_path)
+    text = render_vault_index(tmp_path, notes)
+    # All 9 schema types must appear, populated or not
+    from girdle.vault import NOTE_TYPES
+
+    for note_type in NOTE_TYPES:
+        assert note_type in text, f"type '{note_type}' missing from vault index"
+    # Types with no notes should show the explicit empty marker
+    empty_types = {
+        "decision", "research", "brainstorm", "data-model",
+        "diagram", "ci", "environment", "deployment",
+    }
+    for note_type in empty_types:
+        assert f"(none) | {note_type}" in text, f"empty marker missing for type '{note_type}'"
+
+
 def test_load_note_without_frontmatter(tmp_path: Path):
     path = tmp_path / "plain.md"
     path.write_text("# Just a heading, no frontmatter\n", encoding="utf-8")
