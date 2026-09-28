@@ -76,3 +76,7 @@ stale leftover, or an unrelated tool reusing the name) does not count.
 - If OpenAI documents an exact filename inside `.codex/` in the future, the
   non-emptiness check should be tightened to look for that file specifically,
   the same precision the Copilot and Claude sub-checks already have.
+
+## Related
+
+- [[.agent-vault/decisions/agent-sandbox-bootstrap-detection|agent-sandbox-bootstrap-detection]]

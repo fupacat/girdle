@@ -41,3 +41,7 @@ no ci config and vice versa."
   duplicated per ecosystem detector, since Codecov/Coveralls/diff-cover/
   Sonar config files live in CI workflow files regardless of which
   ecosystem's code they're gating.
+
+## Related
+
+- [[.agent-vault/decisions/coverage-gate-conditional-on-both|coverage-gate-conditional-on-both]]
