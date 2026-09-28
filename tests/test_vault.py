@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from girdle.vault import (
+    NOTE_TYPES,
     DanglingWatchError,
     WatchEntry,
     ack,
@@ -299,6 +300,21 @@ def test_render_vault_index(tmp_path: Path):
     assert "stale=False" in text
 
 
+def test_render_vault_index_shows_empty_types(tmp_path: Path):
+    _write_example(tmp_path)
+    _write_note(tmp_path, note_hash="abc123")
+    notes = load_all_notes(tmp_path)
+    text = render_vault_index(tmp_path, notes)
+    # All 9 schema types must appear, populated or not
+    for note_type in NOTE_TYPES:
+        assert note_type in text, f"type '{note_type}' missing from vault index"
+    # Types with no notes should show the explicit empty marker
+    populated_types = {n.type for n in notes if n.type in NOTE_TYPES}
+    empty_types = set(NOTE_TYPES) - populated_types
+    for note_type in empty_types:
+        assert f"(none) | {note_type}" in text, f"empty marker missing for type '{note_type}'"
+
+
 def test_load_note_without_frontmatter(tmp_path: Path):
     path = tmp_path / "plain.md"
     path.write_text("# Just a heading, no frontmatter\n", encoding="utf-8")
@@ -373,3 +389,72 @@ def test_inject_vault_index_creates_and_replaces_block(tmp_path: Path):
     second = inject_vault_index(target, "note-b.md | decision | stale=False | watches: -")
     assert "note-a.md" not in second
     assert "note-b.md" in second
+
+
+def test_check_blocks_unrecognized_type(tmp_path: Path):
+    _init_repo(tmp_path)
+    (tmp_path / ".agent-vault" / "context").mkdir(parents=True)
+    bad_note = tmp_path / ".agent-vault" / "context" / "oops.md"
+    bad_note.write_text(
+        "---\ntype: typo-type\n---\n\n# A note with a bad type\n", encoding="utf-8"
+    )
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "init")
+
+    result = check(tmp_path)
+    assert result.reconciled == []
+    assert len(result.blocking) == 1
+    assert "unrecognized type" in result.blocking[0]
+    assert "typo-type" in result.blocking[0]
+
+
+def test_check_blocks_type_folder_mismatch(tmp_path: Path):
+    _init_repo(tmp_path)
+    # A note with type 'decision' placed in the wrong folder (context/)
+    (tmp_path / ".agent-vault" / "context").mkdir(parents=True)
+    bad_note = tmp_path / ".agent-vault" / "context" / "misplaced.md"
+    bad_note.write_text(
+        "---\ntype: decision\n---\n\n# A decision note in the wrong folder\n",
+        encoding="utf-8",
+    )
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "init")
+
+    result = check(tmp_path)
+    assert result.reconciled == []
+    assert len(result.blocking) == 1
+    assert "context" in result.blocking[0]
+    assert "decisions" in result.blocking[0]
+
+
+def test_check_passes_valid_note_without_watches(tmp_path: Path):
+    _init_repo(tmp_path)
+    (tmp_path / ".agent-vault" / "decisions").mkdir(parents=True)
+    note = tmp_path / ".agent-vault" / "decisions" / "valid-decision.md"
+    note.write_text(
+        "---\ntype: decision\n---\n\n# A valid decision note\n", encoding="utf-8"
+    )
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "init")
+
+    result = check(tmp_path)
+    assert result.blocking == []
+    assert result.reconciled == []
+
+
+def test_check_blocks_note_at_vault_root(tmp_path: Path):
+    _init_repo(tmp_path)
+    (tmp_path / ".agent-vault").mkdir(parents=True)
+    # Note placed directly in .agent-vault/ with no subfolder
+    bad_note = tmp_path / ".agent-vault" / "orphan.md"
+    bad_note.write_text(
+        "---\ntype: context\n---\n\n# A note at the vault root\n", encoding="utf-8"
+    )
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "init")
+
+    result = check(tmp_path)
+    assert result.reconciled == []
+    assert len(result.blocking) == 1
+    assert "vault root" in result.blocking[0]
+    assert "subfolder" in result.blocking[0]

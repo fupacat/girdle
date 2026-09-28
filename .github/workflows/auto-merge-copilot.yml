@@ -6,25 +6,39 @@ name: Auto-merge Copilot PRs
 # Safe to call repeatedly (idempotent): re-running just re-asserts the same
 # ready-for-review state.
 #
-# Triggers on review_requested/ready_for_review, NOT opened/synchronize:
-# opened fires on Copilot's very first, often-empty "Initial plan" commit,
-# and synchronize fires on every intermediate push while it's still
-# mid-task - promoting to ready that early risks queueing an unfinished PR
-# if a commit happens to pass checks and get approved before Copilot pushes
-# more work. review_requested is the signal Copilot's coding agent
-# itself emits once it considers a round of work actually done (confirmed
-# against this repo's own PR history - Copilot always fires
-# review_requested itself; it never fires ready_for_review, which stays a
-# human/this-workflow action). ready_for_review is also handled so a
-# manually-promoted PR still gets auto-merge armed.
+# Two independent paths to the same outcome:
+#
+# 1. Reactive (auto-merge job): triggers on review_requested/ready_for_review,
+#    NOT opened/synchronize - opened fires on Copilot's very first,
+#    often-empty "Initial plan" commit, and synchronize fires on every
+#    intermediate push while it's still mid-task. review_requested is
+#    usually the signal Copilot's coding agent itself emits once it
+#    considers a round of work done (it requests review from whoever
+#    assigned the issue). ready_for_review is also handled so a
+#    manually-promoted PR still gets auto-merge armed.
+#
+# 2. Fallback (fallback-sweep job): the reactive path is NOT reliable on its
+#    own - confirmed live on PR #114, where Copilot's review_requested event
+#    appears in the PR timeline but no run of this workflow was ever
+#    dispatched for it (compare against CI, which fired normally in the same
+#    window - ruled out a general Actions outage). GitHub does not expose an
+#    authoritative "Copilot finished coding" event; review_requested is an
+#    inferred proxy that several different actors (CODEOWNERS auto-request,
+#    a teammate, Gitar's review flow) can also fire, and is not guaranteed
+#    to reach Actions in every case. Without a fallback, a missed event
+#    means the PR silently sits in draft until a human notices and runs
+#    `gh pr ready` by hand (documented previously on PR #92, recurred on
+#    #114). The sweep runs on a schedule, independent of any GitHub event,
+#    and promotes any Copilot draft PR whose latest commit is older than
+#    the debounce window - long enough that Copilot is very unlikely to
+#    still be actively pushing.
 
 on:
   pull_request:
     types: [review_requested, ready_for_review, reopened]
-
-concurrency:
-  group: auto-merge-copilot-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
 
 permissions:
   pull-requests: write
@@ -33,11 +47,15 @@ permissions:
 jobs:
   auto-merge:
     if: >-
+      github.event_name == 'pull_request' &&
       github.event.pull_request.user.login == 'Copilot' &&
       startsWith(github.event.pull_request.head.ref, 'copilot/') &&
       github.event.pull_request.base.ref == github.event.repository.default_branch &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    concurrency:
+      group: auto-merge-copilot-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
@@ -45,3 +63,53 @@ jobs:
       - name: Mark ready for review
         if: github.event.pull_request.draft == true
         run: gh pr ready "${{ github.event.pull_request.number }}"
+
+  fallback-sweep:
+    # Debounce is deliberately generous (30 minutes) - promoting a PR
+    # Copilot is still actively pushing commits to risks queueing
+    # unfinished work, same risk the opened/synchronize triggers avoid
+    # above.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: auto-merge-copilot-fallback-sweep
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      DEBOUNCE_MINUTES: 30
+    steps:
+      - name: Promote stale Copilot draft PRs out of draft
+        run: |
+          set -euo pipefail
+
+          default_branch=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name')
+          repo_owner="${GH_REPO%%/*}"
+          now_epoch=$(date -u +%s)
+
+          json_fields="number,author,headRefName,isDraft,baseRefName,headRepositoryOwner,title"
+          jq_filter='.[]
+            | select(.isDraft == true)
+            | select(.author.login == "Copilot")
+            | select(.headRefName | startswith("copilot/"))
+            | select(.title | test("^\\[WIP\\]") | not)
+            | [.number, .baseRefName, .headRepositoryOwner.login]
+            | @tsv'
+
+          gh pr list --state open --draft --limit 500 --json "$json_fields" -q "$jq_filter" \
+          | while IFS=$'\t' read -r pr base_ref head_owner; do
+              if [ "$base_ref" != "$default_branch" ] || [ "$head_owner" != "$repo_owner" ]; then
+                echo "Skipping PR #$pr (base=$base_ref, head owner=$head_owner)"
+                continue
+              fi
+              last_commit_date=$(gh pr view "$pr" --json commits -q '.commits[-1].committedDate')
+              commit_epoch=$(date -u -d "$last_commit_date" +%s)
+              age_minutes=$(( (now_epoch - commit_epoch) / 60 ))
+
+              if [ "$age_minutes" -ge "$DEBOUNCE_MINUTES" ]; then
+                echo "Promoting PR #$pr out of draft (last commit ${age_minutes}m ago)"
+                gh pr ready "$pr"
+              else
+                echo "Skipping PR #$pr (${age_minutes}m old, debounce ${DEBOUNCE_MINUTES}m)"
+              fi
+            done
