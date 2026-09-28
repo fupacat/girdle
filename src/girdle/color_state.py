@@ -93,7 +93,7 @@ def display_state(
     if active_harm:
         return DisplayState.RED
     bronze, silver, gold = _badge_thresholds(entries)
-    if percentage is None or percentage < bronze:
+    if percentage is None or percentage <= 0 or percentage < bronze:
         return DisplayState.NEUTRAL
     if percentage < silver:
         return DisplayState.BRONZE
