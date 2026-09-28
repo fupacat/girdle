@@ -116,6 +116,21 @@ Mergify's queue.
   or a manual push) after any change that would newly apply to it - this
   bit twice in this repo's own history (PRs #19-22 sat unreviewed for
   exactly this reason until nudged).
+- **A distinct, separate failure mode from the one above**: Gitar can
+  approve a PR (post its review, even auto-apply a fix commit) while its
+  own required `Gitar` status check silently never posts on the current
+  head SHA - the PR looks approved but Mergify's queue stays blocked on
+  the missing check. Confirmed directly on PR #90: the commit right
+  before Gitar's own auto-applied fix had a successful `Gitar` check;
+  Gitar's own fix commit on top of it did not, and this persisted for
+  ~2 hours until nudged. Not a permanent/categorical gap, though - PR
+  #68's Gitar-authored commit got a clean check under broadly similar
+  timing, so it isn't simply "Gitar never checks its own commits."
+  Recoverable with a same-SHA `@gitar-bot` mention asking it to re-run -
+  confirmed this resolves it without needing a new commit. Root cause
+  (a webhook/queue race, possibly tied to rapid successive commits)
+  isn't visible from this side and wasn't pinned down further - the
+  symptom and the fix are what's actionable, not the mechanism.
 - The required-approval story is now two different mechanisms depending on
   PR type (Mergify self-approve for safe Dependabot bumps vs. Gitar/Copilot
   review for everything else) rather than one uniform rule - documented
