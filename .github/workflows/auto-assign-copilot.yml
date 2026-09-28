@@ -1,0 +1,166 @@
+name: Auto-assign unblocked issues to Copilot
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 minutes
+  pull_request:
+    types: [closed]           # faster path: a merge may unblock something
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  assign:
+    runs-on: ubuntu-latest
+    # For pull_request events only run when the PR was actually merged
+    if: github.event_name == 'schedule' || github.event.pull_request.merged == true
+    steps:
+      - name: Find and assign unblocked issues
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+
+            // ------------------------------------------------------------------
+            // 1. Discover the node-id of the copilot-swe-agent bot actor
+            //    via suggestedActors(capabilities: [CAN_BE_ASSIGNED]).
+            // ------------------------------------------------------------------
+            const repoNodeQuery = `
+              query($owner: String!, $repo: String!) {
+                repository(owner: $owner, name: $repo) {
+                  id
+                  suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 100) {
+                    nodes { login id }
+                  }
+                }
+              }
+            `;
+            const copilotHeaders = { 'GraphQL-Features': 'issues_copilot_assignment_api_support' };
+            const repoData = await github.graphql(repoNodeQuery, {
+              owner, repo, headers: copilotHeaders,
+            });
+            const suggested = repoData.repository.suggestedActors.nodes;
+            const copilotActor = suggested.find(a => a.login === "copilot-swe-agent");
+            if (!copilotActor) {
+              core.warning("copilot-swe-agent not found in suggestedActors – skipping.");
+              return;
+            }
+            const copilotId = copilotActor.id;
+            const repoId    = repoData.repository.id;
+
+            core.info(`Copilot actor id: ${copilotId}`);
+
+            // ------------------------------------------------------------------
+            // 2. Fetch all open, unassigned issues (paginate with cursor).
+            // ------------------------------------------------------------------
+            const issueQuery = `
+              query($owner: String!, $repo: String!, $after: String) {
+                repository(owner: $owner, name: $repo) {
+                  issues(
+                    states: [OPEN]
+                    first: 100
+                    after: $after
+                    filterBy: { assignee: null }
+                  ) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes {
+                      id
+                      number
+                      title
+                      blockedBy(first: 100) {
+                        nodes { number state }
+                        pageInfo { hasNextPage endCursor }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            let candidates = [];
+            let after = null;
+            while (true) {
+              const data = await github.graphql(issueQuery, { owner, repo, after });
+              const conn = data.repository.issues;
+              candidates = candidates.concat(conn.nodes);
+              if (!conn.pageInfo.hasNextPage) break;
+              after = conn.pageInfo.endCursor;
+            }
+
+            core.info(`Open unassigned issues found: ${candidates.length}`);
+
+            // ------------------------------------------------------------------
+            // 3. For each candidate, determine whether it is unblocked.
+            //    An issue is unblocked when its blockedBy list is empty OR
+            //    every issue in it is CLOSED.
+            //    If blockedBy itself was truncated (hasNextPage), we must
+            //    paginate to avoid missing a real open blocker.
+            // ------------------------------------------------------------------
+            const blockedByQuery = `
+              query($id: ID!, $after: String) {
+                node(id: $id) {
+                  ... on Issue {
+                    blockedBy(first: 100, after: $after) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes { number state }
+                    }
+                  }
+                }
+              }
+            `;
+
+            const assignMutation = `
+              mutation($assignableId: ID!, $actorIds: [ID!]!) {
+                replaceActorsForAssignable(input: {
+                  assignableId: $assignableId
+                  actorIds: $actorIds
+                }) {
+                  assignable {
+                    ... on Issue { number }
+                  }
+                }
+              }
+            `;
+
+            for (const issue of candidates) {
+              let blockers = issue.blockedBy.nodes;
+              let pageInfo = issue.blockedBy.pageInfo;
+
+              // Paginate if the first page was truncated
+              let cursor = issue.blockedBy.pageInfo.endCursor;
+              while (pageInfo.hasNextPage) {
+                const more = await github.graphql(blockedByQuery, {
+                  id: issue.id,
+                  after: cursor,
+                });
+                const conn = more.node.blockedBy;
+                blockers = blockers.concat(conn.nodes);
+                pageInfo = conn.pageInfo;
+                cursor = conn.pageInfo.endCursor;
+              }
+
+              const hasOpenBlocker = blockers.some(b => b.state === "OPEN");
+              if (hasOpenBlocker) {
+                const openNums = blockers
+                  .filter(b => b.state === "OPEN")
+                  .map(b => "#" + b.number)
+                  .join(", ");
+                core.info(`Issue #${issue.number} still blocked (${openNums})`);
+                continue;
+              }
+
+              core.info(`Issue #${issue.number} is unblocked – assigning to Copilot`);
+              try {
+                await github.graphql(assignMutation, {
+                  assignableId: issue.id,
+                  actorIds: [copilotId],
+                  headers: copilotHeaders,
+                });
+                core.info(`Assigned #${issue.number} to copilot-swe-agent`);
+              } catch (err) {
+                core.warning(`Failed to assign #${issue.number}: ${err.message}`);
+              }
+            }
