@@ -244,6 +244,17 @@ def test_license_manifest_mismatch_is_absent(tmp_path: Path):
     assert "pyproject.toml declares Apache-2.0 but LICENSE is MIT" == cat.reason
 
 
+def test_license_pyproject_file_form_is_aligned(tmp_path: Path):
+    (tmp_path / "LICENSE").write_text(MIT_LICENSE)
+    (tmp_path / "pyproject.toml").write_text(
+        "[project]\nname = 'demo'\nversion = '0.1.0'\nlicense = {file = 'LICENSE'}\n"
+    )
+    result = build_hygiene(tmp_path, languages=set(), repo_visibility="public")
+    cat = result.checks["license"]
+    assert cat.tier == Tier.CONFIGURED
+    assert 'pyproject.toml: {file = "..."}' in cat.evidence
+
+
 def test_license_to_dict_marks_not_applicable(tmp_path: Path):
     data = build_hygiene(tmp_path, languages=set(), repo_visibility="internal").to_dict()
     assert data["license"]["applicable"] is False

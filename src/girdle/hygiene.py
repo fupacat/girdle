@@ -114,12 +114,23 @@ def _manifest_license_declarations(root: Path) -> list[tuple[str, str, set[str]]
     pyproject = _read_toml(root / "pyproject.toml") or {}
     project = pyproject.get("project") if isinstance(pyproject, dict) else None
     pyproject_license = project.get("license") if isinstance(project, dict) else None
+    pyproject_file_ids: set[str] = set()
     if isinstance(pyproject_license, dict):
+        file_ref = pyproject_license.get("file")
         pyproject_license = pyproject_license.get("text")
+        if isinstance(file_ref, str) and file_ref.strip():
+            file_text = _read_text(root / file_ref.strip())
+            if file_text:
+                pyproject_file_ids = _declared_license_ids(file_text)
+                if not pyproject_file_ids:
+                    detected = _detect_license_id(file_text)
+                    pyproject_file_ids = {detected} if detected else set()
     if isinstance(pyproject_license, str) and pyproject_license.strip():
         declarations.append(
             ("pyproject.toml", pyproject_license, _declared_license_ids(pyproject_license))
         )
+    elif pyproject_file_ids:
+        declarations.append(("pyproject.toml", "{file = \"...\"}", pyproject_file_ids))
 
     cargo_toml = _read_toml(root / "Cargo.toml") or {}
     package = cargo_toml.get("package") if isinstance(cargo_toml, dict) else None
@@ -573,5 +584,8 @@ def build_hygiene(
         "contributing": check_contributing(root),
         "dependency_monitoring": check_dependency_monitoring(root),
     }
-    applicable_checks = [name for name in checks if name != "license" or visibility == "public"]
+    inapplicable_checks = set()
+    if visibility != "public":
+        inapplicable_checks.add("license")
+    applicable_checks = [name for name in checks if name not in inapplicable_checks]
     return HygieneResult(checks=checks, applicable_checks=applicable_checks)
