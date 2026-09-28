@@ -29,10 +29,12 @@ jobs:
         # "no token" state verified locally, not an empty one that might
         # be handled differently.
         #
-        # Exit code is captured so the CI Insights step below can evaluate
-        # quarantine status before deciding whether a pytest failure should
-        # fail the job. Dependabot runs skip that step, so preserve the raw
-        # pytest result for them.
+        # Always exits 0 - the CI Insights step below is what actually
+        # gates the job. Its own exit code is quarantine-aware (a
+        # quarantined flaky test doesn't fail it), which pytest's raw
+        # exit code here is not; gating on pytest's own code would defeat
+        # the entire point of enabling quarantine. The real exit code is
+        # still captured as an output for that step to fall back to.
         run: |
           if [ -z "$MERGIFY_TOKEN" ]; then
             unset MERGIFY_TOKEN
@@ -41,20 +43,22 @@ jobs:
           pytest --cov --cov-report=xml --junitxml=junit.xml
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          if [ "$GITHUB_ACTOR" = "dependabot[bot]" ]; then
-            exit "$code"
-          fi
           exit 0
       - name: Mergify CI Insights
         # Uploads JUnit results and evaluates quarantine status for flaky
-        # tests. `if: always()` so it still runs after pytest, including when
-        # the tests step did not run, but not on Dependabot runs.
-        if: always() && steps.tests.outcome != 'skipped' && github.actor != 'dependabot[bot]'
+        # tests, then gates the job on ITS exit code (quarantine-aware)
+        # rather than pytest's raw one. `if: always()` so it still runs
+        # after a pytest failure - the actual case quarantine is for.
+        # Falls back to pytest's own exit code - real gating, not a
+        # silent pass - when there's no token (Dependabot/fork runs never
+        # get MERGIFY_TOKEN, same as SONAR_TOKEN below) or junit.xml
+        # doesn't exist (pytest can in principle exit without writing one
+        # on a crash before collection finishes).
+        if: always()
         env:
           MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
         run: |
-          if [ -z "$MERGIFY_TOKEN" ]; then
-            echo "No MERGIFY_TOKEN - using raw pytest result"
+          if [ -z "$MERGIFY_TOKEN" ] || [ ! -f junit.xml ]; then
             exit "${{ steps.tests.outputs.exit_code }}"
           fi
           pip install --quiet mergify-cli
