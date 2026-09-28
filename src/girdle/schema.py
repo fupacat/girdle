@@ -72,9 +72,8 @@ class ScanResult:
         tiers: list[Tier] = []
         for eco in self.ecosystems:
             cat = eco.categories.get(entry.key)
-            if cat is not None:
-                if entry.key in eco.applicable_categories:
-                    tiers.append(cat.tier)
+            if cat is not None and entry.key in eco.applicable_categories:
+                tiers.append(cat.tier)
                 continue
             for category in entry.categories:
                 if category not in eco.applicable_categories:

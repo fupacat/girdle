@@ -92,3 +92,33 @@ def test_ecosystem_checks_use_registry_categories_not_key_name(monkeypatch):
 
     assert result.category_percentages == {"tests": 100.0}
     assert result.overall_percentage == 100.0
+
+
+def test_ecosystem_falls_back_when_key_result_not_applicable(monkeypatch):
+    monkeypatch.setattr(
+        "girdle.schema.CHECK_REGISTRY",
+        {
+            "custom_tests_check": CheckEntry("custom_tests_check", ("tests",), Difficulty.BASIC),
+        },
+    )
+    result = ScanResult(
+        repo_root=".",
+        scanned_at="now",
+        mode="static",
+        ecosystems=[
+            EcosystemResult(
+                id="x",
+                language="x",
+                toolchain="x",
+                root=".",
+                categories={
+                    "custom_tests_check": CategoryResult(Tier.ABSENT),
+                    "tests": CategoryResult(Tier.CONFIGURED),
+                },
+                applicable_categories=["tests"],
+            )
+        ],
+    )
+
+    assert result.category_percentages == {"tests": 100.0}
+    assert result.overall_percentage == 100.0
