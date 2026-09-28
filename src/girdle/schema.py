@@ -33,6 +33,8 @@ def _registry_category_names() -> list[str]:
     seen: set[str] = set()
     names: list[str] = []
     for entry in CHECK_REGISTRY.values():
+        if entry.reserved:
+            continue
         for category in entry.categories:
             if category not in seen:
                 seen.add(category)
