@@ -193,7 +193,10 @@ jobs:
                 });
                 core.info(`Assigned #${issue.number} to copilot-swe-agent`);
               } catch (err) {
-                if (err.message.includes("Resource not accessible by personal access token")) {
+                const tokenScopeError =
+                  err.message.includes("Resource not accessible by personal access token") ||
+                  err.message.includes("Resource not accessible by integration");
+                if (tokenScopeError) {
                   core.setFailed(
                     "COPILOT_ASSIGN_TOKEN is configured but lacks GitHub's required " +
                     "permissions for Copilot issue assignment " +
