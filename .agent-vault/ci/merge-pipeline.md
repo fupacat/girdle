@@ -158,3 +158,9 @@ Mergify's queue.
   dashboard UI edit silently reverted several hand-written `.mergify.yml`
   changes during a merge-conflict resolution) - in-repo config is git-diffable
   and reviewable the same way code is.
+
+## Related
+
+- [[.agent-vault/decisions/merge-pipeline-tool-roles-and-paths|merge-pipeline-tool-roles-and-paths]]
+- [[.agent-vault/decisions/dependabot-queue-branch-protection-injection-mode|dependabot-queue-branch-protection-injection-mode]]
+- [[.agent-vault/decisions/gitar-as-sole-auto-fixer|gitar-as-sole-auto-fixer]]
