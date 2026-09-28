@@ -191,7 +191,7 @@ jobs:
                 `Project #${projectNumber} was not found for ${owner}; ` +
                 "skipping project status sync.",
               );
-            } else if (!statusField) {
+            } else if (projectNumber > 0 && !statusField) {
               core.warning(
                 `Project #${projectNumber} is missing a '${projectStatusFieldName}' field; ` +
                 "skipping project status sync.",
