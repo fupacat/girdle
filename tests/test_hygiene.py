@@ -221,8 +221,8 @@ def test_license_public_repo_missing_is_absent(tmp_path: Path):
     result = build_hygiene(tmp_path, languages=set(), repo_visibility="public")
     cat = result.checks["license"]
     assert cat.tier == Tier.ABSENT
-    assert "no LICENSE file" in cat.reason
-    assert "license" in result.applicable_checks
+    assert "LICENSE file not found" == cat.reason
+    assert result.applicable_checks is None
 
 
 def test_license_public_repo_recognized_is_configured(tmp_path: Path):

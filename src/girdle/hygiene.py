@@ -146,6 +146,10 @@ def _manifest_license_declarations(root: Path) -> list[tuple[str, str, set[str]]
     return declarations
 
 
+def _license_is_applicable(visibility: str | None) -> bool:
+    return visibility == "public"
+
+
 # language -> gitignore patterns a healthy repo in that ecosystem usually has.
 # Checked as substrings of .gitignore lines, not exact matches, since authors
 # write these many different ways (node_modules/, /node_modules, **/node_modules).
@@ -526,7 +530,7 @@ def check_dependency_monitoring(root: Path) -> CategoryResult:
 
 
 def check_license(root: Path, visibility: str | None) -> CategoryResult:
-    if visibility != "public":
+    if not _license_is_applicable(visibility):
         reason = (
             "repo is not public; LICENSE check not scored"
             if visibility in {"private", "internal"}
@@ -538,7 +542,7 @@ def check_license(root: Path, visibility: str | None) -> CategoryResult:
     if found is None:
         return CategoryResult(
             Tier.ABSENT,
-            reason="no LICENSE file found",
+            reason="LICENSE file not found",
             recommendation=(
                 "Add a root LICENSE file with a recognized SPDX license text (for example MIT "
                 "or Apache-2.0)."
@@ -595,7 +599,9 @@ def build_hygiene(
         "dependency_monitoring": check_dependency_monitoring(root),
     }
     inapplicable_checks = set()
-    if visibility != "public":
+    if not _license_is_applicable(visibility):
         inapplicable_checks.add("license")
-    applicable_checks = [name for name in checks if name not in inapplicable_checks]
+    applicable_checks = None
+    if inapplicable_checks:
+        applicable_checks = [name for name in checks if name not in inapplicable_checks]
     return HygieneResult(checks=checks, applicable_checks=applicable_checks)
