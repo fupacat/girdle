@@ -28,8 +28,8 @@ jobs:
             if (!process.env.COPILOT_ASSIGN_TOKEN) {
               core.warning(
                 "COPILOT_ASSIGN_TOKEN is not configured; skipping Copilot auto-assignment. " +
-                "Set a user token with metadata read and " +
-                "actions/contents/issues/pull-requests write access.",
+                "Set a user token with the Copilot issue-assignment permissions " +
+                "described in GitHub's API docs.",
               );
               return;
             }
