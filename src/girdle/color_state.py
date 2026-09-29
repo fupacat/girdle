@@ -36,23 +36,20 @@ def badge_state(
         return DisplayState.RED
     live = {entry: passed for entry, passed in results.items() if not entry.reserved}
 
-    def band_ok(levels: tuple[Difficulty, ...]) -> bool:
-        band = [passed for entry, passed in live.items() if entry.difficulty in levels]
-        return (
-            bool(band)
-            and all(any(entry.difficulty == level for entry in live) for level in levels)
-            and all(band)
-        )
-
     if not live or not any(live.values()):
         return DisplayState.NEUTRAL
-    if all(live.values()):
-        return DisplayState.GOLD
-    if band_ok((Difficulty.BASIC, Difficulty.INTERMEDIATE)):
-        return DisplayState.SILVER
-    if band_ok((Difficulty.BASIC,)):
-        return DisplayState.BRONZE
-    return DisplayState.NEUTRAL
+    earned = DisplayState.NEUTRAL
+    tiers = ((Difficulty.BASIC, DisplayState.BRONZE),
+             (Difficulty.INTERMEDIATE, DisplayState.SILVER),
+             (Difficulty.ADVANCED, DisplayState.GOLD))
+    for level, state in tiers:
+        band = [p for e, p in live.items() if e.difficulty == level]
+        if not band:
+            continue
+        if not all(band):
+            break
+        earned = state
+    return earned
 
 
 __all__ = ["DisplayState", "badge_state"]
