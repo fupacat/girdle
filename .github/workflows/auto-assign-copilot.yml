@@ -8,10 +8,6 @@ on:
   pull_request:
     types: [opened, reopened, edited, ready_for_review, converted_to_draft, closed]
 
-concurrency:
-  group: sync-copilot-assign
-  cancel-in-progress: false
-
 permissions:
   contents: read
   issues: write
