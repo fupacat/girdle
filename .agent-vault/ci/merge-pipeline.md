@@ -167,10 +167,10 @@ Mergify's queue.
   workaround found: remove and let the conflict-nudge rule (above)
   re-add the `conflict-nudged` label, which forces a full rule
   re-evaluation - worked on #97, didn't on the first attempt for #98.
-  `default` queue's `batch_size: 3` (added after this was found) is an
-  attempt to sidestep it structurally - batching multiple queued PRs
-  into one speculative-merge check may avoid re-hitting the same stuck
-  per-PR evaluation, though this is unconfirmed, not a verified fix.
+  `default` queue's `batch_size: 3` does not address this: the `-conflict`
+  condition lives in the `queue development PRs` `pull_request_rule` and
+  gates queue entry, while batching only applies to PRs already queued.
+  Batching affects throughput, not this stuck evaluation.
 
 ## Related
 
