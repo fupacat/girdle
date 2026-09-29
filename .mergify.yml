@@ -305,6 +305,7 @@ queue_rules:
       - author!=dependabot[bot]
     merge_conditions:
       - check-success=test
+      - check-success=Gitar
       - "#approved-reviews-by>=1"
 merge_queue:
   max_parallel_checks: 7
