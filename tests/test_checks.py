@@ -57,6 +57,7 @@ def test_basic_checks_present():
     keys = [e.key for e in checks_by_difficulty(Difficulty.BASIC)]
     assert "readme" in keys
     assert "gitignore" in keys
+    assert "license" in keys
     assert "contributing" in keys
 
 
@@ -80,8 +81,8 @@ def test_advanced_checks_present():
 # Reserved slots
 # ---------------------------------------------------------------------------
 
-def test_license_is_reserved():
-    assert CHECK_REGISTRY["license"].reserved is True
+def test_license_is_live():
+    assert CHECK_REGISTRY["license"].reserved is False
 
 
 def test_reproducibility_is_reserved():
@@ -90,7 +91,7 @@ def test_reproducibility_is_reserved():
 
 def test_live_checks_are_not_reserved():
     live_keys = [
-        "readme", "gitignore", "contributing",
+        "readme", "gitignore", "license", "contributing",
         "tests", "lint", "coverage", "build", "ci_gating", "codeowners",
         "dependency_monitoring", "editorconfig", "gitattributes", "precommit",
         "static_analysis",
