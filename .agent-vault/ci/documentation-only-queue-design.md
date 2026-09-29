@@ -2,16 +2,19 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 45266356e5012d95af4a63431ee41b48a4f2498a3ce75551a00c2fe6f1136803
+    hash: 602be50cdef89e9f8614226d7c30733b0585c548b4f6bc46d464247e85b35cbd
 stale: false
 ---
 
-# A separate merge queue for documentation-only PRs
+# A separate merge queue for "light" (docs/CI-config-only) PRs
 
 Implemented (see "Implementation" below) - kept as living documentation
 of the design rather than converted to a `decision` note, since the
-"Not yet decided" tuning questions are still genuinely open. Proposed by
-Eric as a further, targeted response to
+"Not yet decided" tuning questions are still genuinely open. Originally
+scoped as documentation-only; broadened to also cover CI-config changes
+(`.github/workflows/**`, `.mergify.yml`) once a real gap was found - see
+"Broadened to include CI config" below. Proposed by Eric as a further,
+targeted response to
 [[.agent-vault/ci/queue-entry-cost-and-timeouts|queue-entry-cost-and-timeouts]]:
 that note already established that the `default` queue runs the full
 `test` job (SonarQube scan included) 2-3x per merged PR because entry and
@@ -79,24 +82,34 @@ SonarCloud's analysis at all.
 
 ## Implementation
 
-Shipped as a single change (not split further - one coherent feature,
+Shipped in two steps (not split further per step - each one coherent,
 per [[.agent-vault/decisions/minimal-discrete-pr-policy|minimal-discrete-pr-policy]]):
+first as docs-only (`docs` queue/`docs_only` output), then broadened to
+`light`/`light_diff` covering CI config too, once the mutual-exclusion
+gap above was found. Current shape:
 
-- `.mergify.yml`: new `docs` queue (`branch_protection_injection_mode: merge`,
+- `.mergify.yml`: `light` queue (`branch_protection_injection_mode: merge`,
   `checks_timeout: 15m`, `merge_conditions: [check-success=test, check-success=Gitar, "#approved-reviews-by>=1"]` - no SonarCloud
-  requirement). New `queue documentation-only PRs` rule using the
-  verified `-files ~= ^(?!(\.agent-vault/|.*\.md$)).*$` condition;
-  `queue development PRs` gets the complementary `files ~= ^(?!...).*$`
-  condition (at least one non-doc file) so the two rules are mutually
-  exclusive - no PR can match both.
-- `ci.yml`: new `changes` job (pull_request-only) diffs
-  `base.sha`..`head.sha` and outputs `docs_only`. The `test` job depends
-  on it (`if: always()`, so a skipped/failed detection defaults to
-  running everything) and gates the `pytest` step and the `SonarQube Scan` step on `docs_only != 'true'`. `ruff`/`mdformat`/`yamllint`/index/
-  vault-notes checks stay unconditional - they're already the cheap part
-  and scan the whole tree regardless of diff size. `test`'s own
-  check-success is still meaningful for docs-only PRs since those checks
-  still ran.
+  requirement). `queue light (docs/CI-config-only) PRs` rule using
+  `-files ~= ^(?!(\.agent-vault/|.*\.md$|\.github/workflows/|\.mergify\.yml$)).*$`;
+  `queue development PRs` gets the complementary
+  `files ~= ^(?!...).*$` condition (at least one file outside all light
+  patterns) so the two rules are mutually exclusive - no PR can match
+  both, and no PR (light, mixed-light, or code) matches neither.
+- `ci.yml`: `changes` job (pull_request-only) diffs `HEAD^1`..`HEAD`
+  (Gitar later changed this from the original `base.sha`/`head.sha`
+  approach - functionally equivalent, verified the substitution wasn't a
+  silent regression like the one in
+  [[.agent-vault/context/vault-freshness-redesign|vault-freshness-redesign]]'s
+  PR #128 incident) and outputs `light_diff`. The `test` job depends on
+  it (`if: always()`, so a skipped/failed detection defaults to running
+  everything) and gates the `pytest` step and the `SonarQube Scan` step
+  on `light_diff != 'true'`. `ruff`/`mdformat`/`yamllint`/index/
+  vault-notes checks stay unconditional - they're already the cheap part,
+  scan the whole tree regardless of diff size, and (`yamllint`
+  specifically) are exactly what validates a CI-config-only PR's own
+  changed files. `test`'s own check-success is still meaningful for
+  light PRs since those checks still ran.
 
 Resolved the two "does this need a new queue" and "does the branch
 ruleset block this" open questions above: yes, a fourth queue is the
@@ -105,6 +118,39 @@ pattern rather than inventing a new mechanism), and no, the branch
 ruleset doesn't block it - Mergify's bypass-actor status is exactly what
 makes the Dependabot queues' lighter `merge_conditions` work today, and
 `docs` uses the identical mechanism.
+
+## Broadened to include CI config
+
+Eric asked for the same treatment for CI-config changes
+(`.github/workflows/**`, `.mergify.yml`) and specifically whether GitHub
+Actions changes and Mergify config changes should be split into two
+separate categories/queues. Recommendation: no - both share the exact
+same reason for skipping SonarCloud/pytest (neither touches
+`sonar.sources=src`/`sonar.tests=tests`), so splitting them would just
+duplicate identical `merge_conditions` for no benefit.
+
+**A real correctness gap was found while implementing this, not just a
+style preference.** The natural first attempt - a third, separate
+mutually-exclusive `ci`-only queue alongside `docs` - has a hole: a PR
+touching *both* a doc file and `.mergify.yml` (a pattern this repo's own
+PRs have used, e.g. #131 touched `.mergify.yml`/`ci.yml` alongside
+`.agent-vault/*.md` notes) would match neither the docs-only nor the
+ci-only condition (since "all files are docs" and "all files are
+ci-config" are both false for a mixed set), and would therefore match no
+queue rule at all - never getting queued. Fixed by merging into one
+`light` category/queue covering both patterns with a single condition,
+rather than two mutually-exclusive ones. Also confirmed
+`check-success=test` should stay required even for CI-config-only PRs -
+unlike `pytest`, the `test` job's `yamllint` step is exactly what
+validates the YAML files such a PR touches, so it still carries real
+signal even with `pytest`/SonarQube skipped.
+
+Also verified: `yamllint`/`ruff`/`mdformat` all pass, `pytest` passes
+(397 tests), and the light-file regex (`^(\.agent-vault/|.*\.md$|\.github/workflows/|\.mergify\.yml$)`)
+was tested against both `grep -E` (used in `ci.yml`) and Python's `re`
+(what Mergify itself uses) with matching results across doc-only,
+ci-only, mixed-light, mixed-with-real-code, and a deliberate
+false-positive-substring case (`scripts/not.mergify.yml.bak`).
 
 ## Not yet decided
 
