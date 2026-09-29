@@ -3,7 +3,7 @@ type: context
 watches:
   - path: src/girdle/hygiene.py
     symbol: check_agent_sandbox_bootstrap
-    hash: cbab06d8f7b95e723d4085ac08289f5fbfcb9f1d60c743cb0664ba25df9a5c4d
+    hash: 97485092dd4ef47bc56cd01d2fd485eee4ce94b0fa735dabe40eecc1b7ac9b31
 stale: false
 ---
 
@@ -13,8 +13,10 @@ Raw source material: [[coding-agent-sandbox-bootstrap-conventions-2026-09-26]].
 
 ## Context
 
-`check_agent_sandbox_bootstrap` (conditional on `precommit` already being
-CONFIGURED - see `check_precommit`) detects whether an AI coding agent's
+`check_agent_sandbox_bootstrap` (conditional on `.pre-commit-config.yaml`
+existing - deliberately not on `precommit` being CONFIGURED, so a CI/pre-commit
+parity gap reported by `check_precommit` does not cascade into a false sandbox
+finding) detects whether an AI coding agent's
 isolated execution sandbox gets the same local enforcement (`pre-commit install`) a human contributor gets. Three ecosystems are checked, each with
 its own sub-check and its own non-obvious trust boundary:
 

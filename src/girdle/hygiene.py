@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import tomllib
+import yaml
 
 from girdle.tiers import CategoryResult, Tier
 
@@ -400,7 +401,103 @@ def check_precommit(root: Path) -> CategoryResult:
                 "Add a .pre-commit-config.yaml to run fast local checks before commits."
             ),
         )
+    hook_values = _precommit_hook_values(root)
+    ci_tools = _ci_tool_names(root)
+    # A tool found in CI but absent from every pre-commit hook id or entry is a parity gap:
+    # local commits silently under-enforce what CI actually gates on.
+    missing = sorted(
+        tool for tool in ci_tools
+        if not any(
+            re.search(rf"\b{re.escape(tool)}\b", hook_value)
+            for hook_value in hook_values
+        )
+    )
+    if missing:
+        tools_str = ", ".join(missing)
+        return CategoryResult(
+            Tier.ABSENT,
+            evidence=[".pre-commit-config.yaml"],
+            reason=(
+                f"CI runs {tools_str} but pre-commit does not: local commits "
+                "under-enforce what CI gates on"
+            ),
+            recommendation=(
+                f"Add pre-commit hooks for: {tools_str} so local commits enforce "
+                "the same checks CI does."
+            ),
+        )
     return CategoryResult(Tier.CONFIGURED, evidence=[".pre-commit-config.yaml"])
+
+
+# Tool name → regex pattern used to detect it in CI workflow text.
+# Keys are also the substrings matched against pre-commit hook IDs:
+# a hook whose `id` contains the tool name counts as covering it
+# (e.g. hook id "ruff-format" covers tool "ruff").
+_CI_TOOL_PATTERNS: dict[str, str] = {
+    "ruff": r"\bruff\b",
+    "mypy": r"\bmypy\b",
+    "pytest": r"\bpytest\b",
+    "black": r"\bblack\b",
+    "flake8": r"\bflake8\b",
+    "pylint": r"\bpylint\b",
+    "eslint": r"\beslint\b",
+    "prettier": r"\bprettier\b",
+    "bandit": r"\bbandit\b",
+}
+
+
+def _precommit_hook_values(root: Path) -> set[str]:
+    """Return hook ids and entries from .pre-commit-config.yaml."""
+    text = _read_text(root / ".pre-commit-config.yaml") or ""
+    try:
+        data = yaml.safe_load(text) or {}
+    except yaml.YAMLError:
+        return set()
+    if not isinstance(data, dict):
+        return set()
+    values: set[str] = set()
+    for repo in data.get("repos") or []:
+        if not isinstance(repo, dict):
+            continue
+        for hook in repo.get("hooks") or []:
+            if not isinstance(hook, dict):
+                continue
+            for key in ("id", "entry"):
+                value = hook.get(key)
+                if isinstance(value, str):
+                    values.add(value)
+    return values
+
+
+def _ci_tool_names(root: Path) -> set[str]:
+    """Return the subset of _CI_TOOL_PATTERNS keys found in any CI config."""
+    ci_texts: list[str] = []
+    wf_dir = root / ".github" / "workflows"
+    if wf_dir.exists():
+        for wf in wf_dir.glob("*.y*ml"):
+            text = _read_text(wf)
+            if text:
+                ci_texts.append(text)
+    for alt in (".gitlab-ci.yml", "azure-pipelines.yml"):
+        text = _read_text(root / alt)
+        if text:
+            ci_texts.append(text)
+    install_pattern = re.compile(
+        r"\b(?:pip|npm|npx|yarn|pnpm|uv|poetry|pipenv|conda|cargo|gem|bundle|dotnet)"
+        r"\b.*\b(?:install|add|sync)\b"
+    )
+    ci_lines = [
+        segment
+        for text in ci_texts
+        for line in text.splitlines()
+        for segment in re.split(r"&&|\|\||;|\|", line)
+        if not install_pattern.search(segment)
+    ]
+    found: set[str] = set()
+    for tool, pattern in _CI_TOOL_PATTERNS.items():
+        if any(re.search(pattern, line) for line in ci_lines):
+            found.add(tool)
+    return found
 
 
 COPILOT_SETUP_STEPS = ".github/workflows/copilot-setup-steps.yml"
@@ -462,14 +559,13 @@ def _codex_local_environment_configured(root: Path) -> bool:
     return codex_dir.is_dir() and any(codex_dir.iterdir())
 
 
-def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> CategoryResult:
+def check_agent_sandbox_bootstrap(root: Path) -> CategoryResult:
     """Whether an agent's isolated execution sandbox (GitHub Copilot coding
     agent, Claude Code cloud/worktree sessions, OpenAI Codex's local
     desktop environment) gets wired into the same local enforcement
-    pre-commit gives a human contributor. Conditional on pre-commit itself
-    being configured - same shape as scan.py's coverage gate check: nothing
-    to bootstrap into an empty sandbox otherwise, so checking this in
-    isolation would be noise, not a finding.
+    pre-commit gives a human contributor. Conditional on the config file's
+    presence: there is nothing to bootstrap into an empty sandbox otherwise,
+    so checking this in isolation would be noise, not a finding.
 
     Codex's *cloud* environment setup script is deliberately not checked -
     it's configured through OpenAI's own web UI
@@ -477,7 +573,7 @@ def check_agent_sandbox_bootstrap(root: Path, precommit: CategoryResult) -> Cate
     so it's invisible to a local file scan and would be dishonest to score.
     The local desktop environment (.codex/) is different and is checked.
     """
-    if precommit.tier != Tier.CONFIGURED:
+    if not (root / ".pre-commit-config.yaml").exists():
         return CategoryResult(
             Tier.ABSENT,
             reason=(
@@ -676,7 +772,7 @@ def build_hygiene(
         "editorconfig": check_editorconfig(root),
         "gitattributes": check_gitattributes(root),
         "precommit": precommit,
-        "agent_sandbox_bootstrap": check_agent_sandbox_bootstrap(root, precommit),
+        "agent_sandbox_bootstrap": check_agent_sandbox_bootstrap(root),
         "gitignore": check_gitignore(root, languages),
         "license": check_license(root, visibility),
         "codeowners": check_codeowners(root),
