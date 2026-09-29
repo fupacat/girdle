@@ -17,16 +17,21 @@ so the record of what was considered and why survives.
 - [in-progress] **Malicious/poisoned agent instructions detection** -
   [issue #80](https://github.com/fupacat/girdle/issues/80), unassigned
   (depends on #73). Routes through the same active-harm/red bucket as
-  secrets detection, not the percentage/badge model.
+  secrets detection, not the percentage/badge model. `find_agent_instruction_hazards`
+  scans discovered instruction files for zero-width Unicode characters,
+  unusually long base64-like or hex-like blobs, and concrete manipulative
+  directives: requests to ignore prior instructions, reveal system/developer
+  messages or hidden instructions, or conceal information from the user.
 - [in-progress] **SAST/static-analysis-configured check** -
   [issue #79](https://github.com/fupacat/girdle/issues/79), unassigned
   (depends on #73). Distinct from `lint`.
 
 ## New pillars (from the Factory.ai Agent Readiness comparison)
 
-- [in-progress] **Build System** - [issue #78](https://github.com/fupacat/girdle/issues/78),
-  unassigned (depends on #73). Confirm whether girdle already scores
-  deterministic build commands, or whether this is a genuine gap.
+- [done] **Build System** - [issue #78](https://github.com/fupacat/girdle/issues/78):
+  new intermediate `build` check added for compiled ecosystems plus
+  JS repos with an explicit `scripts.build`, with `--run` verification
+  commands where the toolchain has a standard build entry point.
 - [ ] **Debugging & Observability** (structured logging, tracing,
   metrics) - genuine gap, no existing girdle category. Needs its own
   design pass (what's deterministically checkable here - structured
