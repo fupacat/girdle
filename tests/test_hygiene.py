@@ -51,7 +51,69 @@ def test_precommit_absent(tmp_path: Path):
 
 
 def test_precommit_present(tmp_path: Path):
+    # pre-commit exists with no CI configured → CONFIGURED (nothing to be missing from)
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    result = build_hygiene(tmp_path, languages=set())
+    assert result.checks["precommit"].tier == Tier.CONFIGURED
+
+
+def test_precommit_ci_parity_all_hooks_present(tmp_path: Path):
+    # CI runs ruff + pytest, both present as pre-commit hooks → CONFIGURED
+    pc = """
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.0
+    hooks:
+      - id: ruff
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: pytest
+        language: system
+        pass_filenames: false
+"""
+    (tmp_path / ".pre-commit-config.yaml").write_text(pc)
+    wf_dir = tmp_path / ".github" / "workflows"
+    wf_dir.mkdir(parents=True)
+    (wf_dir / "ci.yml").write_text("- run: ruff check .\n- run: pytest\n")
+    result = build_hygiene(tmp_path, languages=set())
+    assert result.checks["precommit"].tier == Tier.CONFIGURED
+
+
+def test_precommit_ci_parity_missing_hook(tmp_path: Path):
+    # CI runs ruff + pytest, but pre-commit only has ruff → pytest is missing → ABSENT
+    pc = """
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.0
+    hooks:
+      - id: ruff
+"""
+    (tmp_path / ".pre-commit-config.yaml").write_text(pc)
+    wf_dir = tmp_path / ".github" / "workflows"
+    wf_dir.mkdir(parents=True)
+    (wf_dir / "ci.yml").write_text("- run: ruff check .\n- run: pytest\n")
+    result = build_hygiene(tmp_path, languages=set())
+    cat = result.checks["precommit"]
+    assert cat.tier == Tier.ABSENT
+    assert "pytest" in (cat.reason or "")
+    assert "pytest" in (cat.recommendation or "")
+
+
+def test_precommit_ci_parity_hook_id_substring_match(tmp_path: Path):
+    # hook id "ruff-format" still covers the tool "ruff" via substring
+    pc = """
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.0
+    hooks:
+      - id: ruff-format
+"""
+    (tmp_path / ".pre-commit-config.yaml").write_text(pc)
+    wf_dir = tmp_path / ".github" / "workflows"
+    wf_dir.mkdir(parents=True)
+    (wf_dir / "ci.yml").write_text("- run: ruff check .\n")
     result = build_hygiene(tmp_path, languages=set())
     assert result.checks["precommit"].tier == Tier.CONFIGURED
 
