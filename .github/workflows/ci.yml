@@ -18,12 +18,11 @@ jobs:
       docs_only: ${{ steps.check.outputs.docs_only }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
       - id: check
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          changed=$(git diff --no-renames --name-only HEAD^1 HEAD)
           if echo "$changed" | grep -qvE '^(\.agent-vault/|.*\.md$)'; then
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
           else

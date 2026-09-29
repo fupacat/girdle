@@ -31,7 +31,7 @@ doesn't accidentally reintroduce a conflict already debugged once.
 | **Copilot (PR reviewer)**     | Backup/secondary reviewer only - can approve, but nothing requests it automatically. Exists as a manual fallback (`gh api .../requested_reviewers`) for a PR that's genuinely stuck, not a parallel automated path | CI-failure auto-fixing, merging                                                                                  |
 | **Copilot (coding agent)**    | Opens PRs from assigned issues (`copilot/*` branches)                                                                                                                                                              | Everything else - it's a PR author, not part of the pipeline                                                     |
 | **Dependabot**                | Opens dependency-bump PRs                                                                                                                                                                                          | Everything else - also just a PR author                                                                          |
-| **Mergify**                   | The **only** merge orchestrator - three named queues, self-approves safe Dependabot bumps, nudges Dependabot rebases, labels majors for review                                                                     | Code quality judgment - it has no opinion on content, only on whether the required checks/approval already exist |
+| **Mergify**                   | The **only** merge orchestrator - four named queues, self-approves safe Dependabot bumps, nudges Dependabot rebases, labels majors for review                                                                        | Code quality judgment - it has no opinion on content, only on whether the required checks/approval already exist |
 
 **Why not consolidate onto GitHub-native tooling** (native merge queue +
 CodeQL + Copilot) instead of Mergify + SonarCloud + Gitar: researched and
@@ -42,11 +42,11 @@ below natively (CodeQL failing against the ephemeral merge-queue ref,
 `GITHUB_TOKEN` unable to enqueue PRs, bot PRs failing human-oriented
 template checks) - it doesn't remove the problem, it just moves it, while
 losing Mergify's per-queue `queue_conditions`/`branch_protection_injection_mode`
-granularity that the three-queue split below depends on. Separately,
+granularity that the four-queue split below depends on. Separately,
 CodeQL is deep security analysis, not a quality-gate/coverage-threshold/
 duplication tool - it's additive to SonarCloud, not a replacement for it.
 
-## Decision: the three merge paths
+## Decision: the four merge paths
 
 1. **Dependabot patch/minor/security** → Mergify auto-approves itself
    (satisfies the 1-review rule for genuinely low-risk bumps) → `Dependabot`
@@ -56,6 +56,9 @@ duplication tool - it's additive to SonarCloud, not a replacement for it.
    `#approved-reviews-by>=1` gates queue *entry*, not just merge, so an
    unapproved major never blocks the train behind it) → `Dependabot-major`
    queue → merged by Mergify.
+1. **Documentation-only PRs** → routed to the `docs` queue, which skips the
+   pytest/SonarCloud checks that are unnecessary for documentation changes →
+   merged by Mergify.
 1. **Everything else** (human PRs, Copilot coding-agent PRs, agent-authored
    PRs like this session's own `ci/*`/`docs/*` branches) → Gitar reviews
    and approves (Copilot as backup if Gitar is somehow unavailable) →
