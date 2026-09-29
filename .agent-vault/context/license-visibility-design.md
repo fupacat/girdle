@@ -2,7 +2,7 @@
 type: context
 watches:
   - path: src/girdle/hygiene.py
-    hash: dd61ff48972ee422d827eeeb0bb4029015af2aa7b24251c437ecb6bcc8f9c06a
+    hash: 821779983acc549d043cd84947e3a96fd4d3b0cd4fceb3cf26afb9d45dcaab3f
 stale: false
 ---
 
