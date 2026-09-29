@@ -217,6 +217,16 @@ jobs:
             //    labels, project Status, and auto-assignment all use the same
             //    snapshot.
             // ------------------------------------------------------------------
+            const projectItemsFields = project ? `
+              projectItems(first: 100) {
+                nodes {
+                  id
+                  project { id number }
+                  fieldValueByName(name: "${projectStatusFieldName}") {
+                    ... on ProjectV2ItemFieldSingleSelectValue { optionId }
+                  }
+                }
+              }` : "";
             const issueFields = `
               id
               number
@@ -243,18 +253,7 @@ jobs:
                 nodes { number state isDraft }
                 pageInfo { hasNextPage endCursor }
               }
-              projectItems(first: 100) {
-                nodes {
-                  id
-                  project {
-                    id
-                    number
-                  }
-                  fieldValueByName(name: "${projectStatusFieldName}") {
-                    ... on ProjectV2ItemFieldSingleSelectValue { optionId }
-                  }
-                }
-              }
+              ${projectItemsFields}
             `;
             const issueQuery = `
               query($owner: String!, $repo: String!, $after: String) {
@@ -466,7 +465,7 @@ jobs:
 
             const syncProjectStatus = async (issue, desiredStatus) => {
               if (!project || !statusField) return;
-              const item = issue.projectItems.nodes.find(
+              const item = (issue.projectItems?.nodes ?? []).find(
                 projectItem => projectItem.project.id === project.id,
               );
               if (!item) {
