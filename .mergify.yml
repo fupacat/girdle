@@ -195,6 +195,15 @@ queue_rules:
     # auto-merge-copilot.yml no longer arms GitHub's native auto-merge
     # (it can't bypass the ruleset either), just promotes out of draft
     # and lets this queue handle the actual merge.
+    #
+    # batch_size: batches of Copilot PRs landing close together were
+    # observed sitting one-at-a-time behind a stuck -conflict evaluation
+    # (see .agent-vault/ci/merge-pipeline.md) - batching gives Mergify's
+    # own speculative-merge testing a chance to process several queued
+    # PRs' conflict state together instead of serially re-evaluating one
+    # at a time.
+    batch_size: 3
+    batch_max_wait_time: "2 minutes"
     queue_conditions:
       - author!=dependabot[bot]
 merge_queue:
