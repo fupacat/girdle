@@ -25,7 +25,7 @@ class JsBunDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
+        return js_common.js_applicable_categories(fp.root)
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
@@ -34,6 +34,7 @@ class JsBunDetector:
             "tests": js_common.scan_tests(pkg_data, "bun"),
             "lint": js_common.scan_lint(root, fp, "bun"),
             "coverage": js_common.scan_coverage(pkg_data, "bun"),
+            **js_common.js_build_scan_entry(pkg_data),
             "reproducibility": self._scan_reproducibility(root),
             "ci_gating": js_common.scan_ci(root, r"\bbun (run )?test\b", "bun test"),
         }

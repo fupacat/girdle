@@ -59,3 +59,10 @@ def test_test_sdk_reference_detected(tmp_path: Path):
     fp = det.detect(tmp_path)
     result = det.scan(fp, mode="static")
     assert result["tests"].tier == Tier.CONFIGURED
+
+
+def test_nested_project_detected(tmp_path: Path):
+    nested = tmp_path / "src" / "App"
+    nested.mkdir(parents=True)
+    (nested / "App.csproj").write_text(CSPROJ_PINNED)
+    assert DotNetDetector().detect(tmp_path) is not None
