@@ -3,6 +3,7 @@ name: Sync issue status and auto-assign Copilot
 on:
   schedule:
     - cron: "*/30 * * * *"   # every 30 minutes
+  workflow_dispatch:
   issues:
     types: [opened, reopened, closed]
   pull_request:
@@ -167,7 +168,14 @@ jobs:
                 project = p.repositoryOwner?.projectV2 ?? null;
               } catch (err) {
                 project = err.data?.repositoryOwner?.projectV2 ?? null;
-                if (isTokenScopeError(err)) throwScopeError("project lookup", err);
+                if (isTokenScopeError(err)) {
+                  core.warning(
+                    "COPILOT_ASSIGN_TOKEN lacks Projects access for project lookup; " +
+                    "skipping project status sync. " +
+                    `GitHub responded: ${errorMessages(err).join(" | ")}`,
+                  );
+                  project = null;
+                }
               }
             }
             const suggested = bootstrap.repository.suggestedActors.nodes;
