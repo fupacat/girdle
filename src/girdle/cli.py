@@ -298,9 +298,16 @@ def _print_ecosystem(eco: dict) -> None:
 
 def _print_summary(data: dict) -> None:
     summary = data["summary"]
+    overall_pct = summary.get("overall_percentage")
+    overall_state = summary.get("overall_state")
+    score_text = (
+        f"{overall_pct:g}% ({overall_state})"
+        if overall_pct is not None and overall_state is not None
+        else TIER_LABEL[summary["overall_min"]]
+    )
     click.echo(
         f"summary: {summary['ecosystem_count']} ecosystem(s), "
-        f"overall_min={TIER_LABEL[summary['overall_min']]}, "
+        f"overall={score_text}, "
         f"weakest={summary['weakest_category']}"
     )
     for w in data["warnings"]:
@@ -317,6 +324,10 @@ def _print_human(data: dict) -> None:
     if hygiene is not None:
         click.echo("")
         _print_hygiene(hygiene)
+    active_harm = data.get("active_harm")
+    if active_harm and active_harm.get("findings"):
+        click.echo("")
+        _print_active_harm(active_harm)
     platform = data.get("platform")
     if platform is not None:
         click.echo("")
@@ -326,11 +337,20 @@ def _print_human(data: dict) -> None:
 def _print_hygiene(hygiene: dict) -> None:
     click.echo("hygiene:")
     for name, cat in hygiene.items():
-        click.echo(f"  {name:<14} {TIER_LABEL[cat['tier']]}")
+        marker = TIER_LABEL[cat["tier"]] if cat.get("applicable", True) else "n/a"
+        click.echo(f"  {name:<14} {marker}")
         if cat["reason"]:
             click.echo(f"    reason: {cat['reason']}")
         if cat["recommendation"]:
             click.echo(f"    fix: {cat['recommendation']}")
+
+
+def _print_active_harm(active_harm: dict) -> None:
+    click.echo("active harm:")
+    for finding in active_harm["findings"]:
+        click.echo(f"  {finding['path']}  [{finding['kind']}]")
+        click.echo(f"    reason: {finding['reason']}")
+        click.echo(f"    evidence: {finding['evidence']}")
 
 
 def _print_platform(platform: dict) -> None:

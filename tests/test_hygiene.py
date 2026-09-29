@@ -3,6 +3,29 @@ from pathlib import Path
 from girdle.hygiene import build_hygiene
 from girdle.tiers import Tier
 
+MIT_LICENSE = """MIT License
+
+Copyright (c) 2026 Example
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
 
 def test_all_absent_on_empty_repo(tmp_path: Path):
     result = build_hygiene(tmp_path, languages=set())
@@ -178,6 +201,66 @@ def test_gitignore_multi_language_checks_all_stacks(tmp_path: Path):
     assert "node_modules" in cat.reason
 
 
+def test_license_private_repo_is_not_applicable(tmp_path: Path):
+    result = build_hygiene(tmp_path, languages=set(), repo_visibility="private")
+    cat = result.checks["license"]
+    assert cat.tier == Tier.ABSENT
+    assert "not public" in cat.reason
+    assert "license" not in result.applicable_checks
+
+
+def test_license_unknown_visibility_is_not_applicable(tmp_path: Path):
+    result = build_hygiene(tmp_path, languages=set(), repo_visibility="unknown")
+    cat = result.checks["license"]
+    assert cat.tier == Tier.ABSENT
+    assert "could not be determined" in cat.reason
+    assert "license" not in result.applicable_checks
+
+
+def test_license_public_repo_missing_is_absent(tmp_path: Path):
+    result = build_hygiene(tmp_path, languages=set(), repo_visibility="public")
+    cat = result.checks["license"]
+    assert cat.tier == Tier.ABSENT
+    assert "LICENSE file not found" == cat.reason
+    assert result.applicable_checks is None
+
+
+def test_license_public_repo_recognized_is_configured(tmp_path: Path):
+    (tmp_path / "LICENSE").write_text(MIT_LICENSE)
+    result = build_hygiene(tmp_path, languages=set(), repo_visibility="public")
+    cat = result.checks["license"]
+    assert cat.tier == Tier.CONFIGURED
+    assert "LICENSE: MIT" in cat.evidence
+
+
+def test_license_manifest_mismatch_is_absent(tmp_path: Path):
+    (tmp_path / "LICENSE").write_text(MIT_LICENSE)
+    (tmp_path / "pyproject.toml").write_text(
+        "[project]\nname = 'demo'\nversion = '0.1.0'\nlicense = 'Apache-2.0'\n"
+    )
+    result = build_hygiene(tmp_path, languages=set(), repo_visibility="public")
+    cat = result.checks["license"]
+    assert cat.tier == Tier.ABSENT
+    assert "pyproject.toml declares Apache-2.0 but LICENSE is MIT" == cat.reason
+
+
+def test_license_pyproject_file_form_is_aligned(tmp_path: Path):
+    (tmp_path / "LICENSE").write_text(MIT_LICENSE)
+    (tmp_path / "pyproject.toml").write_text(
+        "[project]\nname = 'demo'\nversion = '0.1.0'\nlicense = {file = 'LICENSE'}\n"
+    )
+    result = build_hygiene(tmp_path, languages=set(), repo_visibility="public")
+    cat = result.checks["license"]
+    assert cat.tier == Tier.CONFIGURED
+    assert 'pyproject.toml: {file = "..."}' in cat.evidence
+
+
+def test_license_to_dict_marks_not_applicable(tmp_path: Path):
+    data = build_hygiene(tmp_path, languages=set(), repo_visibility="internal").to_dict()
+    assert data["license"]["applicable"] is False
+    assert data["license"]["status"] == "n/a"
+
+
 def test_codeowners_found_in_github_dir(tmp_path: Path):
     github_dir = tmp_path / ".github"
     github_dir.mkdir()
@@ -276,6 +359,8 @@ def test_to_dict_shape(tmp_path: Path):
     d = result.to_dict()
     assert set(d.keys()) == {
         "editorconfig", "gitattributes", "precommit", "agent_sandbox_bootstrap", "gitignore",
-        "codeowners", "agent_instructions", "readme", "contributing", "dependency_monitoring",
+        "license", "codeowners", "agent_instructions", "readme", "contributing",
+        "dependency_monitoring",
     }
     assert "tier" in d["editorconfig"]
+    assert "applicable" in d["license"]

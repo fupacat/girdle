@@ -25,7 +25,7 @@ class RustDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        cats = ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
+        cats = ["tests", "lint", "coverage", "build", "reproducibility", "ci_gating"]
         # A gitignored/absent Cargo.lock is correct practice for a library crate
         # (consumers resolve their own versions), so it's not a scoreable gap.
         if "lib" in fp.variants and not (fp.root / CARGO_LOCK).exists():
@@ -38,6 +38,7 @@ class RustDetector:
             "tests": self._scan_tests(root),
             "lint": self._scan_lint(root),
             "coverage": self._scan_coverage(root),
+            "build": self._scan_build(root),
             "reproducibility": self._scan_reproducibility(root, fp),
             "ci_gating": self._scan_ci(root),
         }
@@ -46,6 +47,7 @@ class RustDetector:
         commands = {
             "tests": ["cargo", "test"],
             "lint": ["cargo", "clippy", "--all-targets", "--", "-D", "warnings"],
+            "build": ["cargo", "build"],
         }
         if (fp.root / TARPAULIN_TOML).exists():
             commands["coverage"] = ["cargo", "tarpaulin"]
@@ -107,6 +109,9 @@ class RustDetector:
                 recommendation="Add cargo-tarpaulin (or cargo-llvm-cov) and run it in CI.",
             )
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
+
+    def _scan_build(self, root: Path) -> CategoryResult:
+        return CategoryResult(Tier.CONFIGURED, evidence=[CARGO_TOML])
 
     def _scan_reproducibility(self, root: Path, fp: Fingerprint) -> CategoryResult:
         lock = root / CARGO_LOCK

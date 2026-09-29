@@ -244,6 +244,13 @@ queue_rules:
     # auto-merge-copilot.yml no longer arms GitHub's native auto-merge
     # (it can't bypass the ruleset either), just promotes out of draft
     # and lets this queue handle the actual merge.
+    #
+    # batch_size: throughput only. NOTE: this does NOT address the stuck
+    # -conflict evaluation (see .agent-vault/ci/merge-pipeline.md) - that
+    # condition lives in the 'queue development PRs' pull_request_rule and
+    # gates queue *entry*; batching only applies to PRs already queued.
+    batch_size: 3
+    batch_max_wait_time: "2 minutes"
     queue_conditions:
       - author!=dependabot[bot]
 merge_queue:
