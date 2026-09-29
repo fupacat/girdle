@@ -183,10 +183,9 @@ pull_request_rules:
     # sat ignored for 16+ minutes on PRs #93/#98/#100, while the same text
     # posted by a human got a real fix commit in ~3.5 minutes). bot_account
     # impersonates a real collaborator account so the mention actually
-    # reaches Copilot. TODO(backlog): replace with a dedicated automation
-    # user account (e.g. girdle-automation) once one is provisioned and
-    # authorized in Mergify, so these nudges don't read as Eric personally
-    # asking each time - deferred for now. NOTE: PRs already labelled
+    # reaches Copilot. Uses the dedicated `girdle-automation` collaborator
+    # account so these nudges stay clearly distinct from Eric's human
+    # activity. NOTE: PRs already labelled
     # conflict-nudged (e.g. #93/#98/#100) must have that label removed
     # manually to be re-nudged under this account.
     conditions:
@@ -197,7 +196,7 @@ pull_request_rules:
       - -draft
     actions:
       comment:
-        bot_account: fupacat
+        bot_account: girdle-automation
         message: >-
           @copilot This PR has a merge conflict with `master`. Please rebase
           onto the latest `master` and resolve the conflicting changes.
