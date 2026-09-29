@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 87dff0a8072fe5336f2b062cf20face3aac6dd9699223198cfc75fa6488a5d8f
+    hash: 34554f3960b25fb94000b2e112b563a94f345bbf35f444ee427a954353bdcd0f
 stale: false
 ---
 
@@ -201,6 +201,19 @@ Mergify's queue.
   dashboard UI edit silently reverted several hand-written `.mergify.yml`
   changes during a merge-conflict resolution) - in-repo config is git-diffable
   and reviewable the same way code is.
+- Mergify's own `-conflict` queue condition can get **persistently** stuck
+  unmet even when GitHub reports `mergeable: MERGEABLE` and a local
+  `git merge` is a genuine no-op - not just transiently stale (fixable
+  with an empty-commit push, as on PR #93), but stuck through repeated
+  `@mergifyio refresh`, `@mergifyio dequeue` + `@mergifyio queue`, and
+  multiple fresh pushes (PRs #97, #98, both 15-20+ minutes). The only
+  workaround found: remove and let the conflict-nudge rule (above)
+  re-add the `conflict-nudged` label, which forces a full rule
+  re-evaluation - worked on #97, didn't on the first attempt for #98.
+  `default` queue's `batch_size: 3` does not address this: the `-conflict`
+  condition lives in the `queue development PRs` `pull_request_rule` and
+  gates queue entry, while batching only applies to PRs already queued.
+  Batching affects throughput, not this stuck evaluation.
 
 ## Related
 
