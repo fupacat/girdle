@@ -35,6 +35,17 @@ the local pre-commit hook is an enforced gate: those commits are not
 guaranteed to be created via local `git commit`. Treat CI status checks
 as the authoritative enforcement boundary for agent-authored commits.
 
+## Pull request scope
+
+Keep each PR to one discrete, reviewable change - break a larger feature
+into the smallest mergeable steps rather than landing it as one PR, and
+land plumbing/refactoring separately from the behavior change it enables.
+If a step needs to merge before the feature it's part of is complete or
+user-visible, land it inert (unreferenced code, or gated behind a flag)
+rather than holding the PR open until everything is ready. Rationale and
+the merge-queue friction this addresses:
+`.agent-vault/decisions/minimal-discrete-pr-policy.md`.
+
 ## Branch protection
 
 `master` is protected, including for admins: changes land via a PR with
