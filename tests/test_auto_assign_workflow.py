@@ -31,7 +31,7 @@ def test_status_logic_covers_ready_in_progress_in_review_done() -> None:
     assert 'linkedPullRequests.some(pr => pr.state === "MERGED")' in text
     assert '"Done"' in text
     assert "issue.assignees.totalCount > 0" in text
-    assert '"In Progress"' in text
+    assert 'return "In Progress";' in text
     assert '"Ready"' in text
-    assert "checksPassing(pr)" in text
+    assert "!pr.isDraft && checksPassing(pr)" in text
     assert 'return "In Review";' in text
