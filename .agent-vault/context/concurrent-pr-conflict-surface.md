@@ -180,11 +180,11 @@ moved from "lowest urgency" to tied-highest after a follow-up search of
 PR review comments (not just CI logs) found real occurrences the first
 pass missed - see that note's evidence section.
 
-1. \*\*[[.agent-vault/context/generated-index-churn|generated-index-churn]]
+1. **[[.agent-vault/context/generated-index-churn|generated-index-churn]]
    and
    [[.agent-vault/context/vault-freshness-redesign|vault-freshness-redesign]]
    - tied highest priority, both confirmed-acute, both point toward the
-     same diff-scoped fix shape.\*\* Index-churn: 11+ explicit
+     same diff-scoped fix shape.** Index-churn: 11+ explicit
      conflict-resolution commits on `AGENTS.md`, two forced empty-commit
      re-evaluations, dedicated Mergify bot automation built to fight it
      (worked example: `74f0730`). Vault-freshness: real rebase-staleness
@@ -193,8 +193,8 @@ pass missed - see that note's evidence section.
      change, not from PR #123's own edits), plus one reported batch
      bisected by the check failing on every composite speculative merge.
      Worth scoping and fixing together given the shared fix shape.
-1. \*\*[[.agent-vault/ci/queue-entry-cost-and-timeouts|queue-entry-cost-and-timeouts]]
-   - high priority.\*\* Confirmed concretely: one PR (#104) had its full
+1. **[[.agent-vault/ci/queue-entry-cost-and-timeouts|queue-entry-cost-and-timeouts]]
+   - high priority.** Confirmed concretely: one PR (#104) had its full
      `test` job (incl. SonarQube scan) run three times before merging.
      Also the mechanism that turned the one real velocity-drop incident
      below into an ~11.5-hour delay (no `checks_timeout`, full ruleset

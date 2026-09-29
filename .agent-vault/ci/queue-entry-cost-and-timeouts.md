@@ -87,9 +87,8 @@ SonarQube scan) three times, not the theorized two - batch reshuffling
 adds runs beyond the entry+merge floor. Check-runs on the PR's own head
 SHA show exactly **one** `SonarCloud Code Analysis` entry, confirming
 Automatic Analysis is off and the duplication is entirely cross-branch
-(own branch vs. each speculative merge branch), not same-SHA duplication
-
-- matches this note's SonarCloud explanation exactly.
+(own branch vs. each speculative merge branch), not same-SHA
+duplication - matches this note's SonarCloud explanation exactly.
 
 **Timeout/stuck-conflict claim: not directly observable in this window,
 not contradicted either.** All 3 sampled `mergify/merge-queue/*` runs

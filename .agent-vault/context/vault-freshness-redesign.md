@@ -29,14 +29,13 @@ being wrong:
   without the others knowing produces the same spurious mismatch, just
   more often.
 - **No reconcile path on CI**: `check()`'s only non-blocking path
-  requires a "staged in this commit" concept
-  ([vault.py:295](../../src/girdle/vault.py:295)), which only exists
-  during a local commit. `ci.yml`'s read-only run
-  ([ci.yml:71-78](../../.github/workflows/ci.yml:71)) - deliberately, to
-  close the `--no-verify` bypass gap - has no such concept on any ref, so
-  every mismatch there is unconditionally blocking. Combined with the two
-  points above, this can block legitimate merges for reasons unrelated to
-  documentation accuracy.
+  requires a "staged in this commit" concept (`_staged_files()` in
+  [vault.py:342](../../src/girdle/vault.py:342)), which only exists
+  during a local commit. `ci.yml`'s read-only run has no such concept, so
+  a mismatch on a PR branch or a master push is unconditionally blocking.
+  Since #128/#129 the step is skipped on `mergify/merge-queue/*` branches
+  as a stop-gap, so batch staleness no longer blocks the queue; rebase
+  staleness on a PR's own branch still does.
 
 ## Evidence (subagent investigation + direct correction, 2026-09-29)
 
