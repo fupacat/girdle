@@ -28,7 +28,8 @@ jobs:
           LIGHT_PATTERN: '^(\.agent-vault/|.*\.md$|\.github/workflows/|\.mergify\.yml$)'
         run: |
           changed=$(git diff --no-renames --name-only HEAD^1 HEAD)
-          if echo "$changed" | grep -qvE "$LIGHT_PATTERN" || echo "$changed" | grep -qx '.github/workflows/ci.yml'; then
+          if echo "$changed" | grep -qvE "$LIGHT_PATTERN" || \
+            echo "$changed" | grep -qx '.github/workflows/ci.yml'; then
             echo "light_diff=false" >> "$GITHUB_OUTPUT"
           else
             echo "light_diff=true" >> "$GITHUB_OUTPUT"
