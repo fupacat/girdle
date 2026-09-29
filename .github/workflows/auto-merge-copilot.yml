@@ -48,6 +48,7 @@ jobs:
   auto-merge:
     if: >-
       github.event_name == 'pull_request' &&
+      github.event.pull_request.state == 'open' &&
       github.event.pull_request.user.login == 'Copilot' &&
       startsWith(github.event.pull_request.head.ref, 'copilot/') &&
       github.event.pull_request.base.ref == github.event.repository.default_branch &&
@@ -62,7 +63,17 @@ jobs:
     steps:
       - name: Mark ready for review
         if: github.event.pull_request.draft == true
-        run: gh pr ready "${{ github.event.pull_request.number }}"
+        run: |
+          pr_number="${{ github.event.pull_request.number }}"
+          if ! gh pr ready "$pr_number"; then
+            pr_state=$(gh pr view "$pr_number" --json state -q '.state' || true)
+            if [ "$pr_state" = "CLOSED" ] || [ "$pr_state" = "MERGED" ]; then
+              echo "PR #$pr_number is $pr_state; skipping ready-for-review."
+              exit 0
+            fi
+            echo "Failed to mark PR #$pr_number ready (state=${pr_state:-unknown})." >&2
+            exit 1
+          fi
 
   fallback-sweep:
     # Debounce is deliberately generous (30 minutes) - promoting a PR
@@ -79,6 +90,8 @@ jobs:
       GH_REPO: ${{ github.repository }}
       DEBOUNCE_MINUTES: 30
     steps:
+      - uses: actions/checkout@v7
+
       - name: Promote stale Copilot draft PRs out of draft
         run: |
           set -euo pipefail
