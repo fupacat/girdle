@@ -19,7 +19,7 @@ class GoModDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
+        return ["tests", "lint", "coverage", "build", "reproducibility", "ci_gating"]
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
@@ -27,12 +27,17 @@ class GoModDetector:
             "tests": self._scan_tests(root),
             "lint": self._scan_lint(root),
             "coverage": self._scan_coverage(root),
+            "build": self._scan_build(root),
             "reproducibility": self._scan_reproducibility(root, fp),
             "ci_gating": self._scan_ci(root),
         }
 
     def run_commands(self, fp: Fingerprint) -> dict[str, list[str]]:
-        commands = {"tests": ["go", "test", "./..."], "coverage": ["go", "test", "-cover", "./..."]}
+        commands = {
+            "tests": ["go", "test", "./..."],
+            "coverage": ["go", "test", "-cover", "./..."],
+            "build": ["go", "build", "./..."],
+        }
         if (fp.root / ".golangci.yml").exists() or (fp.root / ".golangci.yaml").exists():
             commands["lint"] = ["golangci-lint", "run"]
         return commands
@@ -79,6 +84,9 @@ class GoModDetector:
                 ),
             )
         return CategoryResult(Tier.CONFIGURED, evidence=evidence)
+
+    def _scan_build(self, root: Path) -> CategoryResult:
+        return CategoryResult(Tier.CONFIGURED, evidence=["go.mod (build via `go build ./...`)"])
 
     def _scan_reproducibility(self, root: Path, fp: Fingerprint) -> CategoryResult:
         sum_files = [root / "go.sum"]

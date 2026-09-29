@@ -57,13 +57,14 @@ def test_basic_checks_present():
     keys = [e.key for e in checks_by_difficulty(Difficulty.BASIC)]
     assert "readme" in keys
     assert "gitignore" in keys
+    assert "license" in keys
     assert "contributing" in keys
 
 
 def test_intermediate_checks_present():
     keys = [e.key for e in checks_by_difficulty(Difficulty.INTERMEDIATE)]
     for expected in [
-        "tests", "lint", "coverage", "ci_gating", "codeowners",
+        "tests", "lint", "coverage", "build", "ci_gating", "codeowners",
         "dependency_monitoring", "editorconfig", "gitattributes", "precommit",
     ]:
         assert expected in keys, f"expected {expected!r} in intermediate checks"
@@ -71,6 +72,7 @@ def test_intermediate_checks_present():
 
 def test_advanced_checks_present():
     keys = [e.key for e in checks_by_difficulty(Difficulty.ADVANCED)]
+    assert "static_analysis" in keys
     assert "agent_instructions" in keys
     assert "agent_sandbox_bootstrap" in keys
 
@@ -79,8 +81,8 @@ def test_advanced_checks_present():
 # Reserved slots
 # ---------------------------------------------------------------------------
 
-def test_license_is_reserved():
-    assert CHECK_REGISTRY["license"].reserved is True
+def test_license_is_live():
+    assert CHECK_REGISTRY["license"].reserved is False
 
 
 def test_reproducibility_is_reserved():
@@ -89,9 +91,10 @@ def test_reproducibility_is_reserved():
 
 def test_live_checks_are_not_reserved():
     live_keys = [
-        "readme", "gitignore", "contributing",
-        "tests", "lint", "coverage", "ci_gating", "codeowners",
+        "readme", "gitignore", "license", "contributing",
+        "tests", "lint", "coverage", "build", "ci_gating", "codeowners",
         "dependency_monitoring", "editorconfig", "gitattributes", "precommit",
+        "static_analysis",
         "agent_instructions", "agent_sandbox_bootstrap",
     ]
     for key in live_keys:
@@ -113,7 +116,9 @@ def test_categories_are_tuples():
     ("tests", "tests"),
     ("lint", "lint"),
     ("coverage", "coverage"),
+    ("build", "build"),
     ("ci_gating", "ci_gating"),
+    ("static_analysis", "static_analysis"),
     ("codeowners", "codeowners"),
     ("dependency_monitoring", "dependency_monitoring"),
     ("editorconfig", "editorconfig"),
@@ -133,13 +138,13 @@ def test_check_maps_to_expected_category(key, expected_category):
 # Total count
 # ---------------------------------------------------------------------------
 
-def test_registry_covers_all_16_categories():
-    """Registry must cover all 16 categories enumerated in the design doc."""
+def test_registry_covers_all_18_categories():
+    """Registry must cover all 18 categories enumerated in the design doc."""
     expected_categories = {
         "readme", "gitignore", "license", "contributing",
-        "tests", "lint", "coverage", "ci_gating", "codeowners",
+        "tests", "lint", "coverage", "build", "ci_gating", "codeowners",
         "dependency_monitoring", "editorconfig", "gitattributes", "precommit",
-        "agent_instructions", "agent_sandbox_bootstrap", "reproducibility",
+        "agent_instructions", "agent_sandbox_bootstrap", "static_analysis", "reproducibility",
     }
     all_categories: set[str] = set()
     for entry in CHECK_REGISTRY.values():
