@@ -536,20 +536,14 @@ jobs:
               core.info(`Synced #${issue.number} project status to '${desiredStatus}'`);
             };
 
-            const checksPassing = (pullRequest) =>
-              pullRequest.commits.nodes[0]?.commit?.statusCheckRollup?.state === "SUCCESS";
             const desiredProjectStatus = (issue, hasOpenBlocker, linkedPullRequests) => {
               if (issue.state !== "OPEN") return "Done";
-              if (linkedPullRequests.some(pr => pr.state === "MERGED")) return "Done";
               if (hasOpenBlocker) return "Blocked";
               const activePullRequests = linkedPullRequests.filter(pr => pr.state === "OPEN");
-              if (activePullRequests.length === 0) {
-                return issue.assignees.totalCount > 0 ? "In Progress" : "Ready";
-              }
-              if (activePullRequests.some(pr => !pr.isDraft && checksPassing(pr))) {
-                return "In Review";
-              }
-              return "In Progress";
+              if (activePullRequests.some(pr => !pr.isDraft)) return "In Review";
+              if (activePullRequests.length > 0) return "In Progress";
+              if (issue.assignees.totalCount > 0) return "In Progress";
+              return "Ready";
             };
 
             // ------------------------------------------------------------------
