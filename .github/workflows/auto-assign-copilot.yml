@@ -546,10 +546,10 @@ jobs:
               if (activePullRequests.length === 0) {
                 return issue.assignees.totalCount > 0 ? "In Progress" : "Ready";
               }
-              if (activePullRequests.some(pr => pr.isDraft || !checksPassing(pr))) {
-                return "In Progress";
+              if (activePullRequests.some(pr => !pr.isDraft && checksPassing(pr))) {
+                return "In Review";
               }
-              return "In Review";
+              return "In Progress";
             };
 
             // ------------------------------------------------------------------
