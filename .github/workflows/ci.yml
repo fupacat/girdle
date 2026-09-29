@@ -75,6 +75,13 @@ jobs:
         # distinction in a clean checkout, so this only ever verifies -
         # closing the gap where a --no-verify bypass of the local hook
         # would otherwise reach master with nothing checking it.
+        #
+        # Mergify's speculative merge-queue branches compare against the
+        # batched/rebased candidate, not any single PR's own diff, so a
+        # mismatch can be caused entirely by another queued PR touching the
+        # same watched file. The check still runs here so stale hashes cannot
+        # land on master; see issue #127 for this false positive and the
+        # planned diff-scoped replacement.
         run: girdle notes check .
       - name: SonarQube Scan
         # SonarCloud's free plan only analyzes the default branch and PRs, not
