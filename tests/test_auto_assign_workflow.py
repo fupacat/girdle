@@ -8,7 +8,10 @@ def test_assign_job_skips_mergify_merge_queue_pull_requests():
         Path(__file__).resolve().parent.parent
         / ".github/workflows/auto-assign-copilot.yml"
     )
+    assert workflow_path.exists(), f"workflow file not found: {workflow_path}"
     workflow = yaml.safe_load(workflow_path.read_text())
+    assert "jobs" in workflow and "assign" in workflow["jobs"]
+    assert "if" in workflow["jobs"]["assign"]
     condition = " ".join(workflow["jobs"]["assign"]["if"].split())
     assert (
         condition
