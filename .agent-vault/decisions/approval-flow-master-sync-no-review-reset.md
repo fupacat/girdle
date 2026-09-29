@@ -35,15 +35,19 @@ configuration is not stored in this repository. The policy choice is:
 - keep an approval valid across a conflict-only sync/rebase; only a real
   code change should reset the review state;
 - do not require a transient re-review race to keep the queue alive;
-- prefer a queue gate that waits for a stable review state after the diff
-  settles rather than treating a branch-sync event as a fresh review
-  invalidation.
+- prevent branch-sync events from invalidating an approval when the semantic
+  diff is unchanged; a queue-entry gate cannot preserve approval or prevent
+  dequeue when GitHub's required-review condition becomes unsatisfied.
 
-The preferred operational pattern is a Mergify condition based on a
-review-settled marker such as `label=gitar-approved` (or an equivalent
-review-stable signal) plus a short debounce, rather than directly
-relying on `#approved-reviews-by>=1` at queue entry while the branch is
-still rebasing/resolving conflicts.
+A Mergify condition based on a review-settled marker such as
+`label=gitar-approved` (or an equivalent review-stable signal) plus a short
+debounce can delay queue entry until review state settles, but it cannot
+prevent GitHub from dismissing stale approvals on push or stop an already
+queued PR from being dequeued when the required approval disappears. It is
+not a fix for this churn. The direct operational workaround is to disable
+stale-review dismissal in the ruleset; this preserves approvals across
+conflict-only syncs, but also means GitHub will not automatically invalidate
+an approval after a real code change.
 
 ## Alternatives considered
 
@@ -51,25 +55,28 @@ still rebasing/resolving conflicts.
   - Rejected: it creates a temporary approval hole, lets Mergify dequeue a
     still-valid PR, and adds avoidable churn.
 - **Turn off stale review dismissal entirely**
-  - Plausible backup, but too coarse: it keeps stale reviews around even
-    when the code actually changes, which is a weaker signal than
-    "diff-stable approval." It is acceptable as a fallback if maintainers
-    prefer the simplest GitHub-side switch, but not the preferred policy.
+  - Preferred operational workaround: it prevents GitHub from clearing the
+    approval on a conflict-only sync, so the required-review condition does
+    not lapse and trigger dequeue. The tradeoff is that GitHub also keeps an
+    approval after a real code change; enforcing re-review only for meaningful
+    diff changes requires additional automation or a future platform feature.
 - **Have Mergify re-approve when the diff vs `master` is unchanged**
   - Valid fallback, but still couples a queue policy to a bot-driven
     review-game and extra state. It works, but it is more complex than
     protecting the review from being invalidated in the first place.
 - **Make queue entry wait for `label=gitar-approved` + short debounce**
-  - Preferred: it anchors queue entry to a review state after the branch
-    has stabilized, rather than to a transient review count while a
-    rebase is still in flight.
+  - Not sufficient to preserve approval or prevent dequeue: this controls
+    queue entry only and cannot override GitHub's dismissal of stale reviews
+    or the required-review merge gate. It may supplement the operational
+    workaround, but must not be treated as its replacement.
 
 ## Consequences
 
-- A conflict-only master-sync update no longer causes an approved Copilot
-  PR to fall into a queue-dequeue/requeue loop.
+- With stale-review dismissal disabled, a conflict-only master-sync update
+  does not clear the approval and trigger a queue-dequeue/requeue loop.
 - Reviewers are not asked to re-approve solely because the branch was
-  refreshed to absorb `master` changes.
+  refreshed to absorb `master` changes, but GitHub will also retain approval
+  after real code changes unless additional automation enforces re-review.
 - The repo keeps the design rationale visible here, while the concrete
   GitHub Ruleset/Mergify settings remain a maintainer-side operational
   decision rather than an in-repo code change.
