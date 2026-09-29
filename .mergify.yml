@@ -136,7 +136,7 @@ pull_request_rules:
       # (.agent-vault/, *.md) or CI config (.github/workflows/,
       # .mergify.yml) only. Any changed file outside those means this
       # could affect pytest/SonarCloud, so it needs the full queue.
-      - files ~= ^(?!(\.agent-vault/|.*\.md$|\.github/workflows/|\.mergify\.yml$)).*$
+      - files ~= ^(?!(\.agent-vault/|.*\.md$|\.github/workflows/(?!ci\.yml$)|\.mergify\.yml$)).*$
     actions:
       queue:
         name: default
@@ -163,7 +163,7 @@ pull_request_rules:
       - author!=dependabot[bot]
       - -conflict
       - -draft
-      - -files ~= ^(?!(\.agent-vault/|.*\.md$|\.github/workflows/|\.mergify\.yml$)).*$
+      - -files ~= ^(?!(\.agent-vault/|.*\.md$|\.github/workflows/(?!ci\.yml$)|\.mergify\.yml$)).*$
     actions:
       queue:
         name: light
