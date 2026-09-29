@@ -2,9 +2,9 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 45266356e5012d95af4a63431ee41b48a4f2498a3ce75551a00c2fe6f1136803
+    hash: a4a92c14f1a49536be8fdac1dab9e0e90b821489d8dbea9d39451615c8e61d3c
   - path: .github/workflows/ci.yml
-    hash: d7ce835dca64c47c3fe423945a0452bb53c0fd48d4d0cad5e1bd16704dda4f40
+    hash: f37bb2e4a9ad4fe8b7f50f811b2d73444b653e1808d6692391ba6d3def7b5344
 stale: false
 ---
 

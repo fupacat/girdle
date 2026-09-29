@@ -132,33 +132,41 @@ pull_request_rules:
       - author!=dependabot[bot]
       - -conflict
       - -draft
-      # Excludes documentation-only PRs (routed to the docs queue below) -
-      # any changed file outside .agent-vault/ or not ending in .md means
-      # this could affect pytest/SonarCloud, so it needs the full queue.
-      - files ~= ^(?!(\.agent-vault/|.*\.md$)).*$
+      # Excludes "light" PRs (routed to the light queue below) - docs
+      # (.agent-vault/, *.md) or CI config (.github/workflows/,
+      # .mergify.yml) only. Any changed file outside those means this
+      # could affect pytest/SonarCloud, so it needs the full queue.
+      - files ~= ^(?!(\.agent-vault/|.*\.md$|\.github/workflows/(?!ci\.yml$)|\.mergify\.yml$)).*$
     actions:
       queue:
         name: default
 
-  - name: queue documentation-only PRs
-    # Every changed file must fall under .agent-vault/ or end in .md
-    # (README/CONTRIBUTING/the PR template all end in .md too, so no
-    # separate clause is needed). A PR that touches even one non-doc file
-    # falls through to "queue development PRs" above instead, since it
-    # could affect pytest/SonarCloud results the docs queue's lighter
-    # gate never checks. See .agent-vault/ci/documentation-only-queue-design.md
-    # for the full rationale (motivated by
+  - name: queue light (docs/CI-config-only) PRs
+    # Every changed file must fall under .agent-vault/, end in .md
+    # (README/CONTRIBUTING/the PR template all end in .md too), be under
+    # .github/workflows/, or be .mergify.yml itself. Originally
+    # docs-only; broadened to cover CI-config changes too rather than a
+    # separate queue, since a mutually-exclusive docs-only/ci-only split
+    # left a gap - a PR touching both a doc file and .mergify.yml (a
+    # pattern this repo's own PRs have used) matched neither queue and
+    # would never get queued at all. One combined "light" category with
+    # a single condition avoids that. A PR that touches even one file
+    # outside these patterns falls through to "queue development PRs"
+    # above instead, since it could affect pytest/SonarCloud results
+    # this queue's lighter gate never checks. See
+    # .agent-vault/ci/documentation-only-queue-design.md for the full
+    # rationale (motivated by
     # .agent-vault/ci/queue-entry-cost-and-timeouts.md's finding that the
-    # full ruleset - and its SonarQube scan - was gating even doc-only PRs
-    # like this repo's own vault-note PRs).
+    # full ruleset - and its SonarQube scan - was gating even doc-only
+    # PRs like this repo's own vault-note PRs).
     conditions:
       - author!=dependabot[bot]
       - -conflict
       - -draft
-      - -files ~= ^(?!(\.agent-vault/|.*\.md$)).*$
+      - -files ~= ^(?!(\.agent-vault/|.*\.md$|\.github/workflows/(?!ci\.yml$)|\.mergify\.yml$)).*$
     actions:
       queue:
-        name: docs
+        name: light
 
   - name: nudge Copilot when a PR goes into conflict
     # Copilot's own PRs pile up behind each other and drift into conflict
@@ -278,16 +286,23 @@ queue_rules:
     queue_conditions:
       - author!=dependabot[bot]
 
-  - name: docs
-    # Routes here only when every changed file is documentation (see the
-    # "queue documentation-only PRs" pull_request_rule) - nothing in that
-    # diff can affect pytest or SonarCloud's analysis, so this queue
-    # doesn't require either. branch_protection_injection_mode: merge
-    # (same rationale as the Dependabot queues) keeps entry cheap; the
-    # "test" job's own pytest/SonarQube steps are skipped for docs-only
-    # diffs (see ci.yml's "changes" job), so "test" still completes
-    # quickly and its check-success is meaningful (lint/index/vault-notes
-    # checks still ran) without waiting on parts that can't apply.
+  - name: light
+    # Routes here only when every changed file is docs or CI config (see
+    # the "queue light (docs/CI-config-only) PRs" pull_request_rule) -
+    # nothing in that diff can affect pytest or SonarCloud's analysis
+    # (SonarCloud only scans sonar.sources=src/sonar.tests=tests per
+    # sonar-project.properties; a YAML/markdown-only diff can't touch
+    # either), so this queue doesn't require either. Deliberately not
+    # split into separate docs/ci-config queues - see the pull_request_rule
+    # comment for the mutual-exclusion gap that split would reintroduce.
+    # branch_protection_injection_mode: merge (same rationale as the
+    # Dependabot queues) keeps entry cheap; the "test" job's own
+    # pytest/SonarQube steps are skipped for these diffs (see ci.yml's
+    # "changes" job), so "test" still completes quickly and its
+    # check-success is meaningful (lint/index/vault-notes checks - and
+    # yamllint specifically, which validates the CI-config files this
+    # queue exists for - still ran) without waiting on parts that can't
+    # apply.
     branch_protection_injection_mode: merge
     checks_timeout: 15m
     queue_conditions:
