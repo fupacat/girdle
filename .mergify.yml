@@ -282,7 +282,7 @@ queue_rules:
     # condition lives in the 'queue development PRs' pull_request_rule and
     # gates queue *entry*; batching only applies to PRs already queued.
     batch_size: 3
-    batch_max_wait_time: "2 minutes"
+    batch_max_wait_time: "30 seconds"
     queue_conditions:
       - author!=dependabot[bot]
 
