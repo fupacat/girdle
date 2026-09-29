@@ -6,7 +6,37 @@ on:
   pull_request:
 
 jobs:
+  changes:
+    # Detects a documentation-only PR (every changed file under
+    # .agent-vault/ or ending in .md) so the test job below can skip
+    # pytest/SonarQube for it - see
+    # .agent-vault/ci/documentation-only-queue-design.md. Only meaningful
+    # for pull_request events; a push to master always runs everything.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.check.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: check
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          if echo "$changed" | grep -qvE '^(\.agent-vault/|.*\.md$)'; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
+    needs: changes
+    # needs.changes can be skipped (push event) or fail outright; always()
+    # keeps this job running either way - the steps below treat a missing
+    # docs_only output as "false" (run everything), which is the safe
+    # default if detection ever breaks.
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -21,6 +51,7 @@ jobs:
       - run: yamllint .
       - name: pytest
         id: tests
+        if: needs.changes.outputs.docs_only != 'true'
         env:
           MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
         # secrets.MERGIFY_TOKEN resolves to an empty string, not truly
@@ -96,7 +127,12 @@ jobs:
         # workflow runs triggered by Dependabot PRs as a security measure -
         # the token would be blank there regardless of the branch/event
         # check above, so skip explicitly rather than fail on bad auth.
+        #
+        # Also skipped for documentation-only PRs (see the "changes" job)
+        # - nothing in a docs-only diff can change SonarCloud's analysis,
+        # and the docs queue's merge_conditions don't require this check.
         if: >-
+          needs.changes.outputs.docs_only != 'true' &&
           github.actor != 'dependabot[bot]' && (
             github.event_name == 'pull_request' ||
             github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
