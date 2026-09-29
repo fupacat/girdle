@@ -3,6 +3,7 @@ name: Sync issue status and auto-assign Copilot
 on:
   schedule:
     - cron: "*/30 * * * *"   # every 30 minutes
+  workflow_dispatch:
   issues:
     types: [opened, reopened, closed]
   pull_request:
@@ -167,7 +168,14 @@ jobs:
                 project = p.repositoryOwner?.projectV2 ?? null;
               } catch (err) {
                 project = err.data?.repositoryOwner?.projectV2 ?? null;
-                if (isTokenScopeError(err)) throwScopeError("project lookup", err);
+                if (isTokenScopeError(err)) {
+                  core.warning(
+                    "COPILOT_ASSIGN_TOKEN lacks Projects access for project lookup; " +
+                    "skipping project status sync. " +
+                    `GitHub responded: ${errorMessages(err).join(" | ")}`,
+                  );
+                  project = null;
+                }
               }
             }
             const suggested = bootstrap.repository.suggestedActors.nodes;
@@ -209,6 +217,16 @@ jobs:
             //    labels, project Status, and auto-assignment all use the same
             //    snapshot.
             // ------------------------------------------------------------------
+            const projectItemsFields = project ? `
+              projectItems(first: 100) {
+                nodes {
+                  id
+                  project { id number }
+                  fieldValueByName(name: "${projectStatusFieldName}") {
+                    ... on ProjectV2ItemFieldSingleSelectValue { optionId }
+                  }
+                }
+              }` : "";
             const issueFields = `
               id
               number
@@ -235,18 +253,7 @@ jobs:
                 nodes { number state isDraft }
                 pageInfo { hasNextPage endCursor }
               }
-              projectItems(first: 100) {
-                nodes {
-                  id
-                  project {
-                    id
-                    number
-                  }
-                  fieldValueByName(name: "${projectStatusFieldName}") {
-                    ... on ProjectV2ItemFieldSingleSelectValue { optionId }
-                  }
-                }
-              }
+              ${projectItemsFields}
             `;
             const issueQuery = `
               query($owner: String!, $repo: String!, $after: String) {
@@ -458,7 +465,7 @@ jobs:
 
             const syncProjectStatus = async (issue, desiredStatus) => {
               if (!project || !statusField) return;
-              const item = issue.projectItems.nodes.find(
+              const item = (issue.projectItems?.nodes ?? []).find(
                 projectItem => projectItem.project.id === project.id,
               );
               if (!item) {
