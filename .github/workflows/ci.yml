@@ -82,8 +82,7 @@ jobs:
         # a mismatch there can be caused entirely by another queued PR
         # touching the same watched file - not something this PR (or a
         # human) can fix on that branch. Every real PR branch and push to
-        # master still gets the real check; see
-        # .agent-vault/context/vault-freshness-redesign.md for the false
+        # master still gets the real check; see issue #127 for the false
         # positive this avoids and the planned diff-scoped replacement.
         if: ${{ !startsWith(github.head_ref, 'mergify/merge-queue/') }}
         run: girdle notes check .
