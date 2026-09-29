@@ -23,6 +23,7 @@
 .agent-vault/brainstorm/workstream-visibility-2026-09-28.md | brainstorm | stale=False | watches: -
 (none) | data-model
 (none) | diagram
+.agent-vault/ci/documentation-only-queue-design.md | ci | stale=False | watches: .mergify.yml
 .agent-vault/ci/merge-pipeline.md | ci | stale=False | watches: .mergify.yml
 .agent-vault/ci/queue-entry-cost-and-timeouts.md | ci | stale=False | watches: .mergify.yml; .github/workflows/ci.yml
 .agent-vault/environment/external-services.md | environment | stale=False | watches: -

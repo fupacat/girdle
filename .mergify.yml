@@ -132,9 +132,33 @@ pull_request_rules:
       - author!=dependabot[bot]
       - -conflict
       - -draft
+      # Excludes documentation-only PRs (routed to the docs queue below) -
+      # any changed file outside .agent-vault/ or not ending in .md means
+      # this could affect pytest/SonarCloud, so it needs the full queue.
+      - files ~= ^(?!(\.agent-vault/|.*\.md$)).*$
     actions:
       queue:
         name: default
+
+  - name: queue documentation-only PRs
+    # Every changed file must fall under .agent-vault/ or end in .md
+    # (README/CONTRIBUTING/the PR template all end in .md too, so no
+    # separate clause is needed). A PR that touches even one non-doc file
+    # falls through to "queue development PRs" above instead, since it
+    # could affect pytest/SonarCloud results the docs queue's lighter
+    # gate never checks. See .agent-vault/ci/documentation-only-queue-design.md
+    # for the full rationale (motivated by
+    # .agent-vault/ci/queue-entry-cost-and-timeouts.md's finding that the
+    # full ruleset - and its SonarQube scan - was gating even doc-only PRs
+    # like this repo's own vault-note PRs).
+    conditions:
+      - author!=dependabot[bot]
+      - -conflict
+      - -draft
+      - -files ~= ^(?!(\.agent-vault/|.*\.md$)).*$
+    actions:
+      queue:
+        name: docs
 
   - name: nudge Copilot when a PR goes into conflict
     # Copilot's own PRs pile up behind each other and drift into conflict
@@ -253,6 +277,25 @@ queue_rules:
     batch_max_wait_time: "2 minutes"
     queue_conditions:
       - author!=dependabot[bot]
+
+  - name: docs
+    # Routes here only when every changed file is documentation (see the
+    # "queue documentation-only PRs" pull_request_rule) - nothing in that
+    # diff can affect pytest or SonarCloud's analysis, so this queue
+    # doesn't require either. branch_protection_injection_mode: merge
+    # (same rationale as the Dependabot queues) keeps entry cheap; the
+    # "test" job's own pytest/SonarQube steps are skipped for docs-only
+    # diffs (see ci.yml's "changes" job), so "test" still completes
+    # quickly and its check-success is meaningful (lint/index/vault-notes
+    # checks still ran) without waiting on parts that can't apply.
+    branch_protection_injection_mode: merge
+    checks_timeout: 15m
+    queue_conditions:
+      - author!=dependabot[bot]
+    merge_conditions:
+      - check-success=test
+      - check-success=Gitar
+      - "#approved-reviews-by>=1"
 merge_queue:
   max_parallel_checks: 7
 merge_protections_settings:
