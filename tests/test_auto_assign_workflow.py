@@ -1,16 +1,44 @@
 import re
 from pathlib import Path
 
+import yaml
+
+
+def _workflow_path() -> Path:
+    return Path(__file__).resolve().parents[1] / ".github/workflows/auto-assign-copilot.yml"
+
 
 def _workflow_text() -> str:
-    workflow = Path(__file__).resolve().parents[1] / ".github/workflows/auto-assign-copilot.yml"
-    return workflow.read_text(
-        encoding="utf-8",
-    )
+    return _workflow_path().read_text(encoding="utf-8")
 
 
 def _normalized_workflow_text() -> str:
     return re.sub(r"\s+", " ", _workflow_text())
+
+
+def _workflow_yaml() -> dict:
+    return yaml.safe_load(_workflow_text())
+
+
+def test_assign_job_skips_mergify_merge_queue_pull_requests() -> None:
+    workflow = _workflow_yaml()
+    condition = " ".join(workflow["jobs"]["assign"]["if"].split())
+    assert (
+        condition
+        == "github.event_name != 'pull_request' || "
+        "!startsWith(github.head_ref, 'mergify/merge-queue/')"
+    )
+
+
+def test_assign_job_uses_concurrency_group() -> None:
+    workflow = _workflow_yaml()
+    concurrency = workflow["jobs"]["assign"]["concurrency"]
+    assert concurrency["cancel-in-progress"] is False
+    assert (
+        concurrency["group"]
+        == "auto-assign-copilot-${{ github.event.pull_request.number || "
+        "github.event.issue.number || 'sweep' }}"
+    )
 
 
 def test_adds_issue_to_project_before_status_sync() -> None:
