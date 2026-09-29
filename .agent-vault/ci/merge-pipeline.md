@@ -176,10 +176,11 @@ Mergify's queue.
   polling GitHub Actions workflow - it comments `@copilot` on the affected
   PR (Copilot's coding agent watches for mentions on PRs it authored and
   pushes fix commits in response, including conflict resolution). To avoid
-  repeated nudges while still conflicting but allow a later re-conflict to
-  nudge again, the rule checks for a prior hidden marker comment keyed by
-  the current head SHA (`<!-- conflict-nudge:{{head}} -->`) and only posts
-  when that marker is absent. The GitHub author `login` for these PRs is
+  repeated nudges while still conflicted but allow a later re-conflict to
+  nudge again, the rule adds a `conflict-nudged` label with the comment and
+  only posts when that label is absent; a separate rule clears the label
+  once the conflict is resolved. The hidden comment marker records the head
+  commit SHA (`<!-- conflict-nudge:{{head.sha}} -->`) for context. The GitHub author `login` for these PRs is
   `Copilot` (a Bot-type user) - not `copilot-swe-agent[bot]` or
   `app/copilot-swe-agent`, both of which Mergify's `author=` condition
   rejects.
