@@ -220,3 +220,7 @@ Mergify's queue.
 - [[.agent-vault/decisions/merge-pipeline-tool-roles-and-paths|merge-pipeline-tool-roles-and-paths]]
 - [[.agent-vault/decisions/dependabot-queue-branch-protection-injection-mode|dependabot-queue-branch-protection-injection-mode]]
 - [[.agent-vault/decisions/gitar-as-sole-auto-fixer|gitar-as-sole-auto-fixer]]
+- [[.agent-vault/ci/queue-entry-cost-and-timeouts|queue-entry-cost-and-timeouts]] -
+  open question of whether `default` should adopt the Dependabot queues'
+  `branch_protection_injection_mode: merge` to stop gating queue entry on
+  the full ruleset, plus the missing `checks_timeout` on `default`.
