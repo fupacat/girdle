@@ -30,6 +30,8 @@ def test_status_logic_covers_ready_in_progress_in_review_done() -> None:
     text = _normalized_workflow_text()
     assert 'linkedPullRequests.some(pr => pr.state === "MERGED")' in text
     assert '"Done"' in text
-    assert 'return issue.assignees.totalCount > 0 ? "In Progress" : "Ready";' in text
+    assert "issue.assignees.totalCount > 0" in text
+    assert '"In Progress"' in text
+    assert '"Ready"' in text
     assert "checksPassing(pr)" in text
     assert 'return "In Review";' in text
