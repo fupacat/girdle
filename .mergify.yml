@@ -186,9 +186,10 @@ pull_request_rules:
     # reaches Copilot. TODO(backlog): replace with a dedicated automation
     # user account (e.g. girdle-automation) once one is provisioned and
     # authorized in Mergify, so these nudges don't read as Eric personally
-    # asking each time - deferred for now. NOTE: PRs already labelled
-    # conflict-nudged (e.g. #93/#98/#100) must have that label removed
-    # manually to be re-nudged under this account.
+    # asking each time - deferred for now. A label prevents duplicate nudges
+    # while the PR remains conflicted; it is cleared after the conflict is
+    # resolved so a later re-conflict can trigger another nudge. The hidden
+    # marker records the head commit SHA for context.
     conditions:
       - conflict
       - author=Copilot
@@ -198,20 +199,18 @@ pull_request_rules:
     actions:
       comment:
         bot_account: fupacat
-        message: >-
+        message: |-
           @copilot This PR has a merge conflict with `master`. Please rebase
           onto the latest `master` and resolve the conflicting changes.
+          <!-- conflict-nudge:{{head.sha}} -->
       label:
         add:
           - conflict-nudged
 
   - name: clear conflict-nudged label once resolved
-    # Lets a PR get re-nudged if it drifts into conflict again later -
-    # no -draft here, clearing a stale label is harmless regardless of
-    # draft state.
     conditions:
-      - -conflict
       - label=conflict-nudged
+      - -conflict
     actions:
       label:
         remove:
