@@ -4,13 +4,14 @@ build an EcosystemResult per match, and assemble a ScanResult.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 from girdle.coverage_gate import detect_gate
 from girdle.coverage_parse import parse_percentage
 from girdle.detectors import ALL_DETECTORS
-from girdle.detectors._util import scan_static_analysis
+from girdle.detectors._util import read_text, scan_static_analysis
 from girdle.detectors.base import Detector, Fingerprint
 from girdle.hygiene import build_hygiene, find_agent_instruction_hazards
 from girdle.platform import check_platform
@@ -33,6 +34,7 @@ def _run_detector(detector: Detector, repo_root: Path, mode: str) -> EcosystemRe
     categories["static_analysis"] = scan_static_analysis(repo_root)
     _verify(detector, fp, categories, mode)
     _check_coverage_gate(fp, categories)
+    _check_ci_tests_alignment(detector, fp, categories)
     applicable = detector.applicable_categories(fp)
     return EcosystemResult(
         id=fp.id,
@@ -101,6 +103,87 @@ def _check_coverage_gate(fp: Fingerprint, categories: dict[str, CategoryResult])
             "Coverage runs but isn't enforced as a PR-scoped gate. Add a diff-coverage "
             "check (Codecov's patch status, Coveralls, or `diff-cover --fail-under=N` "
             "in CI) as a required status check."
+        )
+
+
+def _check_ci_tests_alignment(
+    detector: Detector, fp: Fingerprint, categories: dict[str, CategoryResult]
+) -> None:
+    """Cross-checks whether the CI test command matches what the `tests`
+    category's run_commands declare. When ci_gating is CONFIGURED but the CI
+    config doesn't actually invoke the expected test command, append an
+    alignment finding to ci_gating's evidence and set a recommendation.
+
+    Only fires when both `tests` and `ci_gating` are at least CONFIGURED, and
+    the detector exposes `run_commands` with a `tests` entry.
+    """
+    tests_result = categories.get("tests")
+    ci_gating_result = categories.get("ci_gating")
+    if tests_result is None or ci_gating_result is None:
+        return
+    if tests_result.tier < Tier.CONFIGURED or ci_gating_result.tier < Tier.CONFIGURED:
+        return
+
+    get_commands = getattr(detector, "run_commands", None)
+    if get_commands is None:
+        return
+    commands = get_commands(fp)
+    test_cmd = commands.get("tests")
+    if not test_cmd:
+        return
+
+    cmd_str = " ".join(test_cmd)
+    # Build a search term from the first non-wrapper token of the test command.
+    # Only strip leading wrapper tokens (e.g. "poetry run pytest" → "pytest").
+    skip_prefixes = {"poetry", "run", "pipenv", "uv", "conda"}
+    remaining = list(test_cmd)
+    while remaining and remaining[0] in skip_prefixes:
+        remaining.pop(0)
+        if remaining and remaining[0] in {"-n", "--name", "-p", "--prefix"}:
+            del remaining[:2]
+    if not remaining:
+        return
+    search_term = Path(remaining[0]).name
+
+    ci_files: list[Path] = []
+    wf_dir = fp.root / ".github" / "workflows"
+    if wf_dir.exists():
+        ci_files.extend(wf_dir.glob("*.y*ml"))
+    for name in (".gitlab-ci.yml", "azure-pipelines.yml"):
+        p = fp.root / name
+        if p.exists():
+            ci_files.append(p)
+
+    for ci_file in ci_files:
+        text = read_text(ci_file) or ""
+        lines = text.splitlines()
+        for index, line in enumerate(lines):
+            execution = re.match(
+                r"(?:-\s*)?(?:run|script|bash|pwsh|powershell)\s*:\s*(.*)", line.strip()
+            )
+            if execution is None:
+                continue
+            execution_lines = [execution.group(1)]
+            indent = len(line) - len(line.lstrip())
+            for continuation in lines[index + 1 :]:
+                if not continuation.strip():
+                    continue
+                if len(continuation) - len(continuation.lstrip()) <= indent:
+                    break
+                execution_lines.append(continuation.strip())
+            if re.search(rf"\b{re.escape(search_term)}\b", " ".join(execution_lines)):
+                return  # Aligned: command found in a CI execution step
+
+    # ci_gating is configured (something runs in CI) but the declared test
+    # command isn't found — flag the drift.
+    ci_gating_result.evidence = [
+        *ci_gating_result.evidence,
+        f"alignment gap: CI does not appear to run `{cmd_str}` (tests command)",
+    ]
+    if ci_gating_result.recommendation is None:
+        ci_gating_result.recommendation = (
+            f"Update your CI workflow to run `{cmd_str}` so it matches the configured "
+            "test command."
         )
 
 
