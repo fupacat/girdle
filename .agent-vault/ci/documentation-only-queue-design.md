@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: f2512fd1b8e4e0e3de3866063cfc88daed3b89f85c0e6cb7819da96d31e04a62
+    hash: 01e559e237ffd45ccb60518439c0f7e77c836f59ebe6573e3da76913ecd599b0
 stale: false
 ---
 
@@ -89,7 +89,7 @@ first as docs-only (`docs` queue/`docs_only` output), then broadened to
 gap above was found. Current shape:
 
 - `.mergify.yml`: `light` queue (`branch_protection_injection_mode: merge`,
-  `checks_timeout: 15m`, `merge_conditions: [check-success=test, check-success=Gitar, "#approved-reviews-by>=1"]` - no SonarCloud
+  `checks_timeout: 15m`, `merge_conditions: [check-success=test, "#approved-reviews-by>=1"]` - no SonarCloud
   requirement). `queue light (docs/CI-config-only) PRs` rule using
   `-files ~= ^(?!(\.agent-vault/|.*\.md$|\.github/workflows/|\.mergify\.yml$)).*$`;
   `queue development PRs` gets the complementary
