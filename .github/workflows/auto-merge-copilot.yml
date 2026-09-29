@@ -90,6 +90,8 @@ jobs:
       GH_REPO: ${{ github.repository }}
       DEBOUNCE_MINUTES: 30
     steps:
+      - uses: actions/checkout@v7
+
       - name: Promote stale Copilot draft PRs out of draft
         run: |
           set -euo pipefail
