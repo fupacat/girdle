@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: a4a92c14f1a49536be8fdac1dab9e0e90b821489d8dbea9d39451615c8e61d3c
+    hash: fe778e33c99d59f1f29ec034e0ca46115a1b4faf63f978e5aa2ee65ec3d9f3b1
 stale: false
 ---
 
@@ -189,15 +189,11 @@ Mergify's queue.
   comments from people who have write access to the repository," and a
   GitHub App's own identity (`mergify[bot]`) doesn't count as a person with
   collaborator write access, regardless of the App's actual installation
-  permissions. The rule now uses `bot_account: fupacat` on the `comment`
-  action so the mention posts as a real collaborator - Eric explicitly
-  approved this after Claude Code's classifier flagged the config change as
-  identity-weakening (automation posting under his name without a human
-  step each time). A dedicated automation user account (e.g.
-  `girdle-automation`), invited as a collaborator and authorized in
-  Mergify, is deferred to the backlog as the non-impersonating long-term
-  fix - `bot_account` only works with a real User-type GitHub account with
-  collaborator write access, not another bot/App identity.
+  permissions. The rule now uses `bot_account: girdle-automation` on the
+  `comment` action so the mention posts as a real collaborator without
+  impersonating Eric's own account. `bot_account` only works with a real
+  User-type GitHub account with collaborator write access, not another
+  bot/App identity.
 - `.mergify.yml`, `.gitar/config/`, and `.gitar/review/` are kept in-repo
   rather than dashboard-only wherever Gitar/Mergify support it, specifically
   because a dashboard-only setting drifted once already (a Mergify
