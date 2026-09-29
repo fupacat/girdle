@@ -15,10 +15,8 @@ permissions:
 jobs:
   assign:
     if: >-
-      ${{
-        github.event_name != 'pull_request' ||
-        !startsWith(github.head_ref, 'mergify/merge-queue/')
-      }}
+      github.event_name != 'pull_request' ||
+      !startsWith(github.head_ref, 'mergify/merge-queue/')
     runs-on: ubuntu-latest
     env:
       PROJECT_NUMBER: "3"
