@@ -20,7 +20,9 @@ If there's no issue, delete this section.
 
 ## Summary
 
-<!-- What changed and why. -->
+<!-- What changed and why. Keep this PR scoped to one discrete change -
+see CONTRIBUTING.md's "Pull request scope" section. If this is a step
+toward a larger feature, land it inert rather than bundling the rest in. -->
 
 ## Test plan
 
