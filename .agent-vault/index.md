@@ -8,6 +8,7 @@
 .agent-vault/context/audit-design.md | context | stale=False | watches: src/girdle/audit.py#run_audit
 .agent-vault/context/coverage-gate-design.md | context | stale=False | watches: src/girdle/scan.py#_check_coverage_gate
 .agent-vault/context/dashboard-pillars-backlog.md | context | stale=False | watches: -
+.agent-vault/context/license-visibility-design.md | context | stale=False | watches: src/girdle/hygiene.py
 .agent-vault/decisions/agent-sandbox-bootstrap-detection.md | decision | stale=False | watches: -
 .agent-vault/decisions/coverage-gate-conditional-on-both.md | decision | stale=False | watches: -
 .agent-vault/decisions/dashboard-scoring-percentage-model.md | decision | stale=False | watches: -

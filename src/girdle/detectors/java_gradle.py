@@ -23,7 +23,7 @@ class JavaGradleDetector:
         )
 
     def applicable_categories(self, fp: Fingerprint) -> list[str]:
-        return ["tests", "lint", "coverage", "reproducibility", "ci_gating"]
+        return ["tests", "lint", "coverage", "build", "reproducibility", "ci_gating"]
 
     def scan(self, fp: Fingerprint, mode: str) -> dict[str, CategoryResult]:
         root = fp.root
@@ -33,6 +33,7 @@ class JavaGradleDetector:
             "tests": self._scan_tests(root, build_text),
             "lint": self._scan_lint(build_text),
             "coverage": self._scan_coverage(build_text),
+            "build": self._scan_build(fp),
             "reproducibility": self._scan_reproducibility(root, build_text),
             "ci_gating": self._scan_ci(root),
         }
@@ -41,7 +42,7 @@ class JavaGradleDetector:
         wrapper_name = "gradlew.bat" if os.name == "nt" else "gradlew"
         wrapper_path = fp.root / wrapper_name
         exe = str(wrapper_path) if wrapper_path.exists() else "gradle"
-        commands = {"tests": [exe, "test"]}
+        commands = {"tests": [exe, "test"], "build": [exe, "assemble"]}
         build_file = BUILD_GRADLE_KTS if "kotlin-dsl" in fp.variants else BUILD_GRADLE
         build_text = read_text(fp.root / build_file) or ""
         if "jacoco" in build_text.lower():
@@ -86,6 +87,10 @@ class JavaGradleDetector:
                 ),
             )
         return CategoryResult(Tier.CONFIGURED, evidence=["build script: jacoco plugin"])
+
+    def _scan_build(self, fp: Fingerprint) -> CategoryResult:
+        build_file = BUILD_GRADLE_KTS if "kotlin-dsl" in fp.variants else BUILD_GRADLE
+        return CategoryResult(Tier.CONFIGURED, evidence=[build_file])
 
     def _scan_reproducibility(self, root: Path, build_text: str) -> CategoryResult:
         lockfile = root / "gradle.lockfile"

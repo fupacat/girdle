@@ -8,8 +8,20 @@ from importlib import resources
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-TIER_LABEL = {0: "Absent", 1: "Configured", 2: "Verified"}
-TIER_CLASS = {0: "tier-absent", 1: "tier-configured", 2: "tier-verified"}
+STATE_LABEL = {
+    "neutral": "Neutral",
+    "bronze": "Bronze",
+    "silver": "Silver",
+    "gold": "Gold",
+    "red": "Active harm",
+}
+STATE_CLASS = {
+    "neutral": "state-neutral",
+    "bronze": "state-bronze",
+    "silver": "state-silver",
+    "gold": "state-gold",
+    "red": "state-red",
+}
 
 
 def render_dashboard(data: dict) -> str:
@@ -18,7 +30,7 @@ def render_dashboard(data: dict) -> str:
         loader=FileSystemLoader(str(template_dir)),
         autoescape=select_autoescape(["html"]),
     )
-    env.filters["tier_label"] = lambda t: TIER_LABEL.get(t, "Unknown")
-    env.filters["tier_class"] = lambda t: TIER_CLASS.get(t, "tier-unknown")
+    env.filters["state_label"] = lambda s: STATE_LABEL.get(s, "Unknown")
+    env.filters["state_class"] = lambda s: STATE_CLASS.get(s, "state-unknown")
     template = env.get_template("dashboard.html.jinja")
     return template.render(data=data)
