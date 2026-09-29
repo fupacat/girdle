@@ -250,7 +250,20 @@ jobs:
                 pageInfo { hasNextPage endCursor }
               }
               closedByPullRequestsReferences(first: 100, includeClosedPrs: true) {
-                nodes { number state isDraft }
+                nodes {
+                  number
+                  state
+                  isDraft
+                  commits(last: 1) {
+                    nodes {
+                      commit {
+                        statusCheckRollup {
+                          state
+                        }
+                      }
+                    }
+                  }
+                }
                 pageInfo { hasNextPage endCursor }
               }
               ${projectItemsFields}
@@ -314,7 +327,20 @@ jobs:
                       includeClosedPrs: true
                     ) {
                       pageInfo { hasNextPage endCursor }
-                      nodes { number state isDraft }
+                      nodes {
+                        number
+                        state
+                        isDraft
+                        commits(last: 1) {
+                          nodes {
+                            commit {
+                              statusCheckRollup {
+                                state
+                              }
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -408,6 +434,18 @@ jobs:
                 }
               }
             `;
+            const addProjectItemMutation = `
+              mutation($projectId: ID!, $contentId: ID!) {
+                addProjectV2ItemById(input: {
+                  projectId: $projectId
+                  contentId: $contentId
+                }) {
+                  item {
+                    id
+                  }
+                }
+              }
+            `;
 
             const loadConnection = async (initial, query, extract) => {
               let nodes = initial.nodes;
@@ -465,15 +503,27 @@ jobs:
 
             const syncProjectStatus = async (issue, desiredStatus) => {
               if (!project || !statusField) return;
-              const item = (issue.projectItems?.nodes ?? []).find(
+              let item = (issue.projectItems?.nodes ?? []).find(
                 projectItem => projectItem.project.id === project.id,
               );
               if (!item) {
-                core.info(
-                  `Issue #${issue.number} is not on project #${projectNumber}; ` +
-                  "skipping status sync.",
-                );
-                return;
+                const result = await copilotGitHub.graphql(addProjectItemMutation, {
+                  projectId: project.id,
+                  contentId: issue.id,
+                });
+                const itemId = result.addProjectV2ItemById?.item?.id;
+                if (!itemId) {
+                  core.warning(
+                    `Could not add #${issue.number} to project #${projectNumber}; ` +
+                    "skipping status sync.",
+                  );
+                  return;
+                }
+                core.info(`Added #${issue.number} to project #${projectNumber}`);
+                item = {
+                  id: itemId,
+                  fieldValueByName: null,
+                };
               }
               const optionId = statusOptionIdsByName.get(desiredStatus);
               if (!optionId) {
@@ -490,13 +540,16 @@ jobs:
                 fieldId: statusField.id,
                 singleSelectOptionId: optionId,
               });
+              core.info(`Synced #${issue.number} project status to '${desiredStatus}'`);
             };
 
-            const desiredProjectStatus = (issueState, hasOpenBlocker, openPullRequests) => {
-              if (issueState !== "OPEN") return "Done";
+            const desiredProjectStatus = (issue, hasOpenBlocker, linkedPullRequests) => {
+              if (issue.state !== "OPEN") return "Done";
               if (hasOpenBlocker) return "Blocked";
-              if (openPullRequests.some(pr => !pr.isDraft)) return "In Review";
-              if (openPullRequests.some(pr => pr.isDraft)) return "In Progress";
+              const activePullRequests = linkedPullRequests.filter(pr => pr.state === "OPEN");
+              if (activePullRequests.some(pr => !pr.isDraft)) return "In Review";
+              if (activePullRequests.length > 0) return "In Progress";
+              if (issue.assignees.totalCount > 0) return "In Progress";
               return "Ready";
             };
 
@@ -555,7 +608,7 @@ jobs:
                 await syncLabels(issue, desiredLabels);
                 await syncProjectStatus(
                   issue,
-                  desiredProjectStatus(issue.state, hasOpenBlocker, openPullRequests),
+                  desiredProjectStatus(issue, hasOpenBlocker, linkedPullRequests),
                 );
               } catch (err) {
                 if (isTokenScopeError(err)) {
