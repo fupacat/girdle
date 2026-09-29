@@ -3,7 +3,7 @@ type: ci
 watches:
   - path: .mergify.yml
     hash: 42b677b13250fcb08b06c5ad632b9e2f13532892644fbd976bc6527c3eb8f1ff
-  stale: false
+stale: false
 ---
 
 # Merge pipeline: tool roles and merge paths
