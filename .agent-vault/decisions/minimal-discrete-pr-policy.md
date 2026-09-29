@@ -7,19 +7,15 @@ type: decision
 ## Context
 
 An investigation into why merge velocity dropped and the queue started
-seeing frequent friction
-([[.agent-vault/context/concurrent-pr-conflict-surface|concurrent-pr-conflict-surface]])
-found several shared-artifact/hot-file collision sources
-([[.agent-vault/context/generated-index-churn|generated-index-churn]],
-[[.agent-vault/context/vault-freshness-redesign|vault-freshness-redesign]],
-and `schema.py`'s hot-file cluster). Independent of those specific fixes,
-a wide-scoped PR is simply more likely to overlap with whatever else is
-in flight - a small PR narrows *how much* it touches even within a hot
-file, and lands faster through the queue, reducing the window in which it
-can collide with something else. This matches established
-trunk-based-development practice (short-lived branches, small diffs -
-see that note's "External validation" section), not a scheme specific to
-this repo.
+seeing frequent friction found several shared-artifact/hot-file collision
+sources, including generated-index churn, vault-freshness changes, and
+`schema.py`'s hot-file cluster. Independent of those specific fixes, a
+wide-scoped PR is simply more likely to overlap with whatever else is in
+flight - a small PR narrows *how much* it touches even within a hot file,
+and lands faster through the queue, reducing the window in which it can
+collide with something else. This matches established
+trunk-based-development practice (short-lived branches, small diffs), not
+a scheme specific to this repo.
 
 ## Decision
 
@@ -38,11 +34,11 @@ Each PR is scoped to one discrete, reviewable change. Concretely:
   focused check) doesn't need artificial splitting - the target is
   discreteness, not a line-count rule.
 
-This is a companion to, not a substitute for, the structural fixes in
-the notes above - decomposing hot files and fixing the diff-scoped
-staleness checks reduces *where* collisions can happen; this policy
-reduces *how often* two things overlap enough to collide in the first
-place.
+This is a companion to, not a substitute for, structural work on shared
+artifacts and hot files, such as decomposing hot files and fixing
+diff-scoped staleness checks. That work reduces *where* collisions can
+happen; this policy reduces *how often* two things overlap enough to
+collide in the first place.
 
 ## Alternatives considered
 
@@ -71,5 +67,5 @@ place.
 
 ## Reference
 
-[[.agent-vault/context/concurrent-pr-conflict-surface|concurrent-pr-conflict-surface]] -
-the investigation and evidence this decision is a response to.
+This decision responds to an investigation into concurrent-PR conflict
+surfaces and the evidence of shared-artifact and hot-file collisions.
