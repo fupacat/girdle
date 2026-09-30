@@ -2,11 +2,11 @@
 type: ci
 watches:
   - path: .github/workflows/gemini-agent.yml
-    hash: 3a48239a8e06a99aa7aff58d5d34f99f15944db5ba5fa7775b3e0dd9400469a8
+    hash: ef6ef016f1823f12d690668beb09485bf9b8b21f5f31f74ade58261e46897a14
   - path: .github/workflows/gemini-agent-pr.yml
-    hash: b44f78c8ef41ff38bf9a96bc93f7cd747d75ee30592333af84ef04f4fce5af74
+    hash: 3c0d032b3e6bb84b872b2e1bf74163d6f8df12cf6c5324f5de79a7ca1104411e
   - path: .github/scripts/report-agent-failure.sh
-    hash: 0155cf0fcae6d7789f6be52408192f004808f0941b6e491c5b756c7e0b7b4641
+    hash: bc4b12791212df508b3bc75e43a8e1fc7ed9a86c655526db5f79a104ca9571e9
 stale: false
 ---
 
@@ -78,17 +78,27 @@ blocking bugs and security gaps. Two workflows share one trust model.
 
 ## Failure reporting
 
-A `report-failure` job in both workflows runs
-`.github/scripts/report-agent-failure.sh` when the agent or publish job fails:
-it comments with the run link, the failed step's name (from the job metadata, available at
-once) and the first `##[error]` line from the failed job's log (fetched through the
-API and retried briefly, since the log can lag the job; truncated,
-backticks and control characters stripped, `@` defused, since the log can echo
-model output or issue text) and labels the target `agent:failed`. An OpenRouter
-credit or spend-limit error (HTTP 402, "insufficient credits", "key limit
-exceeded") also removes the trigger label so the run is not simply re-triggered
-into the same failure; a rate limit is reported as such. The comment posted by
-`GITHUB_TOKEN` does not itself trigger a run.
+A `report-failure` job in both workflows runs `.github/scripts/report-agent-failure.sh`
+when the agent or publish job fails: it comments with the run link, the failed step's
+name (from the job metadata, readable mid-run) and, when the model step failed, the
+first error line, and labels the target `agent:failed`. An OpenRouter credit or
+spend-limit error (HTTP 402, "insufficient credits", "key limit exceeded") also
+removes the trigger label so the run is not simply re-triggered into the same
+failure; a rate limit is reported as such.
+
+**The model failure is classified in the agent job, not by the reporter.** A run's job
+logs cannot be read through the API until the whole run has completed, and the
+reporter runs inside the run, so it cannot classify from the log (the first reports
+had no error line, and a spend limit could never have been detected). The agent job
+has the model's output on disk: the aider step tees it to a file, an
+`if: failure()` step runs `classify-agent-failure.sh` (shared helpers in
+`agent-failure-lib.sh`), and the result is exposed as the `failure_kind` and
+`failure_error` job outputs that the reporter reads. The error text is untrusted (it
+can echo model output or issue text): truncated, stripped of control characters and
+backticks, `@` defused. A failure in any other step or job is reported as a plain
+failure with its step name. A comment posted by `GITHUB_TOKEN` does not itself
+trigger a run. `workflow_dispatch` accepts a `model` override (also how to force a
+real model error for a test).
 
 ## Setup (names only; never put values in this repo)
 
