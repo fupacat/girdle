@@ -293,13 +293,14 @@ jobs:
       - name: Explain the refusal
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           ISSUE_NUM: ${{ github.event.issue.number }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           msg="The Gemini agent did not run: this issue was written by someone"
           msg="$msg who is not an owner, member or collaborator, and the agent only"
           msg="$msg works from text written by trusted people. Copy the request into"
-          msg="$msg a new issue or comment you wrote, then ask again."
+          msg="$msg a new issue you open yourself (or run the workflow manually), then ask again."
           gh issue comment "$ISSUE_NUM" --body "$msg"
           if [ "$EVENT_NAME" = "issues" ]; then
             gh issue edit "$ISSUE_NUM" --remove-label "agent:gemini"
