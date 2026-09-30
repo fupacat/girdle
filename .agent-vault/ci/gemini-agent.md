@@ -6,7 +6,7 @@ watches:
   - path: .github/workflows/gemini-agent-pr.yml
     hash: cb065a3494856bf8446746faeac24e99b424ea32efcb7c9293ef4c39020e5bac
   - path: .github/scripts/report-agent-failure.sh
-    hash: 535d82ec56bbccd08dafc1f098a92ed086f0f2c0311129b485b5c845fb318687
+    hash: c7a22ba8e96d0dc03bef31bb83f946e600b61e28008922f9f81fb5bc5b3cf7b0
 stale: false
 ---
 
