@@ -1,8 +1,8 @@
 name: CI
 
 concurrency:
-  group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
   push:
@@ -79,7 +79,7 @@ jobs:
         run: girdle notes check .
 
   pytest:
-    needs: cheap-checks
+    needs: [changes, cheap-checks]
     if: >-
       needs.cheap-checks.result == 'success' &&
       needs.changes.outputs.light_diff != 'true' &&
@@ -118,6 +118,10 @@ jobs:
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
+      - uses: actions/upload-artifact@v5
+        with:
+          name: coverage
+          path: coverage.xml
       - name: Mergify CI Insights
         # Uploads JUnit results and evaluates quarantine status for flaky
         # tests, then gates the job on ITS exit code (quarantine-aware)
@@ -180,7 +184,7 @@ jobs:
           echo "Required CI checks passed."
 
   sonar:
-    needs: cheap-checks
+    needs: [changes, cheap-checks, pytest]
     if: >-
       needs.cheap-checks.result == 'success' &&
       needs.changes.outputs.light_diff != 'true' &&
@@ -191,6 +195,12 @@ jobs:
       )
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v5
+        with:
+          name: coverage
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.2
         env:
