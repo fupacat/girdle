@@ -16,3 +16,6 @@ junit.xml
 # Obsidian's own device-specific config/cache when .agent-vault/ is opened
 # as a vault - never shared state, keep it out of the repo.
 .agent-vault/.obsidian/
+
+.gemini/
+gha-creds-*.json
