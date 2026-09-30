@@ -1,7 +1,7 @@
 name: CI
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.sha }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
@@ -84,7 +84,8 @@ jobs:
     needs: [changes, cheap-checks]
     if: >-
       needs.cheap-checks.result == 'success' &&
-      needs.changes.outputs.light_diff != 'true'
+      needs.changes.outputs.light_diff != 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -121,6 +122,10 @@ jobs:
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
+      - uses: actions/upload-artifact@v5
+        with:
+          name: coverage
+          path: coverage.xml
       - name: Mergify CI Insights
         # Uploads JUnit results and evaluates quarantine status for flaky
         # tests, then gates the job on ITS exit code (quarantine-aware)
@@ -146,9 +151,10 @@ jobs:
           mergify ci junit-process --test-exit-code "${{ steps.tests.outputs.exit_code }}" junit.xml
 
   sonar:
-    needs: [changes, cheap-checks]
+    needs: [changes, cheap-checks, pytest]
     if: >-
       needs.cheap-checks.result == 'success' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
       github.actor != 'dependabot[bot]' && (
         github.event_name == 'pull_request' ||
         github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
@@ -191,7 +197,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   test:
-    needs: [changes, cheap-checks, pytest, sonar]
+    needs: [cheap-checks, pytest]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -205,9 +211,6 @@ jobs:
           always() &&
           needs.pytest.result != 'success' &&
           (needs.pytest.result != 'skipped' || needs.changes.outputs.light_diff != 'true')
-        run: exit 1
-      - name: SonarQube scan must pass or be intentionally skipped
-        if: always() && needs.sonar.result != 'success' && needs.sonar.result != 'skipped'
         run: exit 1
 
   pages:

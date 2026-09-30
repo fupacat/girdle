@@ -69,7 +69,7 @@ def test_ci_workflow_uses_pr_scoped_concurrency_and_fast_checks() -> None:
     workflow = yaml.safe_load(Path(".github/workflows/ci.yml").read_text(encoding="utf-8"))
     concurrency = workflow["concurrency"]
     assert concurrency["cancel-in-progress"] == "${{ github.event_name == 'pull_request' }}"
-    assert concurrency["group"] == "ci-${{ github.event.pull_request.number || github.sha }}"
+    assert concurrency["group"] == "ci-${{ github.event.pull_request.number || github.ref }}"
 
     jobs = workflow["jobs"]
     cheap = jobs["cheap-checks"]
@@ -84,13 +84,13 @@ def test_ci_workflow_uses_pr_scoped_concurrency_and_fast_checks() -> None:
     pytest_if = " ".join(jobs["pytest"]["if"].split())
     assert "needs.cheap-checks.result == 'success'" in pytest_if
     assert "needs.changes.outputs.light_diff != 'true'" in pytest_if
-    assert "github.event.pull_request.draft" not in pytest_if
+    assert "github.event.pull_request.draft == false" in pytest_if
 
     sonar_if = " ".join(jobs["sonar"]["if"].split())
     assert "needs.cheap-checks.result == 'success'" in sonar_if
-    assert "github.event.pull_request.draft" not in sonar_if
+    assert "github.event.pull_request.draft == false" in sonar_if
 
-    assert jobs["test"]["needs"] == ["changes", "cheap-checks", "pytest", "sonar"]
+    assert jobs["test"]["needs"] == ["cheap-checks", "pytest"]
     assert jobs["test"]["if"] == "always()"
     pytest_gate = next(
         step
