@@ -47,8 +47,8 @@ def test_report_script_handles_spend_limits_and_defuses_untrusted_text() -> None
 
     assert "insufficient credits" in script and "402" in script  # spend limit
     assert "429" in script  # rate limit
-    assert '--add-label "agent:failed"' in script
-    assert '--remove-label "$TRIGGER_LABEL"' in script  # no re-trigger loop on spend
+    assert '"labels[]=agent:failed"' in script
+    assert '-X DELETE "$api/labels/$TRIGGER_LABEL"' in script  # no re-trigger loop on spend
     # The error line comes from a log that can echo model output or issue text.
     assert "sed 's/@/(at)/g'" in script and "cut -c1-300" in script
 
