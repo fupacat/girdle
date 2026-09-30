@@ -2,6 +2,7 @@
 
 ```
 .agent-vault/decisions/agent-sandbox-bootstrap-detection.md | decision | stale=False | watches: -
+.agent-vault/decisions/approval-flow-master-sync-no-review-reset.md | decision | stale=False | watches: -
 .agent-vault/decisions/coverage-gate-conditional-on-both.md | decision | stale=False | watches: -
 .agent-vault/decisions/dashboard-scoring-percentage-model.md | decision | stale=False | watches: -
 .agent-vault/decisions/dependabot-queue-branch-protection-injection-mode.md | decision | stale=False | watches: -
