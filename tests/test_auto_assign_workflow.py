@@ -88,18 +88,17 @@ def test_ci_workflow_uses_pr_scoped_concurrency_and_fast_checks() -> None:
 
     sonar_if = " ".join(jobs["sonar"]["if"].split())
     assert "needs.cheap-checks.result == 'success'" in sonar_if
-    assert "github.event.pull_request.draft == false" in sonar_if
+    assert "needs.pytest.result == 'success'" in sonar_if
 
     assert jobs["test"]["needs"] == ["changes", "cheap-checks", "pytest"]
     assert jobs["test"]["if"] == "always()"
     pytest_gate = next(
         step
         for step in jobs["test"]["steps"]
-        if step["name"] == "pytest must pass or be skipped for light diffs"
+        if step["name"] == "pytest must pass or be skipped for light diffs or drafts"
     )
     pytest_gate_if = " ".join(pytest_gate["if"].split())
     assert "needs.pytest.result != 'success'" in pytest_gate_if
-    assert (
-        "needs.pytest.result != 'skipped' || "
-        "needs.changes.outputs.light_diff != 'true'"
-    ) in pytest_gate_if
+    assert "needs.pytest.result != 'skipped'" in pytest_gate_if
+    assert "needs.changes.outputs.light_diff != 'true'" in pytest_gate_if
+    assert "github.event.pull_request.draft == false" in pytest_gate_if
