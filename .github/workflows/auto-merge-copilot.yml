@@ -243,17 +243,28 @@ jobs:
                 continue
               fi
 
-              mergeable=$(jq -r '.mergeable' <<<"$pr_api")
-              mergeable_state=$(jq -r '.mergeable_state // ""' <<<"$pr_api")
+              mergeable="null"
+              mergeable_state="unknown"
+              for i in {1..5}; do
+                pr_api=$(gh api "repos/$GH_REPO/pulls/$pr")
+                mergeable=$(jq -r '.mergeable' <<<"$pr_api")
+                mergeable_state=$(jq -r '.mergeable_state // ""' <<<"$pr_api")
+                if [ "$mergeable" != "null" ] && [ "$mergeable_state" != "unknown" ]; then
+                  break
+                fi
+                echo "Waiting for mergeability calculation on PR #$pr (attempt $i/5)..."
+                sleep 3
+              done
+
               if [ "$mergeable" = "null" ] || [ "$mergeable_state" = "unknown" ]; then
-                echo "Skipping PR #$pr: mergeability is unknown."
+                echo "Skipping PR #$pr: mergeability calculation timed out."
                 continue
               fi
 
               if [ "$mergeable" = "false" ] || [ "$mergeable_state" = "dirty" ]; then
-                has_marker=$(gh api "repos/$GH_REPO/issues/$pr/comments?per_page=100" \
-                  --jq --arg marker "$marker" \
-                  '[.[] | select(.body | contains($marker))] | length')
+                has_marker=$(gh api --paginate "repos/$GH_REPO/issues/$pr/comments?per_page=100" \
+                  | jq -s --arg marker "$marker" \
+                    '[.[][] | select(.body | contains($marker))] | length')
                 if [ "$has_marker" -eq 0 ]; then
                   comment_body=$(printf '%s\n%s\n%s' \
                     '@copilot This PR has a merge conflict with `master`. Please rebase' \
