@@ -3,9 +3,35 @@ from pathlib import Path
 import yaml
 
 
-def test_fallback_sweep_checks_out_repository():
+def _workflow() -> dict:
     workflow_path = Path(".github/workflows/auto-merge-copilot.yml")
-    workflow = yaml.safe_load(workflow_path.read_text())
+    return yaml.safe_load(workflow_path.read_text())
+
+
+def test_fallback_sweep_checks_out_repository() -> None:
+    workflow = _workflow()
     steps = workflow["jobs"]["fallback-sweep"]["steps"]
 
     assert any(step.get("uses") == "actions/checkout@v7" for step in steps)
+
+
+def test_reactive_mark_ready_skips_empty_or_plan_only_prs() -> None:
+    workflow = _workflow()
+    run_script = workflow["jobs"]["auto-merge"]["steps"][0]["run"]
+
+    assert "--json state,changedFiles,commits" in run_script
+    assert 'if [ "$changed_files" -eq 0 ]; then' in run_script
+    assert "^initial[[:space:]]+plan" in run_script
+    assert "only initial-plan commit and 0 changed files" in run_script
+    assert "Skipping PR #$pr_number: 0 changed files." in run_script
+
+
+def test_fallback_sweep_skips_empty_or_plan_only_prs() -> None:
+    workflow = _workflow()
+    run_script = workflow["jobs"]["fallback-sweep"]["steps"][1]["run"]
+
+    assert "--json changedFiles,commits" in run_script
+    assert 'if [ "$changed_files" -eq 0 ]; then' in run_script
+    assert "^initial[[:space:]]+plan" in run_script
+    assert "only initial-plan commit and 0 changed files" in run_script
+    assert "Skipping PR #$pr: 0 changed files." in run_script
