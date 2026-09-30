@@ -20,14 +20,15 @@ and empty or half-finished PRs reaching the queue.
 ## Decision
 
 Each PR is in exactly one phase at a time. Draft versus ready is the
-mutual-exclusion signal, because Gitar already skips drafts and Mergify
-already requires `-draft`.
+mutual-exclusion signal, because Gitar's draft-skip setting is not enabled
+yet and Mergify already requires `-draft`.
 
 1. **Checks (draft).** The author (Copilot) pushes; cheap checks run
    first (lint, `mdformat`, `yamllint`, Mergify config validation, notes
    and index checks), then the full suite. Nothing reviews a draft.
-1. **Promote.** A workflow marks the PR ready only when every check is
-   green, the diff is non-empty, and there is no conflict.
+1. **Promote.** Update the existing `.github/workflows/auto-merge-copilot.yml`
+   draft-promoter to mark the PR ready only when every check is green, the
+   diff is non-empty, and there is no conflict.
 1. **Review (ready).** Gitar reviews once, on a head that will not
    change under it. Review runs only after all checks are done.
 1. **Verdict.**
@@ -41,8 +42,8 @@ already requires `-draft`.
 
 Queue entry requires all of: ready, approved on the current head, all
 required checks green, no conflict, at least one changed file. Master is
-merged into a PR once, at queue time, through the existing "Keep PRs up to
-date" rule, not by the author proactively; the author merges master only
+merged into a PR while it is open, as needed, through the existing "Keep
+PRs up to date" rule, not once at queue time; the author merges master only
 to resolve a real conflict.
 
 ## Consistency with existing decisions
@@ -57,11 +58,11 @@ to resolve a real conflict.
   piece, in dependency order.
 - [[.agent-vault/decisions/approval-flow-master-sync-no-review-reset|approval-flow-master-sync-no-review-reset]]
   (conflict-only master syncs must not reset approval state) is
-  complemented, not replaced. Under this pipeline, repair pushes happen before approval and
-  the single master sync happens at queue time, so
-  `dismiss_stale_reviews_on_push` can stay on and the approval gap that
-  motivated turning it off is much narrower. The ruleset choice is still
-  a maintainer decision outside the repo.
+  complemented, not replaced. Under this pipeline, repair pushes happen before approval, but
+  the existing up-to-date rule can push master updates while a PR is open
+  rather than only at queue time. To avoid recreating the approval gap
+  behind #256, `dismiss_stale_reviews_on_push` must remain off; the ruleset
+  choice remains a maintainer decision outside the repo.
 
 ## Alternatives considered
 
@@ -83,12 +84,14 @@ to resolve a real conflict.
   a user with write access; a workflow token comment is ignored (the same
   identity constraint behind the dedicated automation account work). Gitar
   as the repair actor avoids this for the common case.
-- To verify before relying on it: whether Copilot's reviewer skips drafts
-  (Gitar does), and that converting a queued PR to draft dequeues it
-  cleanly.
-- Rollout, in order: author-side pre-commit and no proactive master sync;
-  CI cancel-in-progress and a fast-check-first split that keeps the
-  required `test` check name; Gitar draft-skip re-enabled (a Gitar
-  settings change, not in the repo); promote-when-green workflow;
-  review-verdict workflow with the repair cap; queue-entry conditions
-  tightened to match. Each is its own issue and PR.
+- To verify before relying on it: whether Copilot's reviewer skips drafts,
+  whether Gitar's draft-skip setting has been enabled, and that converting
+  a queued PR to draft dequeues it cleanly.
+- Rollout, in order: author-side pre-commit and conflict-only author master
+  sync; CI cancel-in-progress and a fast-check-first split that keeps the
+  required `test` check name; Gitar draft-skip enabled (a Gitar settings
+  change, not in the repo); update the existing
+  `.github/workflows/auto-merge-copilot.yml` to promote only when the
+  promotion conditions above are met; review-verdict workflow with the
+  repair cap; queue-entry conditions tightened to match. Each is its own
+  issue and PR.
