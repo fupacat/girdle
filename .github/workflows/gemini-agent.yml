@@ -257,6 +257,8 @@ jobs:
             (stale note hashes are repaired in review, not acked blindly).
             Fixes #${{ needs.gemini-agent.outputs.issue_num }}
           branch: "gemini/issue-${{ needs.gemini-agent.outputs.issue_num }}"
+          # Marks the PR for the promote-when-green sweep (auto-merge-copilot.yml)
+          labels: agent-pr
           draft: true
           delete-branch: true
 

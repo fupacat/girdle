@@ -600,11 +600,16 @@ jobs:
               const openBlocking = blocking.filter(b => b.state === "OPEN");
               const openPullRequests = linkedPullRequests.filter(pr => pr.state === "OPEN");
               const hasOpenBlocker = openBlockers.length > 0;
+              // Issues a human or another agent owns: never offered to Copilot.
+              const optOutLabels = ["manual", "agent:gemini"];
+              const optedOut = issue.labels.nodes.some(
+                label => optOutLabels.includes(label.name),
+              );
               const desiredLabels = [];
               if (issue.state === "OPEN") {
                 if (hasOpenBlocker) {
                   desiredLabels.push("status:blocked");
-                } else if (issue.assignees.totalCount === 0) {
+                } else if (issue.assignees.totalCount === 0 && !optedOut) {
                   desiredLabels.push("status:ready");
                 }
                 if (openBlocking.length > 0) {
@@ -650,6 +655,13 @@ jobs:
               }
               if (issue.assignees.totalCount > 0) {
                 core.info(`Issue #${issue.number} already assigned – not reassigning`);
+                continue;
+              }
+              if (optedOut) {
+                core.info(
+                  `Issue #${issue.number} is labelled ${optOutLabels.join("/")} – ` +
+                  "not assigning to Copilot",
+                );
                 continue;
               }
               if (!copilotId) {
