@@ -1,5 +1,9 @@
 name: CI
 
+concurrency:
+  group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [master]
@@ -9,7 +13,7 @@ jobs:
   changes:
     # Detects a "light" PR (every changed file under .agent-vault/,
     # ending in .md, under .github/workflows/, or .mergify.yml itself) so
-    # the test job below can skip pytest/SonarQube for it - see
+    # the pytest job below can skip for it - see
     # .agent-vault/ci/documentation-only-queue-design.md. Originally
     # docs-only; broadened to CI config too since neither pytest nor
     # SonarCloud (sonar.sources=src/sonar.tests=tests) can find anything
@@ -35,14 +39,12 @@ jobs:
             echo "light_diff=true" >> "$GITHUB_OUTPUT"
           fi
 
-  test:
+  cheap-checks:
     needs: changes
-    # needs.changes can be skipped (push event) or fail outright; always()
-    # keeps this job running either way - the steps below treat a missing
-    # light_diff output as "false" (run everything), which is the safe
-    # default if detection ever breaks.
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -58,9 +60,45 @@ jobs:
         run: |
           python -m pip install --quiet mergify-cli
           mergify config validate
+      - run: girdle index . --check AGENTS.md
+      - name: vault notes freshness (read-only)
+        # The pre-commit hook is the one place auto-reconcile makes sense
+        # (it can tell a note apart from the code it watches within a
+        # single commit being crafted); here there's no staged/unstaged
+        # distinction in a clean checkout, so this only ever verifies -
+        # closing the gap where a --no-verify bypass of the local hook
+        # would otherwise reach master with nothing checking it.
+        #
+        # Skipped on Mergify's speculative merge-queue branches
+        # (mergify/merge-queue/*): the hash comparison there is against
+        # the batched/rebased candidate, not any single PR's own diff, so
+        # a mismatch there can be caused entirely by another queued PR
+        # touching the same watched file - not something this PR (or a
+        # human) can fix on that branch. Every real PR branch and push to
+        # master still gets the real check; see issue #127 for the false
+        # positive this avoids and the planned diff-scoped replacement.
+        if: ${{ !startsWith(github.head_ref, 'mergify/merge-queue/') }}
+        run: girdle notes check .
+
+  pytest:
+    needs: [changes, cheap-checks]
+    if: >-
+      needs.cheap-checks.result == 'success' &&
+      needs.changes.outputs.light_diff != 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # SonarCloud wants full history for accurate new-code analysis
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
       - name: pytest
         id: tests
-        if: needs.changes.outputs.light_diff != 'true'
         env:
           MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
         # secrets.MERGIFY_TOKEN resolves to an empty string, not truly
@@ -107,25 +145,20 @@ jobs:
           fi
           python -m pip install --quiet mergify-cli
           mergify ci junit-process --test-exit-code "${{ steps.tests.outputs.exit_code }}" junit.xml
-      - run: girdle index . --check AGENTS.md
-      - name: vault notes freshness (read-only)
-        # The pre-commit hook is the one place auto-reconcile makes sense
-        # (it can tell a note apart from the code it watches within a
-        # single commit being crafted); here there's no staged/unstaged
-        # distinction in a clean checkout, so this only ever verifies -
-        # closing the gap where a --no-verify bypass of the local hook
-        # would otherwise reach master with nothing checking it.
-        #
-        # Skipped on Mergify's speculative merge-queue branches
-        # (mergify/merge-queue/*): the hash comparison there is against
-        # the batched/rebased candidate, not any single PR's own diff, so
-        # a mismatch there can be caused entirely by another queued PR
-        # touching the same watched file - not something this PR (or a
-        # human) can fix on that branch. Every real PR branch and push to
-        # master still gets the real check; see issue #127 for the false
-        # positive this avoids and the planned diff-scoped replacement.
-        if: ${{ !startsWith(github.head_ref, 'mergify/merge-queue/') }}
-        run: girdle notes check .
+
+  sonar:
+    needs: [changes, cheap-checks]
+    if: >-
+      needs.cheap-checks.result == 'success' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
+      github.actor != 'dependabot[bot]' && (
+        github.event_name == 'pull_request' ||
+        github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
       - name: SonarQube Scan
         # SonarCloud's free plan only analyzes the default branch and PRs, not
         # arbitrary feature-branch pushes; with sonar.qualitygate.wait=true,
@@ -150,6 +183,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  test:
+    needs: [cheap-checks, pytest, sonar]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: cheap checks must pass
+        if: needs.cheap-checks.result != 'success'
+        run: exit 1
+      - name: pytest must pass or be intentionally skipped
+        if: always() && needs.pytest.result != 'success' && needs.pytest.result != 'skipped'
+        run: exit 1
+      - name: SonarQube scan must pass or be intentionally skipped
+        if: always() && needs.sonar.result != 'success' && needs.sonar.result != 'skipped'
+        run: exit 1
+      - name: draft PR keeps required check green
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft == true
+        run: 'echo "Draft PR: cheap checks passed; expensive jobs intentionally skipped."'
 
   pages:
     # Publishes the HTML dashboard + a shields.io endpoint-badge JSON so the
