@@ -1,8 +1,8 @@
 name: CI
 
 concurrency:
-  group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
   push:
@@ -84,8 +84,7 @@ jobs:
     needs: [changes, cheap-checks]
     if: >-
       needs.cheap-checks.result == 'success' &&
-      needs.changes.outputs.light_diff != 'true' &&
-      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+      needs.changes.outputs.light_diff != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -150,7 +149,6 @@ jobs:
     needs: [changes, cheap-checks]
     if: >-
       needs.cheap-checks.result == 'success' &&
-      (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
       github.actor != 'dependabot[bot]' && (
         github.event_name == 'pull_request' ||
         github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
@@ -159,6 +157,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # SonarCloud wants full history for accurate new-code analysis
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: pytest --cov --cov-report=xml
       - name: SonarQube Scan
         # SonarCloud's free plan only analyzes the default branch and PRs, not
         # arbitrary feature-branch pushes; with sonar.qualitygate.wait=true,
@@ -185,7 +191,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   test:
-    needs: [cheap-checks, pytest, sonar]
+    needs: [changes, cheap-checks, pytest, sonar]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -194,15 +200,15 @@ jobs:
       - name: cheap checks must pass
         if: needs.cheap-checks.result != 'success'
         run: exit 1
-      - name: pytest must pass or be intentionally skipped
-        if: always() && needs.pytest.result != 'success' && needs.pytest.result != 'skipped'
+      - name: pytest must pass or be skipped for light diffs
+        if: >-
+          always() &&
+          needs.pytest.result != 'success' &&
+          (needs.pytest.result != 'skipped' || needs.changes.outputs.light_diff != 'true')
         run: exit 1
       - name: SonarQube scan must pass or be intentionally skipped
         if: always() && needs.sonar.result != 'success' && needs.sonar.result != 'skipped'
         run: exit 1
-      - name: draft PR keeps required check green
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft == true
-        run: 'echo "Draft PR: cheap checks passed; expensive jobs intentionally skipped."'
 
   pages:
     # Publishes the HTML dashboard + a shields.io endpoint-badge JSON so the

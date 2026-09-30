@@ -65,11 +65,11 @@ def test_status_logic_covers_ready_in_progress_in_review_done() -> None:
     assert 'return "In Review";' in text
 
 
-def test_ci_workflow_uses_pr_head_ref_concurrency_and_fast_checks() -> None:
+def test_ci_workflow_uses_pr_scoped_concurrency_and_fast_checks() -> None:
     workflow = yaml.safe_load(Path(".github/workflows/ci.yml").read_text(encoding="utf-8"))
     concurrency = workflow["concurrency"]
-    assert concurrency["cancel-in-progress"] is True
-    assert concurrency["group"] == "ci-${{ github.event.pull_request.head.ref || github.ref_name }}"
+    assert concurrency["cancel-in-progress"] == "${{ github.event_name == 'pull_request' }}"
+    assert concurrency["group"] == "ci-${{ github.event.pull_request.number || github.sha }}"
 
     jobs = workflow["jobs"]
     cheap = jobs["cheap-checks"]
@@ -84,11 +84,17 @@ def test_ci_workflow_uses_pr_head_ref_concurrency_and_fast_checks() -> None:
     pytest_if = " ".join(jobs["pytest"]["if"].split())
     assert "needs.cheap-checks.result == 'success'" in pytest_if
     assert "needs.changes.outputs.light_diff != 'true'" in pytest_if
-    assert "github.event.pull_request.draft == false" in pytest_if
+    assert "github.event.pull_request.draft" not in pytest_if
 
     sonar_if = " ".join(jobs["sonar"]["if"].split())
     assert "needs.cheap-checks.result == 'success'" in sonar_if
-    assert "github.event.pull_request.draft == false" in sonar_if
+    assert "github.event.pull_request.draft" not in sonar_if
 
-    assert jobs["test"]["needs"] == ["cheap-checks", "pytest", "sonar"]
+    assert jobs["test"]["needs"] == ["changes", "cheap-checks", "pytest", "sonar"]
     assert jobs["test"]["if"] == "always()"
+    pytest_gate = next(
+        step for step in jobs["test"]["steps"] if step["name"] == "pytest must pass or be skipped for light diffs"
+    )
+    pytest_gate_if = " ".join(pytest_gate["if"].split())
+    assert "needs.pytest.result != 'success'" in pytest_gate_if
+    assert "needs.pytest.result != 'skipped' || needs.changes.outputs.light_diff != 'true'" in pytest_gate_if
