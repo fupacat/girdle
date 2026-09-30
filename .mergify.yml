@@ -167,7 +167,6 @@ pull_request_rules:
     actions:
       queue:
         name: light
-        merge_bot_account: fupacat
 
   - name: nudge Copilot when a PR goes into conflict
     # Copilot's own PRs pile up behind each other and drift into conflict
@@ -301,6 +300,7 @@ queue_rules:
     # CI still reports SonarCloud on PRs so the protected-branch required
     # check is satisfied when GitHub performs the final merge.
     branch_protection_injection_mode: none
+    merge_bot_account: fupacat
     checks_timeout: 15m
     queue_conditions:
       - author!=dependabot[bot]
