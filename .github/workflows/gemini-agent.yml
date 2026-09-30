@@ -16,13 +16,20 @@ on:
         required: false
         type: string
 
+# Read-only by default. The job that runs the model has no write access at
+# all; the publisher job (below) has no model key. Neither holds both.
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+  contents: read
 
 jobs:
+  # Job 1 - runs the LLM. Holds OPENROUTER_API_KEY but only a read-only
+  # GITHUB_TOKEN and no persisted git credentials, so a prompt-injected run
+  # cannot push or open anything. Its only output is a patch artifact.
   gemini-agent:
+    outputs:
+      issue_num: ${{ steps.prompt.outputs.issue_num }}
+      checks: ${{ steps.hygiene.outputs.checks }}
+      has_changes: ${{ steps.patch.outputs.has_changes }}
     # Trigger when labeled 'agent:gemini', commented with '@gemini', or dispatched manually
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -132,22 +139,77 @@ jobs:
             echo "checks=needs-repair" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Refuse to open an empty PR
+      - name: Collect the agent's changes as a patch
+        id: patch
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUM: ${{ steps.prompt.outputs.issue_num }}
-          RUN_URL: >-
-            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          base="origin/${BASE_BRANCH}"
-          if git diff --quiet "$base"...HEAD && git diff --quiet HEAD; then
-            msg="The Gemini agent run produced no file changes (the work may already"
-            msg="$msg exist on the default branch), so no PR was opened. Run: $RUN_URL"
-            gh issue comment "$ISSUE_NUM" --body "$msg"
-            echo "no changes to propose"
-            exit 1
+          git diff --binary "origin/${BASE_BRANCH}" HEAD > agent.patch
+          if [ -s agent.patch ]; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Upload patch
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: agent-patch
+          path: agent.patch
+          retention-days: 1
+
+  # Job 2 - publishes. Holds the PR-opening token but never runs the model or
+  # any code from the agent's output: it only applies a patch to a clean
+  # checkout, after refusing empty patches, oversized patches and any change
+  # to workflow files (agent-authored workflow changes need a human).
+  publish:
+    needs: gemini-agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
+
+      - name: Download patch
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          name: agent-patch
+          path: patch
+
+      - name: Validate the patch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUM: ${{ needs.gemini-agent.outputs.issue_num }}
+          HAS_CHANGES: ${{ needs.gemini-agent.outputs.has_changes }}
+          RUN_URL: >-
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          fail() {
+            msg="$*"
+            gh issue comment "$ISSUE_NUM" --body "$msg Run: $RUN_URL"
+            echo "$msg"
+            exit 1
+          }
+          if [ "$HAS_CHANGES" != "true" ] || [ ! -s patch/agent.patch ]; then
+            fail "The Gemini agent run produced no file changes (the work may" \
+              "already exist on the default branch), so no PR was opened."
+          fi
+          if [ "$(wc -c < patch/agent.patch)" -gt 1000000 ]; then
+            fail "The Gemini agent patch is larger than 1 MB, so no PR was opened."
+          fi
+          # Headers (including renames and copies) that name workflow files.
+          hdr='^(diff --git|---|\+\+\+|rename (from|to)|copy (from|to)) '
+          if grep -E "$hdr" patch/agent.patch | grep -q '\.github/workflows/'; then
+            fail "The Gemini agent patch changes .github/workflows/, which" \
+              "agents may not do; no PR was opened."
+          fi
+          git apply --check patch/agent.patch
+          git apply patch/agent.patch
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1  # v8.1.1
@@ -155,14 +217,15 @@ jobs:
           # A fine-grained PAT (contents + pull-requests write only): PRs
           # opened with GITHUB_TOKEN do not trigger CI.
           token: ${{ secrets.AGENT_PR_TOKEN }}
-          commit-message: "feat: address issue #${{ steps.prompt.outputs.issue_num }}"
-          title: "Fix issue #${{ steps.prompt.outputs.issue_num }}"
+          add-paths: .
+          commit-message: "feat: address issue #${{ needs.gemini-agent.outputs.issue_num }}"
+          title: "Fix issue #${{ needs.gemini-agent.outputs.issue_num }}"
           body: |
             Automated PR generated by Gemini (via OpenRouter) addressing
-            #${{ steps.prompt.outputs.issue_num }}.
-            Repo checks at open time: ${{ steps.hygiene.outputs.checks }}
+            #${{ needs.gemini-agent.outputs.issue_num }}.
+            Repo checks at open time: ${{ needs.gemini-agent.outputs.checks }}
             (stale note hashes are repaired in review, not acked blindly).
-            Fixes #${{ steps.prompt.outputs.issue_num }}
-          branch: "gemini/issue-${{ steps.prompt.outputs.issue_num }}"
+            Fixes #${{ needs.gemini-agent.outputs.issue_num }}
+          branch: "gemini/issue-${{ needs.gemini-agent.outputs.issue_num }}"
           draft: true
           delete-branch: true
