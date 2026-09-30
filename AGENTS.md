@@ -16,6 +16,16 @@ Copilot coding-agent commits are not guaranteed to go through local
 `git commit`, so treat CI as the real enforcement gate; local
 pre-commit hooks are still useful for in-sandbox manual checks.
 
+Before you finish (and before every push after the first), run
+`pre-commit run --all-files` and fix everything it reports — formatting,
+stale vault-note hashes (`girdle notes ack`), and the AGENTS.md index
+(`girdle index . --inject AGENTS.md`). CI runs the same checks, so skipping
+this only costs a failed round trip. Merge or rebase `master` only to
+resolve a real conflict: a proactive sync changes the head SHA and dismisses
+existing approvals. Do not mark the PR ready for review yourself; a workflow
+promotes it (pipeline rationale: the `staged-pr-pipeline-checks-review-repair`
+decision note in `.agent-vault/decisions/`).
+
 Repo-scoped design rationale, decisions, and reference notes live in
 `.agent-vault/` (schema: `.agent-vault/SCHEMA.md`) — separate from this file
 (operational instructions) and from the structural index below (mechanically
