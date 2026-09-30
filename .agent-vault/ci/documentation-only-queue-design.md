@@ -91,7 +91,9 @@ gap above was found. Current shape:
 - `.mergify.yml`: `light` queue (`branch_protection_injection_mode: none`,
   `merge_bot_account: fupacat`, `checks_timeout: 15m`,
   `merge_conditions: [check-success=test, check-success=Gitar,
-  "#approved-reviews-by>=1"]` - no SonarCloud requirement).
+  "#approved-reviews-by>=1"]` - no SonarCloud queue requirement;
+  `none` stops the queue from inheriting ruleset checks, while CI still
+  reports SonarCloud on the PR for GitHub's final merge).
   `queue light (docs/CI-config-only) PRs` rule using
   `-files ~= ^(?!(\.agent-vault/|.*\.md$|\.github/workflows/|\.mergify\.yml$)).*$`;
   `queue development PRs` gets the complementary
@@ -105,14 +107,16 @@ gap above was found. Current shape:
   [[.agent-vault/context/vault-freshness-redesign|vault-freshness-redesign]]'s
   PR #128 incident) and outputs `light_diff`. The `test` job depends on
   it (`if: always()`, so a skipped/failed detection defaults to running
-  everything) and gates the `pytest` step on `light_diff != 'true'`.
-  `SonarQube Scan` still runs on non-Dependabot PRs so its required
-  branch-protection check is reported. `ruff`/`mdformat`/`yamllint`/index/
-  vault-notes checks stay unconditional - they're already the cheap part,
-  scan the whole tree regardless of diff size, and (`yamllint`
-  specifically) are exactly what validates a CI-config-only PR's own
-  changed files. `test`'s own check-success is still meaningful for
-  light PRs since those checks still ran.
+  everything) and gates only the `pytest` step on
+  `light_diff != 'true'`. `SonarQube Scan` runs for all
+  non-Dependabot PRs (including light diffs) so
+  `SonarCloud Code Analysis` reports on protected-branch PRs.
+  `ruff`/`mdformat`/`yamllint`/index/vault-notes checks stay
+  unconditional - they're already the cheap part, scan the whole tree
+  regardless of diff size, and (`yamllint` specifically) are exactly
+  what validates a CI-config-only PR's own changed files. `test`'s own
+  check-success is still meaningful for light PRs since those checks
+  still ran.
 
 Resolved the two "does this need a new queue" and "does the branch
 ruleset block this" open questions above: yes, a fourth queue is the
