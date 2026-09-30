@@ -75,9 +75,14 @@ def test_master_is_merged_only_for_a_real_conflict_and_at_a_pinned_sha() -> None
         s for s in workflow["jobs"]["publish"]["steps"] if "BASE_SHA" in s.get("env", {})
     )["run"]
 
-    assert "git merge --no-commit --no-ff" in sync
-    assert "git merge --abort" in sync  # clean merge: never sync proactively
-    assert 'git merge --no-commit --no-ff "$BASE_SHA"' in publish  # replay at the agent's SHA
+    # git merge-tree never touches the working tree, so a clean merge changes
+    # nothing (no proactive sync); only exit code 1 (conflicts) sets merged=true.
+    assert "git merge-tree --write-tree" in sync
+    assert '"$rc" -eq 0' in sync and "merged=false" in sync
+    # The agent and the publisher must name the commits identically (marker
+    # labels derive from the arguments), both by SHA, so the trees match.
+    assert '"$head_sha" "$base_sha"' in sync
+    assert '"$HEAD_SHA" "$BASE_SHA"' in publish
 
 
 def test_aider_runs_without_auto_commits_or_shell_suggestions() -> None:
@@ -98,14 +103,15 @@ def test_publisher_refuses_workflow_changes_and_labels_the_cycle() -> None:
 
     assert ".github/workflows/" in publish
     assert '"repair:$((REPAIR_N + 1))"' in publish
-    assert "HEAD:refs/heads/${HEAD_REF}" in publish
+    assert "${commit}:refs/heads/${HEAD_REF}" in publish
     assert "--force" not in publish
 
 
 def test_privileged_jobs_never_check_out_the_pr_branch() -> None:
     # issue_comment workflows can read secrets; the PR branch holds model-written
-    # code. No checkout step may take a ref, and the PR head only ever lives in a
-    # separate worktree that is read and edited as files.
+    # code. No checkout step may take a ref. The agent job reads the PR head as
+    # files in a separate worktree; the publisher has no working tree from the
+    # branch at all (git plumbing on a temporary index).
     workflow = _load(PR_WORKFLOW)
     for job in ("agent", "publish"):
         steps = workflow["jobs"][job]["steps"]
@@ -113,8 +119,15 @@ def test_privileged_jobs_never_check_out_the_pr_branch() -> None:
             if step.get("uses", "").startswith("actions/checkout@"):
                 assert "ref" not in step["with"]
                 assert step["with"]["path"] == "trusted"
-        worktree = [s for s in steps if "git worktree add --detach ../pr" in s.get("run", "")]
-        assert len(worktree) == 1
+    agent_steps = workflow["jobs"]["agent"]["steps"]
+    worktrees = [s for s in agent_steps if "git worktree add --detach ../pr" in s.get("run", "")]
+    assert len(worktrees) == 1
+    publish_steps = workflow["jobs"]["publish"]["steps"]
+    publish_runs = chr(10).join(s.get("run", "") for s in publish_steps)
+    assert "worktree" not in publish_runs
+    assert "git checkout" not in publish_runs
+    assert "GIT_INDEX_FILE" in publish_runs and "git commit-tree" in publish_runs
+    assert "git apply --cached" in publish_runs
 
 
 def test_tooling_and_config_come_from_the_trusted_checkout() -> None:
@@ -129,9 +142,15 @@ def test_tooling_and_config_come_from_the_trusted_checkout() -> None:
     for flag in ("--config", "--env-file", "--no-auto-test", "--no-auto-lint"):
         assert flag in aider["run"]
     assert "$GITHUB_WORKSPACE/trusted/AGENTS.md" in aider["run"]
-    # pytest would execute the PR branch's tests in the privileged job.
-    assert hygiene["env"]["SKIP"] == "pytest"
-    assert "trusted/.pre-commit-config.yaml" in hygiene["env"]["TRUSTED_CONFIG"]
+    # pre-commit runs hooks (pytest among them) that would execute the PR
+    # branch's code in the privileged job; only direct, trusted fixers are used.
+    commands = [
+        line for line in hygiene["run"].splitlines() if not line.strip().startswith("#")
+    ]
+    code = chr(10).join(commands)
+    assert "pre-commit" not in code
+    assert "pytest" not in code
+    assert "girdle index . --inject AGENTS.md" in code
     assert hygiene["working-directory"] == "pr"
 
 
