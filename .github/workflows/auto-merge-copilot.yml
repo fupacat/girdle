@@ -126,8 +126,9 @@ jobs:
                 continue
               fi
 
-              pr_json=$(gh pr view "$pr" \
-                --json number,isDraft,baseRefName,headRepositoryOwner,mergeable,labels,commits,changedFiles,statusCheckRollup)
+              pr_fields=number,isDraft,baseRefName,headRepositoryOwner,mergeable,labels,commits,
+              pr_fields+=changedFiles,statusCheckRollup
+              pr_json=$(gh pr view "$pr" --json "$pr_fields")
               label_names=$(jq -r '.labels[].name // empty' <<<"$pr_json")
               if printf '%s\n' "$label_names" | grep -qx 'manual' || \
                 printf '%s\n' "$label_names" | grep -qx 'repair:cap'; then

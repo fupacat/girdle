@@ -17,7 +17,7 @@ def test_fallback_sweep_checks_out_repository() -> None:
 
 def test_workflow_run_and_schedule_drive_check_based_promotion() -> None:
     workflow = _workflow()
-    triggers = workflow[True]
+    triggers = workflow.get("on", workflow.get(True))
 
     assert triggers["workflow_run"]["workflows"] == ["CI"]
     assert triggers["workflow_run"]["types"] == ["completed"]
