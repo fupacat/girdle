@@ -51,3 +51,29 @@ def test_report_script_handles_spend_limits_and_defuses_untrusted_text() -> None
     assert '--remove-label "$TRIGGER_LABEL"' in script  # no re-trigger loop on spend
     # The error line comes from a log that can echo model output or issue text.
     assert "sed 's/@/(at)/g'" in script and "cut -c1-300" in script
+
+
+# Flags confirmed against aider's own usage text in a real Actions run (the first
+# acceptance run died with "unrecognized arguments: --no-dirty-check"). --config
+# is used by the PR-mode workflow and is confirmed there by the PR-mode run.
+AIDER_FLAGS = {
+    "--model", "--read", "--file", "--message", "--yes-always", "--env-file", "--config",
+    "--auto-commits", "--no-auto-commits", "--no-dirty-commits",
+    "--no-auto-lint", "--no-auto-test", "--no-suggest-shell-commands",
+    "--no-check-update", "--no-analytics",
+}  # fmt: skip
+
+
+def test_aider_is_only_given_flags_it_accepts() -> None:
+    import re
+
+    for path in (".github/workflows/gemini-agent.yml", ".github/workflows/gemini-agent-pr.yml"):
+        workflow = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        for job in workflow["jobs"].values():
+            for step in job.get("steps", []):
+                run = step.get("run", "")
+                if "aider \\" not in run:
+                    continue
+                invocation = run[run.index("aider \\"):]
+                used = set(re.findall(r"(?<![\w-])--[a-z][a-z-]*", invocation))
+                assert used <= AIDER_FLAGS, f"{path}: {sorted(used - AIDER_FLAGS)}"
