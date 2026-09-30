@@ -295,10 +295,10 @@ queue_rules:
     # split into separate docs/ci-config queues - see the pull_request_rule
     # comment for the mutual-exclusion gap that split would reintroduce.
     # branch_protection_injection_mode: none keeps this queue from inheriting
-    # the master ruleset's SonarCloud requirement for PRs that never run
-    # Sonar in the first place; the queue's explicit merge_conditions below
-    # are the only gate, and they still require the fast test job plus one
-    # approval.
+    # impossible queue-only requirements from master's ruleset; queue
+    # admission/merge is gated only by the explicit merge_conditions below.
+    # CI still reports SonarCloud on PRs so the protected-branch required
+    # check is satisfied when GitHub performs the final merge.
     branch_protection_injection_mode: none
     checks_timeout: 15m
     queue_conditions:
