@@ -145,7 +145,7 @@ jobs:
             --read AGENTS.md \
             --message "Address this task per rules in GEMINI.md/AGENTS.md: $TASK" \
             --auto-commits \
-            --no-dirty-check \
+            --no-dirty-commits \
             --no-suggest-shell-commands \
             --no-check-update \
             --no-analytics \

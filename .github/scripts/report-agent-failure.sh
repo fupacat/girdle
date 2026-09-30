@@ -19,13 +19,31 @@ case "${TARGET_NUM:-}" in
     ;;
 esac
 
+# `gh run view --log-failed` does not work for the run that is still in
+# progress (this job runs inside it), so read each failed job through the API.
+# The failed step's name comes from the job metadata, which is available at
+# once; the log text can lag the job's completion, so it is retried briefly
+# (the first real run reported no error line because of exactly that).
+jobs_json=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs" 2>/dev/null || true)
+failed_ids=$(printf '%s' "$jobs_json" \
+  | jq -r '.jobs[]? | select(.conclusion == "failure") | .id' 2>/dev/null || true)
+failed_step=$(printf '%s' "$jobs_json" \
+  | jq -r '[.jobs[]? | select(.conclusion == "failure") | .steps[]?
+      | select(.conclusion == "failure") | .name] | first // empty' 2>/dev/null || true)
 log=''
-for job in $(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs" \
-    --jq '.jobs[] | select(.conclusion == "failure") | .id' 2>/dev/null || true); do
-  log+=$(gh api "repos/$GH_REPO/actions/jobs/$job/logs" 2>/dev/null || true)$'\n'
+for _ in 1 2 3 4 5 6; do
+  log=''
+  for job in $failed_ids; do
+    log+=$(gh api "repos/$GH_REPO/actions/jobs/$job/logs" 2>/dev/null || true)$'\n'
+  done
+  if printf '%s' "$log" | grep -qF '##[error]'; then
+    break
+  fi
+  sleep "${LOG_RETRY_SLEEP:-5}"
 done
-err=$(printf '%s\n' "$log" | grep -m1 -F '##[error]' | sed 's/^.*##\[error\]//' || true)
-err=$(printf '%s' "$err" | tr -d '\000-\010\013-\037`' | sed 's/@/(at)/g' | cut -c1-300)
+clean() { tr -d '\000-\010\013-\037`' | sed 's/@/(at)/g' | cut -c1-300; }
+err=$(printf '%s\n' "$log" | grep -m1 -F '##[error]' | sed 's/^.*##\[error\]//' | clean || true)
+failed_step=$(printf '%s' "$failed_step" | clean || true)
 
 # Classify from error-looking lines only, to avoid matching stray numbers.
 errors=$(printf '%s\n' "$log" | grep -iE 'error|exception' | head -n 60 | tr '[:upper:]' '[:lower:]' || true)
@@ -54,6 +72,9 @@ case "$kind" in
 esac
 
 body="$headline $advice"
+if [ -n "$failed_step" ]; then
+  body="$body"$'\n\n'"Failed step: \`$failed_step\`"
+fi
 if [ -n "$err" ]; then
   body="$body"$'\n\n'"First error: \`$err\`"
 fi
