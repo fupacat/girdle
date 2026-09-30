@@ -4,9 +4,9 @@ watches:
   - path: .github/workflows/gemini-agent.yml
     hash: 3a48239a8e06a99aa7aff58d5d34f99f15944db5ba5fa7775b3e0dd9400469a8
   - path: .github/workflows/gemini-agent-pr.yml
-    hash: 01ced25ead89b796a720c1ba78b7c64e01a44c110e3799e37af3c1299fbf2fe7
+    hash: b44f78c8ef41ff38bf9a96bc93f7cd747d75ee30592333af84ef04f4fce5af74
   - path: .github/scripts/report-agent-failure.sh
-    hash: 67e1799940183dcd5e4e01f1d18be777f4e95bd242753dd7590be4d3ecafe0ec
+    hash: 0155cf0fcae6d7789f6be52408192f004808f0941b6e491c5b756c7e0b7b4641
 stale: false
 ---
 
@@ -113,11 +113,13 @@ cancelled by hand, so duplicate triggers are a known cost.
 The second acceptance pass (issue mode on #400 -> PR #403, then `@gemini` on the
 PR) passed issue mode end to end (the agent created the file, the publisher opened a
 draft `agent-pr` PR) and found three more defects in PR mode: `aider --config` rejects
-an empty file (it must be a YAML mapping, so the stub is `{}`); `gh issue comment/edit`
-use GraphQL, which needs `pull-requests: write` to touch a PR and failed with
-"Resource not accessible by integration" in the PR-mode resolve, publish and
-report-failure jobs (all comments and labels now use the REST issues endpoints,
-which work for PRs with `issues: write` alone); and aider appends `.aider*` to
+an empty file (it must be a YAML mapping, so the stub is `{}`); comments and labels on a PR returned 403
+("Resource not accessible by integration") with `issues: write` alone, in both the
+GraphQL (`gh issue comment/edit`) and the REST form, so the PR-mode resolve, publish
+and report-failure jobs now hold `pull-requests: write` (none of them runs the model
+or code from the branch; the agent job stays read-only), and the `repair:N` label is
+applied before the push so a labelling failure can never leave an uncounted push;
+and aider appends `.aider*` to
 `.gitignore` unless the repo already ignores it (now committed).
 
 ## Not verified end to end

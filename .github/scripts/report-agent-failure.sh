@@ -80,9 +80,8 @@ if [ -n "$err" ]; then
 fi
 body="$body"$'\n\n'"Run: $RUN_URL"
 
-# REST endpoints, not `gh issue comment/edit`: those use GraphQL, which needs
-# pull-requests: write to touch a PR; the REST issues endpoints work for both
-# issues and PRs with issues: write alone.
+# Works for an issue (issues: write) and for a PR (pull-requests: write; the
+# PR-mode workflow grants that to the reporting job, issues: write is not enough).
 api="repos/$GH_REPO/issues/$TARGET_NUM"
 gh api -X POST "$api/comments" -f body="$body" > /dev/null
 gh api -X POST "$api/labels" -f "labels[]=agent:failed" > /dev/null \
