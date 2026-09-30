@@ -44,13 +44,51 @@ def test_failed_runs_are_reported_on_the_issue() -> None:
 
 def test_report_script_handles_spend_limits_and_defuses_untrusted_text() -> None:
     script = Path(".github/scripts/report-agent-failure.sh").read_text(encoding="utf-8")
+    lib = Path(".github/scripts/agent-failure-lib.sh").read_text(encoding="utf-8")
 
-    assert "insufficient credits" in script and "402" in script  # spend limit
-    assert "429" in script  # rate limit
+    assert "insufficient credits" in lib and "402" in lib  # spend limit
+    assert "429" in lib  # rate limit
     assert '"labels[]=agent:failed"' in script
     assert '-X DELETE "$api/labels/$TRIGGER_LABEL"' in script  # no re-trigger loop on spend
-    # The error line comes from a log that can echo model output or issue text.
-    assert "sed 's/@/(at)/g'" in script and "cut -c1-300" in script
+    # The error line comes from text that can echo model output or issue text.
+    assert "sed 's/@/(at)/g'" in lib and "cut -c1-300" in lib
+
+
+def test_failure_is_classified_in_the_agent_job_not_from_the_api_log() -> None:
+    # A run's job logs cannot be read through the API until the whole run has
+    # completed, and the reporter runs inside the run (the first real reports had
+    # no error line). The agent job has the model's output on disk: it tees it,
+    # classifies it there, and hands the result on as job outputs.
+    for path, job in (
+        (".github/workflows/gemini-agent.yml", "gemini-agent"),
+        (".github/workflows/gemini-agent-pr.yml", "agent"),
+    ):
+        workflow = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        steps = workflow["jobs"][job]["steps"]
+        aider = next(s for s in steps if s.get("id") == "aider")
+        classify = next(s for s in steps if s.get("id") == "classify")
+        report = workflow["jobs"]["report-failure"]["steps"][-1]
+
+        assert "set -o pipefail" in aider["run"]  # tee must not mask aider's exit code
+        assert 'tee "$RUNNER_TEMP/aider.log"' in aider["run"]
+        assert "steps.aider.outcome == 'failure'" in classify["if"]
+        assert "classify-agent-failure.sh" in classify["run"]
+        outputs = workflow["jobs"][job]["outputs"]
+        assert outputs["failure_kind"] == "${{ steps.classify.outputs.kind }}"
+        assert outputs["failure_error"] == "${{ steps.classify.outputs.error }}"
+        assert report["env"]["FAILURE_KIND"] == "${{ needs." + job + ".outputs.failure_kind }}"
+        assert report["env"]["FAILURE_ERROR"] == "${{ needs." + job + ".outputs.failure_error }}"
+
+
+def test_dispatch_can_override_the_model() -> None:
+    workflow = _workflow()
+    inputs = workflow["on" if "on" in workflow else True]["workflow_dispatch"]["inputs"]
+
+    assert inputs["model"]["required"] is False
+    aider = next(
+        s for s in workflow["jobs"]["gemini-agent"]["steps"] if s.get("id") == "aider"
+    )
+    assert "github.event.inputs.model" in aider["env"]["MODEL_NAME"]
 
 
 # Flags confirmed against aider's own usage text in a real Actions run (the first
