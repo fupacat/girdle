@@ -88,9 +88,11 @@ first as docs-only (`docs` queue/`docs_only` output), then broadened to
 `light`/`light_diff` covering CI config too, once the mutual-exclusion
 gap above was found. Current shape:
 
-- `.mergify.yml`: `light` queue (`branch_protection_injection_mode: merge`,
-  `checks_timeout: 15m`, `merge_conditions: [check-success=test, "#approved-reviews-by>=1"]` - no SonarCloud
-  requirement). `queue light (docs/CI-config-only) PRs` rule using
+- `.mergify.yml`: `light` queue (`branch_protection_injection_mode: none`,
+  `checks_timeout: 15m`, `merge_conditions: [check-success=test, check-success=Gitar, "#approved-reviews-by>=1"]` - no SonarCloud
+  queue requirement; `none` stops the queue from inheriting the ruleset's
+  checks, while CI still reports SonarCloud on the PR for GitHub's final
+  merge). `queue light (docs/CI-config-only) PRs` rule using
   `-files ~= ^(?!(\.agent-vault/|.*\.md$|\.github/workflows/|\.mergify\.yml$)).*$`;
   `queue development PRs` gets the complementary
   `files ~= ^(?!...).*$` condition (at least one file outside all light
