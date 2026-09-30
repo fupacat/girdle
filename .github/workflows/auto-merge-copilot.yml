@@ -110,9 +110,7 @@ jobs:
           default_branch=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name')
           repo_owner="${GH_REPO%%/*}"
 
-          json_fields="number,author,headRefName,isDraft,baseRefName,
-            headRepositoryOwner,title,mergeable,labels,commits,
-            changedFiles,statusCheckRollup"
+          json_fields="number,author,headRefName,isDraft,baseRefName,headRepositoryOwner,title"
           jq_filter='.[]
             | select(.isDraft == true)
             | select(.author.login == "Copilot")
@@ -129,8 +127,7 @@ jobs:
               fi
 
               pr_json=$(gh pr view "$pr" \
-            --json number,isDraft,baseRefName,headRepositoryOwner,
-            mergeable,labels,commits,changedFiles,statusCheckRollup)
+                --json number,isDraft,baseRefName,headRepositoryOwner,mergeable,labels,commits,changedFiles,statusCheckRollup)
               label_names=$(jq -r '.labels[].name // empty' <<<"$pr_json")
               if printf '%s\n' "$label_names" | grep -qx 'manual' || \
                 printf '%s\n' "$label_names" | grep -qx 'repair:cap'; then
@@ -160,7 +157,6 @@ jobs:
 
               required_checks=$(jq -r '
                 .statusCheckRollup[]?
-                | select(.isRequired == true)
                 | [.name, .status, .conclusion]
                 | @tsv' <<<"$pr_json")
               if [ -z "$required_checks" ]; then
@@ -188,7 +184,7 @@ jobs:
                 pr_state=$(gh pr view "$pr" --json state -q '.state' || true)
                 if [ "$pr_state" = "CLOSED" ] || [ "$pr_state" = "MERGED" ]; then
                   echo "PR #$pr is $pr_state; skipping ready-for-review."
-                  exit 0
+                  continue
                 fi
                 echo "Failed to mark PR #$pr ready " \
                   "(state=${pr_state:-unknown})." >&2
