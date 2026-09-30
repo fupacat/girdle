@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: f4a0caa6ef8643452937c560921c9c66ad63af2db169672d7665cca429285410
+    hash: a9acbcfaaaa586012ce0d5d0f8251578866b19dae4c6c23e8252a6045a773e28
 stale: false
 ---
 
