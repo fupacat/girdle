@@ -28,8 +28,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: read
-      issues: write
+      pull-requests: write
     outputs:
       proceed: ${{ steps.resolve.outputs.proceed }}
       head_sha: ${{ steps.resolve.outputs.head_sha }}
@@ -44,9 +43,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PR_NUM: ${{ github.event.issue.number }}
         run: |
-          # REST endpoints, not `gh issue comment/edit`: those use GraphQL, which
-          # needs pull-requests: write to touch a PR; the REST issues endpoints
-          # work for PRs with issues: write alone.
+          # Commenting on or labelling a PR needs pull-requests: write (issues:
+          # write is not enough: both the GraphQL and the REST comment/label
+          # calls returned 403 with it). The jobs that hold it never run the
+          # model or any code from the branch.
           refuse() {
             gh api -X POST "repos/$GH_REPO/issues/$PR_NUM/comments" \
               -f body="The Gemini agent did not run: $*" > /dev/null
@@ -296,7 +296,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      issues: write
+      pull-requests: write
     steps:
       # The publisher never has the PR branch in a working tree at all: it
       # builds the new commit with git plumbing (a temporary index, the patch
@@ -390,13 +390,16 @@ jobs:
           [ "$MERGED" = "true" ] && parents+=(-p "$BASE_SHA")
           commit=$(git commit-tree "$new_tree" "${parents[@]}" \
             -m "fix: address request on PR #${PR_NUM} (gemini agent)")
+          # Count the cycle before pushing: if labelling fails (the first real
+          # run got a 403 here after the push), nothing has been pushed that the
+          # repair cap does not know about.
+          gh api -X POST "repos/$GH_REPO/issues/$PR_NUM/labels" \
+            -f "labels[]=repair:$((REPAIR_N + 1))" > /dev/null
           url="https://x-access-token:${AGENT_PR_TOKEN}@github.com/${GH_REPO}.git"
           if ! git push "$url" "${commit}:refs/heads/${HEAD_REF}"; then
             fail "Could not push to ${HEAD_REF} (the branch moved, or the token" \
               "cannot push); nothing was pushed."
           fi
-          gh api -X POST "repos/$GH_REPO/issues/$PR_NUM/labels" \
-            -f "labels[]=repair:$((REPAIR_N + 1))" > /dev/null
           msg="The Gemini agent pushed ${commit:0:7} to ${HEAD_REF}"
           msg="$msg (repo checks: ${CHECKS}). Run: $RUN_URL"
           gh api -X POST "repos/$GH_REPO/issues/$PR_NUM/comments" -f body="$msg" > /dev/null
@@ -413,7 +416,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      issues: write
+      pull-requests: write
       actions: read
     steps:
       - name: Checkout the default branch (report script only)

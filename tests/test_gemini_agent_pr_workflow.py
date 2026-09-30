@@ -177,17 +177,17 @@ def test_failed_pr_runs_are_reported_on_the_pr() -> None:
     assert run["env"]["TARGET_NUM"] == "${{ github.event.issue.number }}"
 
 
-def test_pr_comments_and_labels_use_rest_not_graphql() -> None:
-    # `gh issue comment/edit` use GraphQL, which needs pull-requests: write to touch
-    # a PR and failed with "Resource not accessible by integration" on the real run;
-    # the REST issues endpoints work for PRs with issues: write alone.
-    for path in (PR_WORKFLOW, ".github/scripts/report-agent-failure.sh"):
-        assert "gh issue" not in Path(path).read_text(encoding="utf-8").replace(
-            "`gh issue comment/edit`", ""
-        )
+def test_jobs_that_comment_on_the_pr_have_pull_requests_write() -> None:
+    # Commenting on or labelling a PR returned 403 ("Resource not accessible by
+    # integration") with issues: write alone, in both GraphQL and REST form. Only
+    # the jobs that never run the model or branch code hold it.
     workflow = _load(PR_WORKFLOW)
+
+    assert "permissions" not in workflow["jobs"]["agent"]  # read-only, inherited
     for job in ("resolve", "publish", "report-failure"):
-        assert "pull-requests" not in workflow["jobs"][job]["permissions"] or job == "resolve"
+        assert workflow["jobs"][job]["permissions"]["pull-requests"] == "write"
+        text = yaml.safe_dump(workflow["jobs"][job])
+        assert "OPENROUTER_API_KEY" not in text
 
 
 def test_aider_config_stub_is_a_yaml_mapping() -> None:
