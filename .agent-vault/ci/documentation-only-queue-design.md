@@ -88,9 +88,11 @@ first as docs-only (`docs` queue/`docs_only` output), then broadened to
 `light`/`light_diff` covering CI config too, once the mutual-exclusion
 gap above was found. Current shape:
 
-- `.mergify.yml`: `light` queue (`branch_protection_injection_mode: merge`,
-  `checks_timeout: 15m`, `merge_conditions: [check-success=test, "#approved-reviews-by>=1"]` - no SonarCloud
-  requirement). `queue light (docs/CI-config-only) PRs` rule using
+- `.mergify.yml`: `light` queue (`branch_protection_injection_mode: none`,
+  `merge_bot_account: fupacat`, `checks_timeout: 15m`,
+  `merge_conditions: [check-success=test, check-success=Gitar,
+  "#approved-reviews-by>=1"]` - no SonarCloud requirement).
+  `queue light (docs/CI-config-only) PRs` rule using
   `-files ~= ^(?!(\.agent-vault/|.*\.md$|\.github/workflows/|\.mergify\.yml$)).*$`;
   `queue development PRs` gets the complementary
   `files ~= ^(?!...).*$` condition (at least one file outside all light
@@ -103,8 +105,9 @@ gap above was found. Current shape:
   [[.agent-vault/context/vault-freshness-redesign|vault-freshness-redesign]]'s
   PR #128 incident) and outputs `light_diff`. The `test` job depends on
   it (`if: always()`, so a skipped/failed detection defaults to running
-  everything) and gates the `pytest` step and the `SonarQube Scan` step
-  on `light_diff != 'true'`. `ruff`/`mdformat`/`yamllint`/index/
+  everything) and gates the `pytest` step on `light_diff != 'true'`.
+  `SonarQube Scan` still runs on non-Dependabot PRs so its required
+  branch-protection check is reported. `ruff`/`mdformat`/`yamllint`/index/
   vault-notes checks stay unconditional - they're already the cheap part,
   scan the whole tree regardless of diff size, and (`yamllint`
   specifically) are exactly what validates a CI-config-only PR's own
@@ -143,7 +146,8 @@ rather than two mutually-exclusive ones. Also confirmed
 `check-success=test` should stay required even for CI-config-only PRs -
 unlike `pytest`, the `test` job's `yamllint` step is exactly what
 validates the YAML files such a PR touches, so it still carries real
-signal even with `pytest`/SonarQube skipped.
+signal even when `pytest` is skipped; SonarQube still runs on
+non-Dependabot PRs.
 
 Also verified: `yamllint`/`ruff`/`mdformat` all pass, `pytest` passes
 (397 tests), and the light-file regex (`^(\.agent-vault/|.*\.md$|\.github/workflows/|\.mergify\.yml$)`)
