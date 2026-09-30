@@ -44,8 +44,12 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PR_NUM: ${{ github.event.issue.number }}
         run: |
+          # REST endpoints, not `gh issue comment/edit`: those use GraphQL, which
+          # needs pull-requests: write to touch a PR; the REST issues endpoints
+          # work for PRs with issues: write alone.
           refuse() {
-            gh issue comment "$PR_NUM" --body "The Gemini agent did not run: $*"
+            gh api -X POST "repos/$GH_REPO/issues/$PR_NUM/comments" \
+              -f body="The Gemini agent did not run: $*" > /dev/null
             echo "proceed=false" >> "$GITHUB_OUTPUT"
             echo "refused: $*"
             exit 0
@@ -69,7 +73,8 @@ jobs:
           fi
           repair_n=$(printf '%s\n' "$labels" | grep -cE '^repair:[0-9]+$' || true)
           if [ "$repair_n" -ge 2 ]; then
-            gh issue edit "$PR_NUM" --add-label manual
+            gh api -X POST "repos/$GH_REPO/issues/$PR_NUM/labels" \
+              -f "labels[]=manual" > /dev/null
             refuse "this PR has used its two repair cycles; it is now labelled manual."
           fi
           {
@@ -220,7 +225,8 @@ jobs:
           # shell suggestions, auto-test and auto-lint are disabled outright.
           # No auto-commits: the final state is captured as a tree and diffed
           # against the baseline.
-          : > "$RUNNER_TEMP/empty.yml"
+          # aider's config parser rejects an empty file: it must be a YAML mapping.
+          echo '{}' > "$RUNNER_TEMP/empty.yml"
           : > "$RUNNER_TEMP/empty.env"
           aider \
             --config "$RUNNER_TEMP/empty.yml" \
@@ -331,7 +337,8 @@ jobs:
         run: |
           fail() {
             msg="$*"
-            gh issue comment "$PR_NUM" --body "$msg Run: $RUN_URL"
+            gh api -X POST "repos/$GH_REPO/issues/$PR_NUM/comments" \
+              -f body="$msg Run: $RUN_URL" > /dev/null
             echo "$msg"
             exit 1
           }
@@ -388,10 +395,11 @@ jobs:
             fail "Could not push to ${HEAD_REF} (the branch moved, or the token" \
               "cannot push); nothing was pushed."
           fi
-          gh issue edit "$PR_NUM" --add-label "repair:$((REPAIR_N + 1))"
+          gh api -X POST "repos/$GH_REPO/issues/$PR_NUM/labels" \
+            -f "labels[]=repair:$((REPAIR_N + 1))" > /dev/null
           msg="The Gemini agent pushed ${commit:0:7} to ${HEAD_REF}"
           msg="$msg (repo checks: ${CHECKS}). Run: $RUN_URL"
-          gh issue comment "$PR_NUM" --body "$msg"
+          gh api -X POST "repos/$GH_REPO/issues/$PR_NUM/comments" -f body="$msg" > /dev/null
 
   # Job 4 - a failed run must never be silent: comment on the PR with the run
   # link and first error, label it agent:failed, and on an OpenRouter

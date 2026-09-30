@@ -19,3 +19,4 @@ junit.xml
 
 .gemini/
 gha-creds-*.json
+.aider*
