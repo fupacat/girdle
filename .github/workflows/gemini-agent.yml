@@ -30,7 +30,10 @@ jobs:
         github.event_name == 'issue_comment' &&
         contains(github.event.comment.body, '@gemini') &&
         !github.event.issue.pull_request &&
-        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+        contains(
+          fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+          github.event.comment.author_association
+        )
       ) ||
       (github.event_name == 'issues' && github.event.label.name == 'agent:gemini')
     runs-on: ubuntu-latest
