@@ -19,7 +19,11 @@ case "${TARGET_NUM:-}" in
     ;;
 esac
 
-log=$(gh run view "$RUN_ID" --repo "$GH_REPO" --log-failed 2>/dev/null || true)
+log=''
+for job in $(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs" \
+    --jq '.jobs[] | select(.conclusion == "failure") | .id' 2>/dev/null || true); do
+  log+=$(gh api "repos/$GH_REPO/actions/jobs/$job/logs" 2>/dev/null || true)$'\n'
+done
 err=$(printf '%s\n' "$log" | grep -m1 -F '##[error]' | sed 's/^.*##\[error\]//' || true)
 err=$(printf '%s' "$err" | tr -d '\000-\010\013-\037`' | sed 's/@/(at)/g' | cut -c1-300)
 
