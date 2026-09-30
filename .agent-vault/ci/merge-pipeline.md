@@ -111,6 +111,16 @@ comment). Gitar's own auto-merge (`.gitar/config/merge.md`) is deliberately
 never created, so it can't arm a second merge path competing with
 Mergify's queue.
 
+**Gitar's "Skip draft PRs" setting is on** (dashboard setting, not in the
+repo; re-enabled 2026-09-30). Draft versus ready is the phase signal in the
+staged checks/review/repair pipeline (see the
+`staged-pr-pipeline-checks-review-repair` decision note): Gitar reviews
+only ready PRs, so it never reviews a Copilot PR mid-work or a Mergify
+`mergify/merge-queue/*` speculative draft. The `light` queue nevertheless
+still has an explicit `check-success=Gitar` merge condition; it was not
+removed. Do not infer from the draft-skipping setting that Gitar is absent
+from that queue's merge gate.
+
 ## Consequences
 
 - A PR sitting open across a `.mergify.yml`/`.gitar/` config change gets no
