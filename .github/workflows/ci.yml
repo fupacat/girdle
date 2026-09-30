@@ -22,6 +22,8 @@ jobs:
     # push to master always runs everything.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       light_diff: ${{ steps.check.outputs.light_diff }}
     steps:
