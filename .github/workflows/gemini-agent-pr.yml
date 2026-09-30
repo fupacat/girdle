@@ -96,8 +96,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
-      failure_kind: ${{ steps.classify.outputs.kind }}
-      failure_error: ${{ steps.classify.outputs.error }}
+      failure_kind: ${{ steps.classify.outputs.kind || steps.silent.outputs.kind }}
+      failure_error: ${{ steps.classify.outputs.error || steps.silent.outputs.error }}
       has_changes: ${{ steps.patch.outputs.has_changes }}
       merged: ${{ steps.sync.outputs.merged }}
       base_sha: ${{ steps.sync.outputs.base_sha }}
@@ -289,6 +289,14 @@ jobs:
           else
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
           fi
+
+      # aider prints a provider error (bad model id, exhausted credits, rate
+      # limit) and still exits 0, so with nothing produced check its output and
+      # fail here with a real explanation, not "no changes".
+      - name: Fail on a silent model error
+        id: silent
+        if: steps.patch.outputs.has_changes == 'false'
+        run: bash "$GITHUB_WORKSPACE/trusted/.github/scripts/classify-agent-failure.sh" --silent
 
       - name: Upload patch
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
