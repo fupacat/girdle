@@ -392,3 +392,34 @@ jobs:
           msg="The Gemini agent pushed ${commit:0:7} to ${HEAD_REF}"
           msg="$msg (repo checks: ${CHECKS}). Run: $RUN_URL"
           gh issue comment "$PR_NUM" --body "$msg"
+
+  # Job 4 - a failed run must never be silent: comment on the PR with the run
+  # link and first error, label it agent:failed, and on an OpenRouter
+  # credit/spend-limit error say it will not be retried. No secrets, no model.
+  report-failure:
+    needs: [resolve, agent, publish]
+    if: >-
+      always() &&
+      (needs.agent.result == 'failure' || needs.publish.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    steps:
+      - name: Checkout the default branch (report script only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - name: Report the failure on the PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TARGET_NUM: ${{ github.event.issue.number }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: >-
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/scripts/report-agent-failure.sh

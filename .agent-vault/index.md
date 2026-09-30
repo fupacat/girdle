@@ -26,6 +26,7 @@
 (none) | data-model
 (none) | diagram
 .agent-vault/ci/documentation-only-queue-design.md | ci | stale=False | watches: .mergify.yml
+.agent-vault/ci/gemini-agent.md | ci | stale=False | watches: .github/workflows/gemini-agent.yml; .github/workflows/gemini-agent-pr.yml; .github/scripts/report-agent-failure.sh
 .agent-vault/ci/merge-pipeline.md | ci | stale=False | watches: .mergify.yml
 .agent-vault/ci/queue-entry-cost-and-timeouts.md | ci | stale=False | watches: .mergify.yml; .github/workflows/ci.yml
 .agent-vault/environment/external-services.md | environment | stale=False | watches: -
