@@ -21,6 +21,12 @@ permissions:
   pull-requests: write
   issues: write
 
+# One run per issue at a time: two concurrent runs on the same issue would
+# race on the fixed branch name (and waste model spend).
+concurrency:
+  group: gemini-agent-${{ github.event.inputs.issue_number || github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   gemini-agent:
     # Trigger when labeled 'agent:gemini', commented with '@gemini', or dispatched manually
@@ -37,16 +43,20 @@ jobs:
       ) ||
       (github.event_name == 'issues' && github.event.label.name == 'agent:gemini')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
+      # Actions are pinned to full commit SHAs: a compromised tag would
+      # otherwise expose every secret this job holds.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install dependencies and Aider
         run: |
@@ -64,6 +74,9 @@ jobs:
           ISSUE_BODY: ${{ github.event.issue.body }}
           MANUAL_INSTRUCTIONS: ${{ github.event.inputs.instructions }}
         run: |
+          # workflow_dispatch input is free text and flows into the branch
+          # name, title and body: accept digits only.
+          case "$ISSUE_NUMBER" in ''|*[!0-9]*) echo "issue number must be numeric"; exit 1;; esac
           echo "issue_num=${ISSUE_NUMBER}" >> "$GITHUB_OUTPUT"
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             TASK="Issue #${ISSUE_NUMBER}: ${MANUAL_INSTRUCTIONS}"
@@ -81,13 +94,16 @@ jobs:
 
       - name: Run Aider with Gemini via OpenRouter
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MODEL_NAME: ${{ vars.GEMINI_MODEL || 'openrouter/google/gemini-2.5-pro' }}
           TASK: ${{ steps.prompt.outputs.task_desc }}
         run: |
           git config user.name "gemini-agent[bot]"
           git config user.email "gemini-agent[bot]@users.noreply.github.com"
 
+          # --yes-always confirms every prompt, so shell-command suggestions
+          # are disabled outright. Aider's own commits skip git hooks by
+          # default; the hygiene step below is the real check.
           aider \
             --model "$MODEL_NAME" \
             --read GEMINI.md \
@@ -95,25 +111,58 @@ jobs:
             --message "Address this task per rules in GEMINI.md/AGENTS.md: $TASK" \
             --auto-commits \
             --no-dirty-check \
-            --yes
+            --no-suggest-shell-commands \
+            --no-check-update \
+            --no-analytics \
+            --yes-always
 
       - name: Enforce repository hygiene and formatting
+        id: hygiene
         run: |
+          # Deterministic repairs only. Stale vault-note hashes are NOT acked
+          # blindly here (an ack asserts the note was compared against the
+          # change); they stay red in CI and Gitar's repair instructions
+          # (.gitar/instructions/repo-check-repairs.md) handle them.
           girdle index . --inject AGENTS.md
-          girdle notes ack
           pre-commit run --all-files || true
-          git commit -am "chore: run pre-commit and refresh repo index" || true
-          pre-commit run --all-files
+          git add -A
+          git commit -m "chore: run pre-commit and refresh repo index" || true
+          if pre-commit run --all-files; then
+            echo "checks=passing" >> "$GITHUB_OUTPUT"
+          else
+            echo "checks=needs-repair" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Refuse to open an empty PR
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_PR_TOKEN }}
+          ISSUE_NUM: ${{ steps.prompt.outputs.issue_num }}
+          RUN_URL: >-
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          base="origin/${BASE_BRANCH}"
+          if git diff --quiet "$base"...HEAD && git diff --quiet HEAD; then
+            msg="The Gemini agent run produced no file changes (the work may already"
+            msg="$msg exist on the default branch), so no PR was opened. Run: $RUN_URL"
+            gh issue comment "$ISSUE_NUM" --body "$msg"
+            echo "no changes to propose"
+            exit 1
+          fi
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1  # v8.1.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # A fine-grained PAT (contents + pull-requests write only): PRs
+          # opened with GITHUB_TOKEN do not trigger CI.
+          token: ${{ secrets.AGENT_PR_TOKEN }}
           commit-message: "feat: address issue #${{ steps.prompt.outputs.issue_num }}"
           title: "Fix issue #${{ steps.prompt.outputs.issue_num }}"
           body: |
             Automated PR generated by Gemini (via OpenRouter) addressing
             #${{ steps.prompt.outputs.issue_num }}.
+            Repo checks at open time: ${{ steps.hygiene.outputs.checks }}
+            (stale note hashes are repaired in review, not acked blindly).
             Fixes #${{ steps.prompt.outputs.issue_num }}
           branch: "gemini/issue-${{ steps.prompt.outputs.issue_num }}"
           draft: true
