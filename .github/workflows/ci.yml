@@ -8,6 +8,7 @@ on:
   push:
     branches: [master]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
   changes:
@@ -83,6 +84,7 @@ jobs:
   pytest:
     needs: [changes, cheap-checks]
     if: >-
+      always() &&
       needs.cheap-checks.result == 'success' &&
       needs.changes.outputs.light_diff != 'true' &&
       (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
@@ -155,9 +157,7 @@ jobs:
     if: >-
       always() &&
       needs.cheap-checks.result == 'success' &&
-      needs.pytest.result != 'failure' &&
-      needs.pytest.result != 'cancelled' &&
-      (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
+      needs.pytest.result == 'success' &&
       github.actor != 'dependabot[bot]' && (
         github.event_name == 'pull_request' ||
         github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
