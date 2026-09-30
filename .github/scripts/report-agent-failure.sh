@@ -80,10 +80,14 @@ if [ -n "$err" ]; then
 fi
 body="$body"$'\n\n'"Run: $RUN_URL"
 
-gh issue comment "$TARGET_NUM" --repo "$GH_REPO" --body "$body"
-gh issue edit "$TARGET_NUM" --repo "$GH_REPO" --add-label "agent:failed" \
+# REST endpoints, not `gh issue comment/edit`: those use GraphQL, which needs
+# pull-requests: write to touch a PR; the REST issues endpoints work for both
+# issues and PRs with issues: write alone.
+api="repos/$GH_REPO/issues/$TARGET_NUM"
+gh api -X POST "$api/comments" -f body="$body" > /dev/null
+gh api -X POST "$api/labels" -f "labels[]=agent:failed" > /dev/null \
   || echo "could not add the agent:failed label"
 if [ "$kind" = "spend" ] && [ -n "${TRIGGER_LABEL:-}" ]; then
-  gh issue edit "$TARGET_NUM" --repo "$GH_REPO" --remove-label "$TRIGGER_LABEL" \
+  gh api -X DELETE "$api/labels/$TRIGGER_LABEL" > /dev/null \
     || echo "could not remove the $TRIGGER_LABEL label"
 fi

@@ -64,7 +64,7 @@ def test_resolve_enforces_branch_label_fork_and_repair_cap() -> None:
     assert "gemini/*" in script
     assert "agent-pr" in script
     assert "repair:[0-9]+" in script
-    assert '-ge 2' in script and "--add-label manual" in script
+    assert '-ge 2' in script and '"labels[]=manual"' in script
 
 
 def test_master_is_merged_only_for_a_real_conflict_and_at_a_pinned_sha() -> None:
@@ -102,7 +102,7 @@ def test_publisher_refuses_workflow_changes_and_labels_the_cycle() -> None:
     )["run"]
 
     assert ".github/workflows/" in publish
-    assert '"repair:$((REPAIR_N + 1))"' in publish
+    assert '"labels[]=repair:$((REPAIR_N + 1))"' in publish
     assert "${commit}:refs/heads/${HEAD_REF}" in publish
     assert "--force" not in publish
 
@@ -175,3 +175,24 @@ def test_failed_pr_runs_are_reported_on_the_pr() -> None:
     run = next(s for s in job["steps"] if "run" in s)
     assert run["run"] == "bash .github/scripts/report-agent-failure.sh"
     assert run["env"]["TARGET_NUM"] == "${{ github.event.issue.number }}"
+
+
+def test_pr_comments_and_labels_use_rest_not_graphql() -> None:
+    # `gh issue comment/edit` use GraphQL, which needs pull-requests: write to touch
+    # a PR and failed with "Resource not accessible by integration" on the real run;
+    # the REST issues endpoints work for PRs with issues: write alone.
+    for path in (PR_WORKFLOW, ".github/scripts/report-agent-failure.sh"):
+        assert "gh issue" not in Path(path).read_text(encoding="utf-8").replace(
+            "`gh issue comment/edit`", ""
+        )
+    workflow = _load(PR_WORKFLOW)
+    for job in ("resolve", "publish", "report-failure"):
+        assert "pull-requests" not in workflow["jobs"][job]["permissions"] or job == "resolve"
+
+
+def test_aider_config_stub_is_a_yaml_mapping() -> None:
+    # aider's parser rejects an empty config file ("returned type NoneType").
+    steps = _load(PR_WORKFLOW)["jobs"]["agent"]["steps"]
+    aider = next(s for s in steps if "aider \\" in s.get("run", ""))["run"]
+
+    assert "echo '{}' > \"$RUNNER_TEMP/empty.yml\"" in aider

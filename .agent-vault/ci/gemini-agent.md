@@ -4,9 +4,9 @@ watches:
   - path: .github/workflows/gemini-agent.yml
     hash: 3a48239a8e06a99aa7aff58d5d34f99f15944db5ba5fa7775b3e0dd9400469a8
   - path: .github/workflows/gemini-agent-pr.yml
-    hash: 2f2bc10e134055e56ef8c5596f813098d3ed57be95b442e2be071170ff132fda
+    hash: 01ced25ead89b796a720c1ba78b7c64e01a44c110e3799e37af3c1299fbf2fe7
   - path: .github/scripts/report-agent-failure.sh
-    hash: cbb9fed163925dea7fa540a1909ddb639c9397f9831afdaf7e3ca88ec0e3b54c
+    hash: 67e1799940183dcd5e4e01f1d18be777f4e95bd242753dd7590be4d3ecafe0ec
 stale: false
 ---
 
@@ -109,6 +109,16 @@ error line, because the job log was not yet available when the reporter ran
 application produced two `labeled` events, and the second run sat pending behind
 the job-level concurrency group and would have repeated the model spend; it was
 cancelled by hand, so duplicate triggers are a known cost.
+
+The second acceptance pass (issue mode on #400 -> PR #403, then `@gemini` on the
+PR) passed issue mode end to end (the agent created the file, the publisher opened a
+draft `agent-pr` PR) and found three more defects in PR mode: `aider --config` rejects
+an empty file (it must be a YAML mapping, so the stub is `{}`); `gh issue comment/edit`
+use GraphQL, which needs `pull-requests: write` to touch a PR and failed with
+"Resource not accessible by integration" in the PR-mode resolve, publish and
+report-failure jobs (all comments and labels now use the REST issues endpoints,
+which work for PRs with `issues: write` alone); and aider appends `.aider*` to
+`.gitignore` unless the repo already ignores it (now committed).
 
 ## Not verified end to end
 
