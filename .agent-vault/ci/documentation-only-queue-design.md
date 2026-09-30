@@ -90,8 +90,7 @@ gap above was found. Current shape:
 
 - `.mergify.yml`: `light` queue (`branch_protection_injection_mode: none`,
   `merge_bot_account: fupacat`, `checks_timeout: 15m`,
-  `merge_conditions: [check-success=test, check-success=Gitar,
-  "#approved-reviews-by>=1"]` - no SonarCloud queue requirement;
+  `merge_conditions: [check-success=test, check-success=Gitar, "#approved-reviews-by>=1"]` - no SonarCloud queue requirement;
   `none` stops the queue from inheriting ruleset checks, while CI still
   reports SonarCloud on the PR for GitHub's final merge).
   `queue light (docs/CI-config-only) PRs` rule using
