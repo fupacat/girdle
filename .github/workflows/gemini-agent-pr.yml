@@ -146,19 +146,31 @@ jobs:
           base_sha=$(git rev-parse "origin/$BASE_REF")
           echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
           : > "$RUNNER_TEMP/conflicted.txt"
-          if git merge --no-commit --no-ff "$base_sha"; then
-            git merge --abort 2>/dev/null || true
+          # git merge-tree computes the merge without touching the working
+          # tree or index: exit 0 = clean (nothing is merged), 1 = conflicts.
+          # The first output line is the merged tree, conflict markers
+          # included; the publisher recomputes exactly the same tree, so both
+          # must name the commits the same way (the conflict-marker labels
+          # are derived from the arguments: a bare HEAD here and a SHA there
+          # would produce different trees and a patch that does not apply).
+          head_sha=$(git rev-parse HEAD)
+          rc=0
+          out=$(git merge-tree --write-tree --name-only --no-messages "$head_sha" "$base_sha") \
+            || rc=$?
+          if [ "$rc" -eq 0 ]; then
             echo "merged=false" >> "$GITHUB_OUTPUT"
-          else
-            git diff --name-only --diff-filter=U > "$RUNNER_TEMP/conflicted.txt"
-            if [ ! -s "$RUNNER_TEMP/conflicted.txt" ]; then
-              echo "merge failed without a content conflict"
-              exit 1
-            fi
-            git add -A
+            echo "base_tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+          elif [ "$rc" -eq 1 ]; then
+            tree0=$(printf '%s\n' "$out" | head -1)
+            printf '%s\n' "$out" | sed -n '2,$p' | sed '/^$/,$d' \
+              > "$RUNNER_TEMP/conflicted.txt"
+            git read-tree -u --reset "$tree0"
             echo "merged=true" >> "$GITHUB_OUTPUT"
+            echo "base_tree=$tree0" >> "$GITHUB_OUTPUT"
+          else
+            echo "git merge-tree failed (exit $rc)"
+            exit 1
           fi
-          echo "base_tree=$(git write-tree)" >> "$GITHUB_OUTPUT"
 
       - name: Prepare Prompt
         id: prompt
@@ -230,18 +242,17 @@ jobs:
       - name: Enforce repository hygiene and formatting
         id: hygiene
         working-directory: pr
-        env:
-          # Hooks come from the trusted config; pytest would execute the PR
-          # branch's tests (untrusted code) in a privileged job, so it is
-          # skipped here and left to CI.
-          SKIP: pytest
-          TRUSTED_CONFIG: ${{ github.workspace }}/trusted/.pre-commit-config.yaml
         run: |
-          # Deterministic repairs only; stale note hashes stay red for the
-          # repair path instead of being acked blindly.
+          # Only the fixers that do not execute anything from the branch: the
+          # trusted-installed formatters and girdle read its files. pre-commit
+          # (which runs hooks, pytest among them) is deliberately not used in
+          # this privileged job; CI runs the full hook set. Stale note hashes
+          # stay red for the repair path instead of being acked blindly.
           girdle index . --inject AGENTS.md
-          pre-commit run --config "$TRUSTED_CONFIG" --all-files || true
-          if pre-commit run --config "$TRUSTED_CONFIG" --all-files; then
+          ruff check --fix . || true
+          git ls-files -z '*.md' | xargs -0 -r mdformat --wrap keep || true
+          if ruff check . && yamllint . && girdle index . --check AGENTS.md \
+            && girdle notes check .; then
             echo "checks=passing" >> "$GITHUB_OUTPUT"
           else
             echo "checks=needs-repair" >> "$GITHUB_OUTPUT"
@@ -281,9 +292,10 @@ jobs:
       contents: read
       issues: write
     steps:
-      # As in the agent job: the workspace is the trusted default branch and the
-      # PR head is a separate worktree that git merges and applies a patch to.
-      # Nothing from it is executed while the push token is in reach.
+      # The publisher never has the PR branch in a working tree at all: it
+      # builds the new commit with git plumbing (a temporary index, the patch
+      # applied with --cached, commit-tree), so there is nothing from the branch
+      # on disk to execute while the push token is in reach.
       - name: Checkout the default branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
@@ -291,15 +303,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Fetch the PR head into a separate worktree (files only)
+      - name: Fetch the PR head commit (objects only)
+        working-directory: trusted
         env:
           HEAD_REF: ${{ needs.resolve.outputs.head_ref }}
           HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
         run: |
-          cd trusted
           git fetch --no-tags origin "+refs/heads/${HEAD_REF}:refs/remotes/pr/head"
           git cat-file -e "${HEAD_SHA}^{commit}"
-          git worktree add --detach ../pr "$HEAD_SHA"
 
       - name: Download patch
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
@@ -308,13 +319,14 @@ jobs:
           path: ${{ runner.temp }}/patch
 
       - name: Validate and apply the patch, then push
-        working-directory: pr
+        working-directory: trusted
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           AGENT_PR_TOKEN: ${{ secrets.AGENT_PR_TOKEN }}
           PR_NUM: ${{ github.event.issue.number }}
           HEAD_REF: ${{ needs.resolve.outputs.head_ref }}
+          HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
           REPAIR_N: ${{ needs.resolve.outputs.repair_n }}
           HAS_CHANGES: ${{ needs.agent.outputs.has_changes }}
           MERGED: ${{ needs.agent.outputs.merged }}
@@ -343,31 +355,43 @@ jobs:
           fi
           git config user.name "gemini-agent[bot]"
           git config user.email "gemini-agent[bot]@users.noreply.github.com"
+          # Build the commit with plumbing: a temporary index (no working tree
+          # from the PR branch), the baseline tree the agent diffed against,
+          # the patch applied to the index only, then commit-tree.
+          export GIT_INDEX_FILE="$RUNNER_TEMP/publish.index"
           if [ "$MERGED" = "true" ]; then
-            # Same inputs as the agent job, so the same conflicted baseline.
-            git merge --no-commit --no-ff "$BASE_SHA" || true
-            git add -A
+            # Same inputs as the agent job (the same two commits), so the same
+            # conflicted baseline tree, markers included.
+            rc=0
+            out=$(git merge-tree --write-tree --no-messages "$HEAD_SHA" "$BASE_SHA") || rc=$?
+            [ "$rc" -eq 1 ] || fail "The base branch no longer conflicts with the PR;" \
+              "nothing was pushed."
+            base_tree=$(printf '%s\n' "$out" | head -1)
+          else
+            base_tree=$(git rev-parse "${HEAD_SHA}^{tree}")
           fi
-          if ! git apply --index "$PATCH"; then
+          git read-tree "$base_tree"
+          if ! git apply --cached "$PATCH"; then
             fail "The Gemini agent patch no longer applies to the PR branch" \
               "(it changed while the agent ran); nothing was pushed."
           fi
+          new_tree=$(git write-tree)
           # A merge commit must not carry unresolved conflict markers.
           markers='^(<<<<<<<|>>>>>>>) '
-          if [ "$MERGED" = "true" ] \
-            && git diff --cached --name-only -z \
-            | xargs -0 -r grep -lE "$markers" -- 2>/dev/null \
-            | grep -q .; then
+          if [ "$MERGED" = "true" ] && git grep -qE "$markers" "$new_tree" --; then
             fail "The Gemini agent left conflict markers in the merge;" \
               "nothing was pushed."
           fi
-          git commit -m "fix: address request on PR #${PR_NUM} (gemini agent)"
+          parents=(-p "$HEAD_SHA")
+          [ "$MERGED" = "true" ] && parents+=(-p "$BASE_SHA")
+          commit=$(git commit-tree "$new_tree" "${parents[@]}" \
+            -m "fix: address request on PR #${PR_NUM} (gemini agent)")
           url="https://x-access-token:${AGENT_PR_TOKEN}@github.com/${GH_REPO}.git"
-          if ! git push "$url" "HEAD:refs/heads/${HEAD_REF}"; then
+          if ! git push "$url" "${commit}:refs/heads/${HEAD_REF}"; then
             fail "Could not push to ${HEAD_REF} (the branch moved, or the token" \
               "cannot push); nothing was pushed."
           fi
           gh issue edit "$PR_NUM" --add-label "repair:$((REPAIR_N + 1))"
-          msg="The Gemini agent pushed $(git rev-parse --short HEAD) to ${HEAD_REF}"
+          msg="The Gemini agent pushed ${commit:0:7} to ${HEAD_REF}"
           msg="$msg (repo checks: ${CHECKS}). Run: $RUN_URL"
           gh issue comment "$PR_NUM" --body "$msg"
