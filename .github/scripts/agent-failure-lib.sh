@@ -43,6 +43,9 @@ classify_failure_log() {
 # so a bad model id, an exhausted credit balance or a rate limit otherwise
 # looks like "the agent changed nothing").
 has_model_error() {
-  [ -f "$1" ] && grep -qiE \
-    'litellm\.[a-z]*error|openrouterexception|insufficient credits|key limit exceeded|too many requests' "$1"
+  [ -f "$1" ] || return 1
+  # provider errors are printed on lines starting with litellm.<X>Error;
+  # ignore ones aider announced it would retry
+  grep -E '^(litellm\.[A-Za-z]*Error|.*OpenrouterException)' "$1" \
+    | grep -viq 'retrying'
 }
