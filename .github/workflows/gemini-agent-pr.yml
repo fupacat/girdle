@@ -232,7 +232,7 @@ jobs:
             --no-auto-commits \
             --no-auto-lint \
             --no-auto-test \
-            --no-dirty-check \
+            --no-dirty-commits \
             --no-suggest-shell-commands \
             --no-check-update \
             --no-analytics \

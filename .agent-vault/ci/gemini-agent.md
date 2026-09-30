@@ -2,11 +2,11 @@
 type: ci
 watches:
   - path: .github/workflows/gemini-agent.yml
-    hash: 3268b75fb6c5f170dc257390289a7894d4fd1c3f7ebd441d1a1da61c9e3f9db6
+    hash: 3a48239a8e06a99aa7aff58d5d34f99f15944db5ba5fa7775b3e0dd9400469a8
   - path: .github/workflows/gemini-agent-pr.yml
-    hash: cb065a3494856bf8446746faeac24e99b424ea32efcb7c9293ef4c39020e5bac
+    hash: 2f2bc10e134055e56ef8c5596f813098d3ed57be95b442e2be071170ff132fda
   - path: .github/scripts/report-agent-failure.sh
-    hash: c7a22ba8e96d0dc03bef31bb83f946e600b61e28008922f9f81fb5bc5b3cf7b0
+    hash: cbb9fed163925dea7fa540a1909ddb639c9397f9831afdaf7e3ca88ec0e3b54c
 stale: false
 ---
 
@@ -80,7 +80,9 @@ blocking bugs and security gaps. Two workflows share one trust model.
 
 A `report-failure` job in both workflows runs
 `.github/scripts/report-agent-failure.sh` when the agent or publish job fails:
-it comments with the run link and the first `##[error]` line (truncated,
+it comments with the run link, the failed step's name (from the job metadata, available at
+once) and the first `##[error]` line from the failed job's log (fetched through the
+API and retried briefly, since the log can lag the job; truncated,
 backticks and control characters stripped, `@` defused, since the log can echo
 model output or issue text) and labels the target `agent:failed`. An OpenRouter
 credit or spend-limit error (HTTP 402, "insufficient credits", "key limit
@@ -95,6 +97,18 @@ into the same failure; a rate limit is reported as such. The comment posted by
   only). Optional variable: `GEMINI_MODEL` (default
   `openrouter/google/gemini-2.5-pro`).
 - Do not reuse `COPILOT_ASSIGN_TOKEN`: it is a broad classic PAT.
+
+## Acceptance-run findings
+
+The first real run (issue #400, label trigger) failed at the Aider step with
+`unrecognized arguments: --no-dirty-check` (the flag is `--no-dirty-commits`; a
+test now pins every flag passed to aider to a verified list) and proved the
+failure reporter: it commented and labelled `agent:failed`, but without the
+error line, because the job log was not yet available when the reporter ran
+(now retried, and the failed step name is always shown). Also seen: one label
+application produced two `labeled` events, and the second run sat pending behind
+the job-level concurrency group and would have repeated the model spend; it was
+cancelled by hand, so duplicate triggers are a known cost.
 
 ## Not verified end to end
 
