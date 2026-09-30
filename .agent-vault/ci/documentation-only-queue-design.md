@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 5cb09b7babf697c61997853bb77c7b3a3fe5dcd9dfd9ffd00be42eda3a9cbc1b
+    hash: 94d6c83865c57389ae3465eadb271da1dcc8ac0ed385d6a9432cc45f14438560
 stale: false
 ---
 
@@ -90,7 +90,7 @@ gap above was found. Current shape:
 
 - `.mergify.yml`: `light` queue (`branch_protection_injection_mode: none`,
   `merge_bot_account: fupacat`, `checks_timeout: 15m`,
-  `merge_conditions: [check-success=test, check-success=Gitar, "#approved-reviews-by>=1"]` - no SonarCloud queue requirement;
+  `merge_conditions: [check-success=test, "#approved-reviews-by>=1"]` - no SonarCloud queue requirement and no `Gitar` check (Gitar skips draft PRs, so it never reports on Mergify's speculative draft; its approval is covered by the approval count);
   `none` stops the queue from inheriting ruleset checks, while CI still
   reports SonarCloud on the PR for GitHub's final merge).
   `queue light (docs/CI-config-only) PRs` rule using
