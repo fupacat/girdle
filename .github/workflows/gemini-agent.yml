@@ -15,6 +15,10 @@ on:
         description: 'Specific instructions or prompt'
         required: false
         type: string
+      model:
+        description: 'Model override (OpenRouter id, e.g. openrouter/google/gemini-2.5-pro)'
+        required: false
+        type: string
 
 # Read-only by default. The job that runs the model has no write access at
 # all; the publisher job (below) has no model key. Neither holds both.
@@ -30,6 +34,8 @@ jobs:
       issue_num: ${{ steps.prompt.outputs.issue_num }}
       checks: ${{ steps.hygiene.outputs.checks }}
       has_changes: ${{ steps.patch.outputs.has_changes }}
+      failure_kind: ${{ steps.classify.outputs.kind }}
+      failure_error: ${{ steps.classify.outputs.error }}
     # Trigger when labeled 'agent:gemini', commented with '@gemini', or
     # dispatched manually. The text the model reads must come from a trusted
     # person: for the comment trigger both the commenter and the issue author
@@ -128,11 +134,17 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Run Aider with Gemini via OpenRouter
+        id: aider
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          MODEL_NAME: ${{ vars.GEMINI_MODEL || 'openrouter/google/gemini-2.5-pro' }}
+          MODEL_NAME: >-
+            ${{ github.event.inputs.model || vars.GEMINI_MODEL
+            || 'openrouter/google/gemini-2.5-pro' }}
           TASK: ${{ steps.prompt.outputs.task_desc }}
         run: |
+          # The output is also kept in a file so a failure can be classified
+          # here, where the text is on disk (see agent-failure-lib.sh).
+          set -o pipefail
           git config user.name "gemini-agent[bot]"
           git config user.email "gemini-agent[bot]@users.noreply.github.com"
 
@@ -149,7 +161,12 @@ jobs:
             --no-suggest-shell-commands \
             --no-check-update \
             --no-analytics \
-            --yes-always
+            --yes-always 2>&1 | tee "$RUNNER_TEMP/aider.log"
+
+      - name: Classify a model failure
+        id: classify
+        if: failure() && steps.aider.outcome == 'failure'
+        run: bash .github/scripts/classify-agent-failure.sh
 
       - name: Enforce repository hygiene and formatting
         id: hygiene
@@ -339,4 +356,6 @@ jobs:
           RUN_URL: >-
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           TRIGGER_LABEL: ${{ github.event_name == 'issues' && 'agent:gemini' || '' }}
+          FAILURE_KIND: ${{ needs.gemini-agent.outputs.failure_kind }}
+          FAILURE_ERROR: ${{ needs.gemini-agent.outputs.failure_error }}
         run: bash .github/scripts/report-agent-failure.sh

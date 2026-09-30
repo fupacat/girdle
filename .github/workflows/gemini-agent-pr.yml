@@ -96,6 +96,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
+      failure_kind: ${{ steps.classify.outputs.kind }}
+      failure_error: ${{ steps.classify.outputs.error }}
       has_changes: ${{ steps.patch.outputs.has_changes }}
       merged: ${{ steps.sync.outputs.merged }}
       base_sha: ${{ steps.sync.outputs.base_sha }}
@@ -208,12 +210,16 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Run Aider with Gemini via OpenRouter
+        id: aider
         working-directory: pr
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MODEL_NAME: ${{ vars.GEMINI_MODEL || 'openrouter/google/gemini-2.5-pro' }}
           TASK: ${{ steps.prompt.outputs.task_desc }}
         run: |
+          # The output is also kept in a file so a failure can be classified
+          # here, where the text is on disk (see agent-failure-lib.sh).
+          set -o pipefail
           args=()
           while IFS= read -r f; do
             [ -n "$f" ] && args+=(--file "$f")
@@ -243,7 +249,12 @@ jobs:
             --no-check-update \
             --no-analytics \
             --yes-always \
-            "${args[@]}"
+            "${args[@]}" 2>&1 | tee "$RUNNER_TEMP/aider.log"
+
+      - name: Classify a model failure
+        id: classify
+        if: failure() && steps.aider.outcome == 'failure'
+        run: bash "$GITHUB_WORKSPACE/trusted/.github/scripts/classify-agent-failure.sh"
 
       - name: Enforce repository hygiene and formatting
         id: hygiene
@@ -433,4 +444,6 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_URL: >-
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          FAILURE_KIND: ${{ needs.agent.outputs.failure_kind }}
+          FAILURE_ERROR: ${{ needs.agent.outputs.failure_error }}
         run: bash .github/scripts/report-agent-failure.sh
