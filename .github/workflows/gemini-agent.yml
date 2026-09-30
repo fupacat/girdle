@@ -29,7 +29,8 @@ jobs:
       (
         github.event_name == 'issue_comment' &&
         contains(github.event.comment.body, '@gemini') &&
-        !github.event.issue.pull_request
+        !github.event.issue.pull_request &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
       ) ||
       (github.event_name == 'issues' && github.event.label.name == 'agent:gemini')
     runs-on: ubuntu-latest
@@ -68,7 +69,12 @@ jobs:
           else
             TASK="Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE} - ${ISSUE_BODY}"
           fi
-          echo "task_desc=${TASK}" >> "$GITHUB_OUTPUT"
+          delim="EOF_$(openssl rand -hex 8)"
+          {
+            echo "task_desc<<${delim}"
+            printf '%s\n' "$TASK"
+            echo "${delim}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Run Aider with Gemini via OpenRouter
         env:
@@ -90,10 +96,11 @@ jobs:
 
       - name: Enforce repository hygiene and formatting
         run: |
-          girdle index . --inject AGENTS.md || true
-          girdle notes ack || true
+          girdle index . --inject AGENTS.md
+          girdle notes ack
           pre-commit run --all-files || true
           git commit -am "chore: run pre-commit and refresh repo index" || true
+          pre-commit run --all-files
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
