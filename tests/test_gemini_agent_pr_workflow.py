@@ -161,3 +161,17 @@ def test_publisher_rejects_unresolved_conflict_markers() -> None:
     )["run"]
 
     assert "<<<<<<<" in publish and "conflict markers" in publish
+
+
+def test_failed_pr_runs_are_reported_on_the_pr() -> None:
+    job = _load(PR_WORKFLOW)["jobs"]["report-failure"]
+
+    assert job["needs"] == ["resolve", "agent", "publish"]
+    assert "always()" in job["if"]
+    assert "needs.agent.result == 'failure'" in job["if"]
+    assert "needs.publish.result == 'failure'" in job["if"]
+    text = yaml.safe_dump(job)
+    assert "OPENROUTER_API_KEY" not in text and "AGENT_PR_TOKEN" not in text
+    run = next(s for s in job["steps"] if "run" in s)
+    assert run["run"] == "bash .github/scripts/report-agent-failure.sh"
+    assert run["env"]["TARGET_NUM"] == "${{ github.event.issue.number }}"

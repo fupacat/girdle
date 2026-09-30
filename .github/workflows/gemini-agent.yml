@@ -307,3 +307,36 @@ jobs:
           if [ "$EVENT_NAME" = "issues" ]; then
             gh issue edit "$ISSUE_NUM" --remove-label "agent:gemini"
           fi
+
+  # Job 4 - a failed run must never be silent. Comments on the issue with the
+  # run link and the first error line, labels it agent:failed, and on an
+  # OpenRouter credit/spend-limit error also removes the trigger label so the
+  # run is not re-triggered into the same failure. No secrets, no model.
+  report-failure:
+    needs: [gemini-agent, publish]
+    if: >-
+      always() &&
+      (needs.gemini-agent.result == 'failure' || needs.publish.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    steps:
+      - name: Checkout the default branch (report script only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - name: Report the failure on the issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TARGET_NUM: ${{ github.event.inputs.issue_number || github.event.issue.number }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: >-
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TRIGGER_LABEL: ${{ github.event_name == 'issues' && 'agent:gemini' || '' }}
+        run: bash .github/scripts/report-agent-failure.sh
