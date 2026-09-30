@@ -133,12 +133,11 @@ jobs:
         # the token would be blank there regardless of the branch/event
         # check above, so skip explicitly rather than fail on bad auth.
         #
-        # Also skipped for "light" (docs/CI-config-only) PRs (see the
-        # "changes" job) - nothing in that diff can change SonarCloud's
-        # analysis, and the light queue's merge_conditions don't require
-        # this check.
+        # Runs for all non-Dependabot PRs (including "light"
+        # docs/CI-config-only diffs) so the required
+        # `SonarCloud Code Analysis` status is always reported for
+        # branches targeting protected `master`.
         if: >-
-          needs.changes.outputs.light_diff != 'true' &&
           github.actor != 'dependabot[bot]' && (
             github.event_name == 'pull_request' ||
             github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
