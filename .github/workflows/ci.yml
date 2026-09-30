@@ -84,7 +84,7 @@ jobs:
   pytest:
     needs: [changes, cheap-checks]
     if: >-
-      always() &&
+      !cancelled() &&
       needs.cheap-checks.result == 'success' &&
       needs.changes.outputs.light_diff != 'true' &&
       (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
@@ -155,7 +155,7 @@ jobs:
   sonar:
     needs: [changes, cheap-checks, pytest]
     if: >-
-      always() &&
+      !cancelled() &&
       needs.cheap-checks.result == 'success' &&
       needs.pytest.result == 'success' &&
       github.actor != 'dependabot[bot]' && (
