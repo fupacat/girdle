@@ -21,12 +21,6 @@ permissions:
   pull-requests: write
   issues: write
 
-# One run per issue at a time: two concurrent runs on the same issue would
-# race on the fixed branch name (and waste model spend).
-concurrency:
-  group: gemini-agent-${{ github.event.inputs.issue_number || github.event.issue.number }}
-  cancel-in-progress: false
-
 jobs:
   gemini-agent:
     # Trigger when labeled 'agent:gemini', commented with '@gemini', or dispatched manually
@@ -42,6 +36,11 @@ jobs:
         )
       ) ||
       (github.event_name == 'issues' && github.event.label.name == 'agent:gemini')
+    # One run per issue at a time: two concurrent runs on the same issue would
+    # race on the fixed branch name (and waste model spend).
+    concurrency:
+      group: gemini-agent-${{ github.event.inputs.issue_number || github.event.issue.number }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -135,7 +134,7 @@ jobs:
 
       - name: Refuse to open an empty PR
         env:
-          GH_TOKEN: ${{ secrets.AGENT_PR_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUM: ${{ steps.prompt.outputs.issue_num }}
           RUN_URL: >-
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
