@@ -83,6 +83,7 @@ jobs:
   pytest:
     needs: [changes, cheap-checks]
     if: >-
+      !cancelled() &&
       needs.cheap-checks.result == 'success' &&
       needs.changes.outputs.light_diff != 'true' &&
       (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
@@ -153,6 +154,7 @@ jobs:
   sonar:
     needs: [changes, cheap-checks, pytest]
     if: >-
+      !cancelled() &&
       needs.cheap-checks.result == 'success' &&
       (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
       github.actor != 'dependabot[bot]' && (
@@ -166,11 +168,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # SonarCloud wants full history for accurate new-code analysis
-      - uses: actions/setup-python@v7
+      - uses: actions/download-artifact@v5
         with:
-          python-version: "3.12"
-      - run: pip install -e ".[dev]"
-      - run: pytest --cov --cov-report=xml
+          name: coverage
       - name: SonarQube Scan
         # SonarCloud's free plan only analyzes the default branch and PRs, not
         # arbitrary feature-branch pushes; with sonar.qualitygate.wait=true,
@@ -197,7 +197,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   test:
-    needs: [cheap-checks, pytest]
+    needs: [changes, cheap-checks, pytest]
     if: always()
     runs-on: ubuntu-latest
     permissions:
