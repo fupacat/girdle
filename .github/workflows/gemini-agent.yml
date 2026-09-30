@@ -34,8 +34,8 @@ jobs:
       issue_num: ${{ steps.prompt.outputs.issue_num }}
       checks: ${{ steps.hygiene.outputs.checks }}
       has_changes: ${{ steps.patch.outputs.has_changes }}
-      failure_kind: ${{ steps.classify.outputs.kind }}
-      failure_error: ${{ steps.classify.outputs.error }}
+      failure_kind: ${{ steps.classify.outputs.kind || steps.silent.outputs.kind }}
+      failure_error: ${{ steps.classify.outputs.error || steps.silent.outputs.error }}
     # Trigger when labeled 'agent:gemini', commented with '@gemini', or
     # dispatched manually. The text the model reads must come from a trusted
     # person: for the comment trigger both the commenter and the issue author
@@ -196,6 +196,14 @@ jobs:
           else
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
           fi
+
+      # aider prints a provider error (bad model id, exhausted credits, rate
+      # limit) and still exits 0, so with nothing produced check its output and
+      # fail here with a real explanation, not "no file changes".
+      - name: Fail on a silent model error
+        id: silent
+        if: steps.patch.outputs.has_changes == 'false'
+        run: bash .github/scripts/classify-agent-failure.sh --silent
 
       - name: Upload patch
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4

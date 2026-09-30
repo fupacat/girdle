@@ -32,5 +32,17 @@ classify_failure_log() {
     'rate.?limit|too many requests|"code": ?429|status ?code: ?429|error code: ?429'; then
     KIND=rate
   fi
-  ERR=$(grep -m1 -iE 'error|exception' "$file" | clean_line || true)
+  # The first error-looking line plus the next one (aider prints the provider's
+  # JSON message on the following line), with the OpenRouter user id scrubbed.
+  ERR=$(awk 'tolower($0) ~ /error|exception/ { print; if ((getline nxt) > 0) print nxt; exit }' \
+    "$file" | tr '\n' ' ' | sed 's/"user_id": *"[^"]*"//g' | clean_line || true)
+}
+
+# has_model_error FILE: true when the model step's output shows the model
+# provider rejecting or failing a call (aider prints these and still exits 0,
+# so a bad model id, an exhausted credit balance or a rate limit otherwise
+# looks like "the agent changed nothing").
+has_model_error() {
+  [ -f "$1" ] && grep -qiE \
+    'litellm\.[a-z]*error|openrouterexception|insufficient credits|key limit exceeded|too many requests' "$1"
 }

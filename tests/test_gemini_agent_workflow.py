@@ -74,8 +74,18 @@ def test_failure_is_classified_in_the_agent_job_not_from_the_api_log() -> None:
         assert "steps.aider.outcome == 'failure'" in classify["if"]
         assert "classify-agent-failure.sh" in classify["run"]
         outputs = workflow["jobs"][job]["outputs"]
-        assert outputs["failure_kind"] == "${{ steps.classify.outputs.kind }}"
-        assert outputs["failure_error"] == "${{ steps.classify.outputs.error }}"
+        assert outputs["failure_kind"] == (
+            "${{ steps.classify.outputs.kind || steps.silent.outputs.kind }}"
+        )
+        assert outputs["failure_error"] == (
+            "${{ steps.classify.outputs.error || steps.silent.outputs.error }}"
+        )
+        # aider exits 0 on a provider error (bad model id, 402, 429): with nothing
+        # produced, the output is checked and the job fails with a real reason.
+        silent = next(s for s in steps if s.get("id") == "silent")
+        assert silent["if"] == "steps.patch.outputs.has_changes == 'false'"
+        assert "classify-agent-failure.sh" in silent["run"] and "--silent" in silent["run"]
+        assert steps.index(silent) > steps.index(next(s for s in steps if s.get("id") == "patch"))
         assert report["env"]["FAILURE_KIND"] == "${{ needs." + job + ".outputs.failure_kind }}"
         assert report["env"]["FAILURE_ERROR"] == "${{ needs." + job + ".outputs.failure_error }}"
 
@@ -115,3 +125,16 @@ def test_aider_is_only_given_flags_it_accepts() -> None:
                 invocation = run[run.index("aider \\"):]
                 used = set(re.findall(r"(?<![\w-])--[a-z][a-z-]*", invocation))
                 assert used <= AIDER_FLAGS, f"{path}: {sorted(used - AIDER_FLAGS)}"
+
+
+def test_silent_mode_fails_only_when_the_output_shows_a_provider_error() -> None:
+    script = Path(".github/scripts/classify-agent-failure.sh").read_text(encoding="utf-8")
+    lib = Path(".github/scripts/agent-failure-lib.sh").read_text(encoding="utf-8")
+
+    assert "--silent" in script and "has_model_error" in script
+    assert "exit 1" in script  # the job must fail so the reporter explains it
+    # A run that simply changed nothing must not be turned into a failure.
+    assert '[ "$silent" -eq 1 ] && ! has_model_error "$log"' in script
+    assert "litellm" in lib and "openrouterexception" in lib
+    # The OpenRouter user id is scrubbed from the posted error text.
+    assert "user_id" in lib
