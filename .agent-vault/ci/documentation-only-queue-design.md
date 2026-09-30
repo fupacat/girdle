@@ -96,8 +96,12 @@ gap above was found. Current shape:
   `-files ~= ^(?!(\.agent-vault/|.*\.md$|\.github/workflows/|\.mergify\.yml$)).*$`;
   `queue development PRs` gets the complementary
   `files ~= ^(?!...).*$` condition (at least one file outside all light
-  patterns) so the two rules are mutually exclusive - no PR can match
-  both, and no PR (light, mixed-light, or code) matches neither.
+  patterns) so the two rules are mutually exclusive - no non-empty PR can
+  match both or neither. Both rules also require `"#files>=1"` (the
+  negated `-files ~=` light condition is vacuously true for a zero-file
+  diff, which let plan-only PRs fall into `light`, #152) and
+  `"#approved-reviews-by>=1"` at queue *entry*, so unapproved PRs no longer
+  spawn speculative queue draft PRs; empty-diff PRs are intentionally never queued.
 - `ci.yml`: `changes` job (pull_request-only) diffs `HEAD^1`..`HEAD`
   (Gitar later changed this from the original `base.sha`/`head.sha`
   approach - functionally equivalent, verified the substitution wasn't a
