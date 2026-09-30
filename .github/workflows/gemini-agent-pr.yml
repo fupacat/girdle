@@ -272,7 +272,8 @@ jobs:
           # that is not an edit the agent made, so snapshot the state after the
           # fixers and restore it once the checks have run.
           cp .git/index "$RUNNER_TEMP/snapshot.index"
-          snapshot=$(GIT_INDEX_FILE="$RUNNER_TEMP/snapshot.index" sh -c 'git add -A && git write-tree')
+          snapshot=$(GIT_INDEX_FILE="$RUNNER_TEMP/snapshot.index" \
+            sh -c 'git add -A && git write-tree')
           if ruff check . && yamllint . && girdle index . --check AGENTS.md \
             && girdle notes check .; then
             echo "checks=passing" >> "$GITHUB_OUTPUT"
