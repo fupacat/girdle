@@ -116,9 +116,10 @@ repo; re-enabled 2026-09-30). Draft versus ready is the phase signal in the
 staged checks/review/repair pipeline (see the
 `staged-pr-pipeline-checks-review-repair` decision note): Gitar reviews
 only ready PRs, so it never reviews a Copilot PR mid-work or a Mergify
-`mergify/merge-queue/*` speculative draft. No queue merge condition may
-therefore depend on a `Gitar` check being present on a draft (the `light`
-queue's `check-success=Gitar` was removed for exactly that reason).
+`mergify/merge-queue/*` speculative draft. The `light` queue nevertheless
+still has an explicit `check-success=Gitar` merge condition; it was not
+removed. Do not infer from the draft-skipping setting that Gitar is absent
+from that queue's merge gate.
 
 ## Consequences
 
