@@ -93,8 +93,13 @@ def test_ci_workflow_uses_pr_scoped_concurrency_and_fast_checks() -> None:
     assert jobs["test"]["needs"] == ["changes", "cheap-checks", "pytest", "sonar"]
     assert jobs["test"]["if"] == "always()"
     pytest_gate = next(
-        step for step in jobs["test"]["steps"] if step["name"] == "pytest must pass or be skipped for light diffs"
+        step
+        for step in jobs["test"]["steps"]
+        if step["name"] == "pytest must pass or be skipped for light diffs"
     )
     pytest_gate_if = " ".join(pytest_gate["if"].split())
     assert "needs.pytest.result != 'success'" in pytest_gate_if
-    assert "needs.pytest.result != 'skipped' || needs.changes.outputs.light_diff != 'true'" in pytest_gate_if
+    assert (
+        "needs.pytest.result != 'skipped' || "
+        "needs.changes.outputs.light_diff != 'true'"
+    ) in pytest_gate_if
