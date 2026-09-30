@@ -61,7 +61,9 @@ duplication tool - it's additive to SonarCloud, not a replacement for it.
    merged by Mergify.
 1. **Everything else** (human PRs, Copilot coding-agent PRs, agent-authored
    PRs like this session's own `ci/*`/`docs/*` branches) → Gitar reviews
-   and approves (Copilot as backup if Gitar is somehow unavailable) →
+   and approves (Copilot's reviewer is manual-only; the automatic "Copilot
+   review for default branch" ruleset was disabled 2026-09-30 because it
+   duplicated Gitar, re-ran on every push, and burned quota) →
    `default` queue → merged by Mergify.
 
 GitHub's native "Allow auto-merge" repo setting is explicitly disabled
