@@ -189,11 +189,13 @@ jobs:
       - name: cheap checks must pass
         if: needs.cheap-checks.result != 'success'
         run: exit 1
-      - name: pytest must pass or be skipped for light diffs
+      - name: pytest must pass or be skipped for light diffs or drafts
         if: >-
           always() &&
           needs.pytest.result != 'success' &&
-          (needs.pytest.result != 'skipped' || needs.changes.outputs.light_diff != 'true')
+          (needs.pytest.result != 'skipped' ||
+            (needs.changes.outputs.light_diff != 'true' &&
+              (github.event_name != 'pull_request' || github.event.pull_request.draft == false)))
         run: exit 1
 
   pages:
