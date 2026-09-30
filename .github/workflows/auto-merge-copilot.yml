@@ -64,7 +64,26 @@ jobs:
       - name: Mark ready for review
         if: github.event.pull_request.draft == true
         run: |
+          set -euo pipefail
+
           pr_number="${{ github.event.pull_request.number }}"
+          pr_json=$(gh pr view "$pr_number" --json state,changedFiles,commits)
+          pr_state=$(jq -r '.state' <<<"$pr_json")
+          changed_files=$(jq -r '.changedFiles // 0' <<<"$pr_json")
+          commit_count=$(jq -r '.commits | length' <<<"$pr_json")
+          first_headline=$(jq -r '.commits[0].messageHeadline // ""' <<<"$pr_json")
+          initial_plan_pattern='^initial[[:space:]]+plan([[:space:]:-].*)?$'
+
+          if [ "$changed_files" -eq 0 ]; then
+            if [ "$commit_count" -eq 1 ] \
+              && printf '%s' "$first_headline" | grep -qiE "$initial_plan_pattern"; then
+              echo "Skipping PR #$pr_number: only initial-plan commit and 0 changed files."
+            else
+              echo "Skipping PR #$pr_number: 0 changed files."
+            fi
+            exit 0
+          fi
+
           if ! gh pr ready "$pr_number"; then
             pr_state=$(gh pr view "$pr_number" --json state -q '.state' || true)
             if [ "$pr_state" = "CLOSED" ] || [ "$pr_state" = "MERGED" ]; then
@@ -115,7 +134,27 @@ jobs:
                 echo "Skipping PR #$pr (base=$base_ref, head owner=$head_owner)"
                 continue
               fi
-              last_commit_date=$(gh pr view "$pr" --json commits -q '.commits[-1].committedDate')
+              pr_json=$(gh pr view "$pr" --json changedFiles,commits)
+              changed_files=$(jq -r '.changedFiles // 0' <<<"$pr_json")
+              commit_count=$(jq -r '.commits | length' <<<"$pr_json")
+              first_headline=$(jq -r '.commits[0].messageHeadline // ""' <<<"$pr_json")
+              initial_plan_pattern='^initial[[:space:]]+plan([[:space:]:-].*)?$'
+              last_commit_date=$(jq -r '.commits[-1].committedDate // empty' <<<"$pr_json")
+
+              if [ "$changed_files" -eq 0 ]; then
+                if [ "$commit_count" -eq 1 ] \
+                  && printf '%s' "$first_headline" | grep -qiE "$initial_plan_pattern"; then
+                  echo "Skipping PR #$pr: only initial-plan commit and 0 changed files."
+                else
+                  echo "Skipping PR #$pr: 0 changed files."
+                fi
+                continue
+              fi
+              if [ -z "$last_commit_date" ]; then
+                echo "Skipping PR #$pr: no commits found."
+                continue
+              fi
+
               commit_epoch=$(date -u -d "$last_commit_date" +%s)
               age_minutes=$(( (now_epoch - commit_epoch) / 60 ))
 
