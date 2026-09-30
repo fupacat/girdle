@@ -132,6 +132,8 @@ pull_request_rules:
       - author!=dependabot[bot]
       - -conflict
       - -draft
+      - "#approved-reviews-by>=1"
+      - "#files>=1"
       # Excludes "light" PRs (routed to the light queue below) - docs
       # (.agent-vault/, *.md) or CI config (.github/workflows/,
       # .mergify.yml) only. Any changed file outside those means this
@@ -163,6 +165,8 @@ pull_request_rules:
       - author!=dependabot[bot]
       - -conflict
       - -draft
+      - "#approved-reviews-by>=1"
+      - "#files>=1"
       - -files ~= ^(?!(\.agent-vault/|.*\.md$|\.github/workflows/(?!ci\.yml$)|\.mergify\.yml$)).*$
     actions:
       queue:
