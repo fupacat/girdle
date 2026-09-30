@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: f4a0caa6ef8643452937c560921c9c66ad63af2db169672d7665cca429285410
+    hash: a9acbcfaaaa586012ce0d5d0f8251578866b19dae4c6c23e8252a6045a773e28
 stale: false
 ---
 
@@ -103,13 +103,16 @@ gap above was found. Current shape:
   [[.agent-vault/context/vault-freshness-redesign|vault-freshness-redesign]]'s
   PR #128 incident) and outputs `light_diff`. The `test` job depends on
   it (`if: always()`, so a skipped/failed detection defaults to running
-  everything) and gates the `pytest` step and the `SonarQube Scan` step
-  on `light_diff != 'true'`. `ruff`/`mdformat`/`yamllint`/index/
-  vault-notes checks stay unconditional - they're already the cheap part,
-  scan the whole tree regardless of diff size, and (`yamllint`
-  specifically) are exactly what validates a CI-config-only PR's own
-  changed files. `test`'s own check-success is still meaningful for
-  light PRs since those checks still ran.
+  everything) and gates only the `pytest` step on
+  `light_diff != 'true'`. `SonarQube Scan` now runs for all
+  non-Dependabot PRs (including light diffs) so
+  `SonarCloud Code Analysis` always reports on protected-branch PRs.
+  `ruff`/`mdformat`/`yamllint`/index/vault-notes checks stay
+  unconditional - they're already the cheap part, scan the whole tree
+  regardless of diff size, and (`yamllint` specifically) are exactly
+  what validates a CI-config-only PR's own changed files. `test`'s own
+  check-success is still meaningful for light PRs since those checks
+  still ran.
 
 Resolved the two "does this need a new queue" and "does the branch
 ruleset block this" open questions above: yes, a fourth queue is the
@@ -143,7 +146,7 @@ rather than two mutually-exclusive ones. Also confirmed
 `check-success=test` should stay required even for CI-config-only PRs -
 unlike `pytest`, the `test` job's `yamllint` step is exactly what
 validates the YAML files such a PR touches, so it still carries real
-signal even with `pytest`/SonarQube skipped.
+signal even with `pytest` skipped.
 
 Also verified: `yamllint`/`ruff`/`mdformat` all pass, `pytest` passes
 (397 tests), and the light-file regex (`^(\.agent-vault/|.*\.md$|\.github/workflows/|\.mergify\.yml$)`)
