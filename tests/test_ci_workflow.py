@@ -26,7 +26,7 @@ def test_ci_runs_cheap_checks_before_expensive_and_skips_draft_prs() -> None:
     assert jobs["pytest"]["needs"] == ["changes", "cheap-checks"]
     assert "github.event.pull_request.draft == false" in jobs["pytest"]["if"]
     assert jobs["sonar"]["needs"] == ["changes", "cheap-checks", "pytest"]
-    assert "github.event.pull_request.draft == false" in jobs["sonar"]["if"]
+    assert "needs.pytest.result == 'success'" in jobs["sonar"]["if"]
 
     assert jobs["test"]["if"] == "always()"
-    assert jobs["test"]["needs"] == ["cheap-checks", "pytest"]
+    assert jobs["test"]["needs"] == ["changes", "cheap-checks", "pytest"]

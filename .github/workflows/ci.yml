@@ -8,12 +8,13 @@ on:
   push:
     branches: [master]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
   changes:
     # Detects a "light" PR (every changed file under .agent-vault/,
     # ending in .md, under .github/workflows/, or .mergify.yml itself) so
-    # the test job below can skip pytest/SonarQube for it - see
+    # the pytest job below can skip for it - see
     # .agent-vault/ci/documentation-only-queue-design.md. Originally
     # docs-only; broadened to CI config too since neither pytest nor
     # SonarCloud (sonar.sources=src/sonar.tests=tests) can find anything
@@ -43,6 +44,8 @@ jobs:
     needs: changes
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -81,10 +84,13 @@ jobs:
   pytest:
     needs: [changes, cheap-checks]
     if: >-
+      !cancelled() &&
       needs.cheap-checks.result == 'success' &&
       needs.changes.outputs.light_diff != 'true' &&
       (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -146,59 +152,25 @@ jobs:
           python -m pip install --quiet mergify-cli
           mergify ci junit-process --test-exit-code "${{ steps.tests.outputs.exit_code }}" junit.xml
 
-  test:
-    needs: [cheap-checks, pytest]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Report required CI status
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          cheap_result="${{ needs.cheap-checks.result }}"
-          pytest_result="${{ needs.pytest.result }}"
-
-          if [ "$cheap_result" = "failure" ] || [ "$cheap_result" = "cancelled" ]; then
-            echo "cheap checks failed; skipping expensive checks." >&2
-            exit 1
-          fi
-
-          if [ "$pytest_result" = "failure" ] || [ "$pytest_result" = "cancelled" ]; then
-            echo "pytest failed." >&2
-            exit 1
-          fi
-
-          if [ "$pytest_result" = "skipped" ] \
-            && [ "${{ github.event_name }}" = "pull_request" ] \
-            && [ "${{ github.event.pull_request.draft }}" = "true" ]; then
-            echo "Draft PR: cheap checks passed and expensive checks are intentionally skipped."
-            exit 0
-          fi
-
-          if [ "$pytest_result" != "success" ] && [ "$pytest_result" != "skipped" ]; then
-            echo "pytest finished in an unexpected state: $pytest_result" >&2
-            exit 1
-          fi
-
-          echo "Required CI checks passed."
-
   sonar:
     needs: [changes, cheap-checks, pytest]
     if: >-
+      !cancelled() &&
       needs.cheap-checks.result == 'success' &&
-      needs.changes.outputs.light_diff != 'true' &&
-      (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
+      needs.pytest.result == 'success' &&
       github.actor != 'dependabot[bot]' && (
         github.event_name == 'pull_request' ||
         github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
       )
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # SonarCloud wants full history for accurate new-code analysis
       - uses: actions/download-artifact@v5
+        if: needs.pytest.result == 'success'
         with:
           name: coverage
       - name: SonarQube Scan
@@ -206,6 +178,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  test:
+    needs: [changes, cheap-checks, pytest]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: cheap checks must pass
+        if: needs.cheap-checks.result != 'success'
+        run: exit 1
+      - name: pytest must pass or be skipped for light diffs or drafts
+        if: >-
+          always() &&
+          needs.pytest.result != 'success' &&
+          (needs.pytest.result != 'skipped' ||
+            (needs.changes.outputs.light_diff != 'true' &&
+              (github.event_name != 'pull_request' || github.event.pull_request.draft == false)))
+        run: exit 1
 
   pages:
     # Publishes the HTML dashboard + a shields.io endpoint-badge JSON so the

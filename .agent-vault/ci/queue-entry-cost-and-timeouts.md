@@ -4,7 +4,7 @@ watches:
   - path: .mergify.yml
     hash: 5cb09b7babf697c61997853bb77c7b3a3fe5dcd9dfd9ffd00be42eda3a9cbc1b
   - path: .github/workflows/ci.yml
-    hash: 44df51587ab29b4b594632e8434a30ea487c278de4781ff814254e47dbdebe2f
+    hash: c1e62ce524bb40ec9a782007168f643a621c186d353878bd79065e74402a5a38
 stale: false
 ---
 
@@ -34,8 +34,9 @@ Concretely this means:
   aggregate status check over `cheap-checks` and `pytest`. `cheap-checks`
   runs the lint/format, Mergify config, structural-index, and vault-notes
   checks; `pytest` runs pytest+coverage and is skipped for light PRs and
-  drafts. For a non-draft PR with a non-light diff, the expensive pytest
-  tier runs on the PR's own branch before it can enter the queue.
+  drafts. The aggregate status accepts pytest being skipped only for light
+  diffs or draft PRs. For a non-draft PR with a non-light diff, the expensive
+  pytest tier runs on the PR's own branch before it can enter the queue.
 - SonarQube runs in a separate `sonar` job, rather than inside `test`.
   It is skipped for light PRs, drafts, and Dependabot PRs; for other PRs
   it remains a separate required check alongside the aggregate `test`
