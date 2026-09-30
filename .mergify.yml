@@ -308,9 +308,12 @@ queue_rules:
     checks_timeout: 15m
     queue_conditions:
       - author!=dependabot[bot]
+    # No check-success=Gitar here: Gitar skips draft PRs (dashboard setting)
+    # and merge_conditions are evaluated on Mergify's speculative draft, so
+    # a Gitar check never appears there and the queue times out. Gitar's
+    # approval is already covered by the approval count below.
     merge_conditions:
       - check-success=test
-      - check-success=Gitar
       - "#approved-reviews-by>=1"
 merge_queue:
   max_parallel_checks: 7

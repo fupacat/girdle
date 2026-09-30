@@ -21,11 +21,13 @@ def test_light_queue_does_not_inject_master_ruleset_sonar_gate():
     assert queue['branch_protection_injection_mode'] == 'none'
     assert queue['merge_conditions'] == [
         'check-success=test',
-        'check-success=Gitar',
         '#approved-reviews-by>=1',
     ]
+    # Gitar skips draft PRs and merge_conditions are evaluated on Mergify's
+    # speculative draft, so a `Gitar` check never appears there and the queue
+    # would time out; Gitar's approval is covered by the approval count.
     assert all(
-        'SonarCloud Code Analysis' not in condition
+        'Gitar' not in condition and 'SonarCloud Code Analysis' not in condition
         for condition in queue['merge_conditions']
     )
 
