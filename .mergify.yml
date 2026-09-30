@@ -294,20 +294,18 @@ queue_rules:
     # either), so this queue doesn't require either. Deliberately not
     # split into separate docs/ci-config queues - see the pull_request_rule
     # comment for the mutual-exclusion gap that split would reintroduce.
-    # branch_protection_injection_mode: merge (same rationale as the
-    # Dependabot queues) keeps entry cheap; the "test" job's own
-    # pytest/SonarQube steps are skipped for these diffs (see ci.yml's
-    # "changes" job), so "test" still completes quickly and its
-    # check-success is meaningful (lint/index/vault-notes checks - and
-    # yamllint specifically, which validates the CI-config files this
-    # queue exists for - still ran) without waiting on parts that can't
-    # apply.
-    branch_protection_injection_mode: merge
+    # branch_protection_injection_mode: none keeps this queue from inheriting
+    # the master ruleset's SonarCloud requirement for PRs that never run
+    # Sonar in the first place; the queue's explicit merge_conditions below
+    # are the only gate, and they still require the fast test job plus one
+    # approval.
+    branch_protection_injection_mode: none
     checks_timeout: 15m
     queue_conditions:
       - author!=dependabot[bot]
     merge_conditions:
       - check-success=test
+      - check-success=Gitar
       - "#approved-reviews-by>=1"
 merge_queue:
   max_parallel_checks: 7

@@ -11,6 +11,25 @@ def _rule_by_name(name: str) -> dict:
     return next(rule for rule in _mergify()['pull_request_rules'] if rule.get('name') == name)
 
 
+def _queue_rule_by_name(name: str) -> dict:
+    return next(rule for rule in _mergify()['queue_rules'] if rule.get('name') == name)
+
+
+def test_light_queue_does_not_inject_master_ruleset_sonar_gate():
+    queue = _queue_rule_by_name('light')
+
+    assert queue['branch_protection_injection_mode'] == 'none'
+    assert queue['merge_conditions'] == [
+        'check-success=test',
+        'check-success=Gitar',
+        '#approved-reviews-by>=1',
+    ]
+    assert all(
+        'SonarCloud Code Analysis' not in condition
+        for condition in queue['merge_conditions']
+    )
+
+
 def test_conflict_nudge_is_gated_by_label_and_marks_head_sha():
     rule = _rule_by_name('nudge Copilot when a PR goes into conflict')
 
