@@ -13,8 +13,12 @@ decision.
   `girdle notes ack <note path>`. If the change made it inaccurate, update
   the note's prose in the same commit (its hash refreshes automatically),
   then ack. Do not ack a note you have not compared against the change.
-- **`mdformat`, `ruff`, or `yamllint` fails**: run the matching hook
-  (`pre-commit run <hook> --all-files`) and commit the result.
+- **`mdformat` fails**: run `pre-commit run mdformat --all-files` and
+  commit the result.
+- **`ruff` fails**: run `ruff check --fix .`, fix any remaining
+  findings by hand, and commit.
+- **`yamllint` fails**: it never rewrites files; edit the YAML to fix
+  each rule `yamllint .` reports, then commit.
 - **`mergify config validate` fails**: fix the schema error it names; do
   not change queue behavior beyond what is needed to make it valid.
 - Before pushing any of these, run `pre-commit run --all-files` and confirm
