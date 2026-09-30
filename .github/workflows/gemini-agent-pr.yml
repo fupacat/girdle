@@ -302,7 +302,9 @@ jobs:
             fail "The Gemini agent patch no longer applies to the PR branch" \
               "(it changed while the agent ran); nothing was pushed."
           fi
-          if [ "$MERGED" = "true" ] && git diff --cached --name-only -z | xargs -0 -r grep -lE '^(<<<<<<<|>>>>>>>) ' -- 2>/dev/null | grep -q .; then
+          if [ "$MERGED" = "true" ] && \
+            git diff --cached --name-only -z | \
+              xargs -0 -r grep -lE '^(<<<<<<<|>>>>>>>) ' -- 2>/dev/null | grep -q .; then
             fail "The Gemini agent left conflict markers in the merge; nothing was pushed."
           fi
           git commit -m "fix: address request on PR #${PR_NUM} (gemini agent)"
