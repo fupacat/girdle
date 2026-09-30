@@ -286,6 +286,11 @@ queue_rules:
     # gates queue *entry*; batching only applies to PRs already queued.
     batch_size: 3
     batch_max_wait_time: "30 seconds"
+    # Explicit timeout: with none, Mergify derives an automatic one from the
+    # queue's recent CI runtime. After a run of quick light-queue merges that
+    # came out at 3m07s, and #413's speculative check timed out waiting for the
+    # SonarCloud check of a full run (~6-8 min), dequeuing a healthy PR.
+    checks_timeout: 20m
     queue_conditions:
       - author!=dependabot[bot]
 

@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 94d6c83865c57389ae3465eadb271da1dcc8ac0ed385d6a9432cc45f14438560
+    hash: 82b8bf5a624b8392e412913d73e4205e138a4d3de1df93a946ff6dee5ed9f8bc
   - path: .github/workflows/ci.yml
     hash: c1e62ce524bb40ec9a782007168f643a621c186d353878bd79065e74402a5a38
 stale: false
@@ -60,6 +60,14 @@ satisfy entry and again on Mergify's speculative batch-merge branch to
 satisfy the merge gate. SonarCloud remains the most visible instance of
 the same cross-branch duplication because it is both an explicit required
 check and an expensive tier.
+
+**Update 2026-09-30: the `default` queue now sets `checks_timeout: 20m`.** It was
+not actually unbounded: without an explicit value Mergify derives an automatic
+timeout from the queue's recent CI runtime ("automatic checks timeout of 3
+minutes 7 seconds" in a real dequeue reason). After a run of fast light-queue
+merges that was far too short for a full run, and #413's speculative check
+timed out waiting for the SonarCloud check, dequeuing a healthy PR. The text
+below is the original (superseded) analysis.
 
 **No `checks_timeout` on the `default` queue.** The `Dependabot` and
 `Dependabot-major` queue rules both set `checks_timeout: 30m`; the
@@ -159,8 +167,8 @@ first-class pattern, and adds two more worth adopting:
   been checked (the Dependabot rationale for `merge` mode was about
   secrets/permissions differing per-author, which doesn't obviously apply
   here).
-- What `checks_timeout` value the `default` queue should get, and what
-  should happen on timeout (dequeue and report, vs. retry) - not scoped.
+- What should happen on timeout (dequeue and report, vs. retry) - not scoped.
+  (The `default` queue's value is decided: 20m, see the 2026-09-30 update above.)
 - The fast/slow split has since been implemented in `ci.yml`:
   `cheap-checks` runs independently of the pytest and Sonar tiers, while
   the aggregate `test` job reports the required CI status. This makes
