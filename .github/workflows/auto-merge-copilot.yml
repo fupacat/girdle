@@ -26,6 +26,8 @@ name: Auto-merge Copilot PRs
 on:
   pull_request:
     types: [review_requested, ready_for_review, reopened]
+  push:
+    branches: [master]
   workflow_run:
     workflows: ["CI"]
     types: [completed]
@@ -35,6 +37,7 @@ on:
 
 permissions:
   pull-requests: write
+  issues: write
   contents: write
 
 jobs:
@@ -190,5 +193,96 @@ jobs:
                 echo "Failed to mark PR #$pr ready " \
                   "(state=${pr_state:-unknown})." >&2
                 exit 1
+              fi
+            done
+
+  conflict-nudge-sweep:
+    if: >-
+      github.event_name == 'push' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: auto-merge-copilot-conflict-nudge-sweep
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Nudge conflicted Copilot PRs per master SHA
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "COPILOT_ASSIGN_TOKEN is not configured; skipping conflict-nudge sweep."
+            exit 0
+          fi
+
+          repo_owner="${GH_REPO%%/*}"
+          master_sha=$(gh api "repos/$GH_REPO/git/ref/heads/master" -q '.object.sha')
+          marker="<!-- conflict-nudge:${master_sha} -->"
+
+          gh pr list --state open --author Copilot --limit 500 \
+            --json number,isDraft,baseRefName,headRefName,headRepositoryOwner \
+            -q '.[]
+              | select(.isDraft == false)
+              | select(.baseRefName == "master")
+              | select(.headRefName | startswith("copilot/"))
+              | [.number, .headRepositoryOwner.login]
+              | @tsv' \
+          | while IFS=$'\t' read -r pr head_owner; do
+              if [ "$head_owner" != "$repo_owner" ]; then
+                echo "Skipping PR #$pr: head owner is $head_owner."
+                continue
+              fi
+
+              pr_api=$(gh api "repos/$GH_REPO/pulls/$pr")
+              labels=$(jq -r '.labels[].name // empty' <<<"$pr_api")
+              if printf '%s\n' "$labels" | grep -qx 'manual'; then
+                echo "Skipping PR #$pr: manual label applied."
+                continue
+              fi
+
+              mergeable="null"
+              mergeable_state="unknown"
+              for i in {1..5}; do
+                pr_api=$(gh api "repos/$GH_REPO/pulls/$pr")
+                mergeable=$(jq -r '.mergeable' <<<"$pr_api")
+                mergeable_state=$(jq -r '.mergeable_state // ""' <<<"$pr_api")
+                if [ "$mergeable" != "null" ] && [ "$mergeable_state" != "unknown" ]; then
+                  break
+                fi
+                echo "Waiting for mergeability calculation on PR #$pr (attempt $i/5)..."
+                sleep 3
+              done
+
+              if [ "$mergeable" = "null" ] || [ "$mergeable_state" = "unknown" ]; then
+                echo "Skipping PR #$pr: mergeability calculation timed out."
+                continue
+              fi
+
+              if [ "$mergeable" = "false" ] || [ "$mergeable_state" = "dirty" ]; then
+                has_marker=$(gh api --paginate "repos/$GH_REPO/issues/$pr/comments?per_page=100" \
+                  | jq -s --arg marker "$marker" \
+                    '[.[][] | select(.body | contains($marker))] | length')
+                if [ "$has_marker" -eq 0 ]; then
+                  comment_body=$(printf '%s\n%s\n%s' \
+                    '@copilot This PR has a merge conflict with `master`. Please rebase' \
+                    'onto the latest `master` and resolve the conflicting changes.' \
+                    "${marker}")
+                  gh api "repos/$GH_REPO/issues/$pr/comments" -X POST \
+                    -f body="$comment_body" >/dev/null
+                  echo "Posted conflict nudge for PR #$pr at master $master_sha."
+                else
+                  echo "PR #$pr already has a conflict nudge for master $master_sha."
+                fi
+                gh api "repos/$GH_REPO/issues/$pr/labels" -X POST \
+                  -f labels[]=conflict-nudged >/dev/null
+                continue
+              fi
+
+              if printf '%s\n' "$labels" | grep -qx 'conflict-nudged'; then
+                gh api "repos/$GH_REPO/issues/$pr/labels/conflict-nudged" -X DELETE >/dev/null
+                echo "Removed conflict-nudged label from PR #$pr."
               fi
             done
