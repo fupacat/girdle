@@ -186,9 +186,10 @@ pull_request_rules:
     # reaches Copilot. TODO(backlog): replace with a dedicated automation
     # user account (e.g. girdle-automation) once one is provisioned and
     # authorized in Mergify, so these nudges don't read as Eric personally
-    # asking each time - deferred for now. NOTE: PRs already labelled
-    # conflict-nudged (e.g. #93/#98/#100) must have that label removed
-    # manually to be re-nudged under this account.
+    # asking each time - deferred for now. A label prevents duplicate nudges
+    # while the PR remains conflicted; it is cleared after the conflict is
+    # resolved so a later re-conflict can trigger another nudge. The hidden
+    # marker records the head commit SHA for context.
     conditions:
       - conflict
       - author=Copilot
@@ -198,20 +199,18 @@ pull_request_rules:
     actions:
       comment:
         bot_account: fupacat
-        message: >-
+        message: |-
           @copilot This PR has a merge conflict with `master`. Please rebase
           onto the latest `master` and resolve the conflicting changes.
+          <!-- conflict-nudge:{{head.sha}} -->
       label:
         add:
           - conflict-nudged
 
   - name: clear conflict-nudged label once resolved
-    # Lets a PR get re-nudged if it drifts into conflict again later -
-    # no -draft here, clearing a stale label is harmless regardless of
-    # draft state.
     conditions:
-      - -conflict
       - label=conflict-nudged
+      - -conflict
     actions:
       label:
         remove:
@@ -295,20 +294,18 @@ queue_rules:
     # either), so this queue doesn't require either. Deliberately not
     # split into separate docs/ci-config queues - see the pull_request_rule
     # comment for the mutual-exclusion gap that split would reintroduce.
-    # branch_protection_injection_mode: merge (same rationale as the
-    # Dependabot queues) keeps entry cheap; the "test" job's own
-    # pytest/SonarQube steps are skipped for these diffs (see ci.yml's
-    # "changes" job), so "test" still completes quickly and its
-    # check-success is meaningful (lint/index/vault-notes checks - and
-    # yamllint specifically, which validates the CI-config files this
-    # queue exists for - still ran) without waiting on parts that can't
-    # apply.
-    branch_protection_injection_mode: merge
+    # branch_protection_injection_mode: none keeps this queue from inheriting
+    # impossible queue-only requirements from master's ruleset; queue
+    # admission/merge is gated only by the explicit merge_conditions below.
+    # CI still reports SonarCloud on PRs so the protected-branch required
+    # check is satisfied when GitHub performs the final merge.
+    branch_protection_injection_mode: none
     checks_timeout: 15m
     queue_conditions:
       - author!=dependabot[bot]
     merge_conditions:
       - check-success=test
+      - check-success=Gitar
       - "#approved-reviews-by>=1"
 merge_queue:
   max_parallel_checks: 7

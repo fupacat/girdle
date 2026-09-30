@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 01e559e237ffd45ccb60518439c0f7e77c836f59ebe6573e3da76913ecd599b0
+    hash: 18277321e45f38ea2ecc4e0ff452ab445fda341663c3b1487d94c3e0c81d9aa9
 stale: false
 ---
 
@@ -175,13 +175,15 @@ Mergify's queue.
   `conflict` + `author=Copilot` reacts within seconds rather than needing a
   polling GitHub Actions workflow - it comments `@copilot` on the affected
   PR (Copilot's coding agent watches for mentions on PRs it authored and
-  pushes fix commits in response, including conflict resolution) and adds
-  a `conflict-nudged` label so the rule doesn't re-fire on every subsequent
-  webhook while still conflicting; a second rule clears the label once
-  `conflict` goes false again, so a future conflict can re-trigger the
-  nudge. The GitHub author `login` for these PRs is `Copilot` (a Bot-type
-  user) - not `copilot-swe-agent[bot]` or `app/copilot-swe-agent`, both of
-  which Mergify's `author=` condition rejects.
+  pushes fix commits in response, including conflict resolution). To avoid
+  repeated nudges while still conflicted but allow a later re-conflict to
+  nudge again, the rule adds a `conflict-nudged` label with the comment and
+  only posts when that label is absent; a separate rule clears the label
+  once the conflict is resolved. The hidden comment marker records the head
+  commit SHA (`<!-- conflict-nudge:{{head.sha}} -->`) for context. The GitHub author `login` for these PRs is
+  `Copilot` (a Bot-type user) - not `copilot-swe-agent[bot]` or
+  `app/copilot-swe-agent`, both of which Mergify's `author=` condition
+  rejects.
 - The `@copilot` nudge comment above initially posted as `mergify[bot]` and
   was silently ignored - confirmed live on PRs #93/#98/#100, 16+ minutes
   with zero response, versus ~3.5 minutes for an identical mention posted
