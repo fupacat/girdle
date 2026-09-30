@@ -10,6 +10,7 @@
 .agent-vault/decisions/gitar-as-sole-auto-fixer.md | decision | stale=False | watches: -
 .agent-vault/decisions/merge-pipeline-tool-roles-and-paths.md | decision | stale=False | watches: -
 .agent-vault/decisions/minimal-discrete-pr-policy.md | decision | stale=False | watches: -
+.agent-vault/decisions/staged-pr-pipeline-checks-review-repair.md | decision | stale=False | watches: -
 .agent-vault/decisions/workstream-visibility-labels-and-project.md | decision | stale=False | watches: -
 .agent-vault/context/agent-sandbox-bootstrap-design.md | context | stale=False | watches: src/girdle/hygiene.py#check_agent_sandbox_bootstrap
 .agent-vault/context/audit-design.md | context | stale=False | watches: src/girdle/audit.py#run_audit
