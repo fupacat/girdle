@@ -179,13 +179,14 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           name: agent-patch
-          path: patch
+          path: ${{ runner.temp }}/patch
 
       - name: Validate the patch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUM: ${{ needs.gemini-agent.outputs.issue_num }}
           HAS_CHANGES: ${{ needs.gemini-agent.outputs.has_changes }}
+          PATCH: ${{ runner.temp }}/patch/agent.patch
           RUN_URL: >-
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -195,21 +196,21 @@ jobs:
             echo "$msg"
             exit 1
           }
-          if [ "$HAS_CHANGES" != "true" ] || [ ! -s patch/agent.patch ]; then
+          if [ "$HAS_CHANGES" != "true" ] || [ ! -s "$PATCH" ]; then
             fail "The Gemini agent run produced no file changes (the work may" \
               "already exist on the default branch), so no PR was opened."
           fi
-          if [ "$(wc -c < patch/agent.patch)" -gt 1000000 ]; then
+          if [ "$(wc -c < "$PATCH")" -gt 1000000 ]; then
             fail "The Gemini agent patch is larger than 1 MB, so no PR was opened."
           fi
           # Headers (including renames and copies) that name workflow files.
           hdr='^(diff --git|---|\+\+\+|rename (from|to)|copy (from|to)) '
-          if grep -E "$hdr" patch/agent.patch | grep -q '\.github/workflows/'; then
+          if grep -E "$hdr" "$PATCH" | grep -q '\.github/workflows/'; then
             fail "The Gemini agent patch changes .github/workflows/, which" \
               "agents may not do; no PR was opened."
           fi
-          git apply --check patch/agent.patch
-          git apply patch/agent.patch
+          git apply --check "$PATCH"
+          git apply "$PATCH"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1  # v8.1.1
