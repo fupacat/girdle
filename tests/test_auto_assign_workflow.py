@@ -90,7 +90,7 @@ def test_ci_workflow_uses_pr_scoped_concurrency_and_fast_checks() -> None:
     assert "needs.cheap-checks.result == 'success'" in sonar_if
     assert "github.event.pull_request.draft == false" in sonar_if
 
-    assert jobs["test"]["needs"] == ["cheap-checks", "pytest"]
+    assert jobs["test"]["needs"] == ["changes", "cheap-checks", "pytest"]
     assert jobs["test"]["if"] == "always()"
     pytest_gate = next(
         step

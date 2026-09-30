@@ -83,7 +83,6 @@ jobs:
   pytest:
     needs: [changes, cheap-checks]
     if: >-
-      !cancelled() &&
       needs.cheap-checks.result == 'success' &&
       needs.changes.outputs.light_diff != 'true' &&
       (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
@@ -154,8 +153,10 @@ jobs:
   sonar:
     needs: [changes, cheap-checks, pytest]
     if: >-
-      !cancelled() &&
+      always() &&
       needs.cheap-checks.result == 'success' &&
+      needs.pytest.result != 'failure' &&
+      needs.pytest.result != 'cancelled' &&
       (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
       github.actor != 'dependabot[bot]' && (
         github.event_name == 'pull_request' ||
@@ -169,28 +170,10 @@ jobs:
         with:
           fetch-depth: 0  # SonarCloud wants full history for accurate new-code analysis
       - uses: actions/download-artifact@v5
+        if: needs.pytest.result == 'success'
         with:
           name: coverage
       - name: SonarQube Scan
-        # SonarCloud's free plan only analyzes the default branch and PRs, not
-        # arbitrary feature-branch pushes; with sonar.qualitygate.wait=true,
-        # attempting the latter fails hard ("Not authorized or project not
-        # found") instead of silently no-op'ing, so skip it here.
-        #
-        # GitHub also withholds repo secrets (SONAR_TOKEN included) from
-        # workflow runs triggered by Dependabot PRs as a security measure -
-        # the token would be blank there regardless of the branch/event
-        # check above, so skip explicitly rather than fail on bad auth.
-        #
-        # Runs for all non-Dependabot PRs (including "light"
-        # docs/CI-config-only diffs) so the required
-        # `SonarCloud Code Analysis` status is always reported for
-        # branches targeting protected `master`.
-        if: >-
-          github.actor != 'dependabot[bot]' && (
-            github.event_name == 'pull_request' ||
-            github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-          )
         uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

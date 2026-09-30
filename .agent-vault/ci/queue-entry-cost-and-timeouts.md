@@ -4,7 +4,7 @@ watches:
   - path: .mergify.yml
     hash: 5cb09b7babf697c61997853bb77c7b3a3fe5dcd9dfd9ffd00be42eda3a9cbc1b
   - path: .github/workflows/ci.yml
-    hash: 586ec445d5489db9c077050d14189c6b86cb2f06a71e5abe009ffb3288416b27
+    hash: 54da86d5c66f9e8127afd474f5ea21d7d7ab636d5e8c9335e1fced4dbffeb2a6
 stale: false
 ---
 
@@ -30,30 +30,35 @@ queue rule has no explicit `merge_conditions`/`queue_conditions` beyond
 `author!=dependabot[bot]` - it's all coming from the injected ruleset).
 Concretely this means:
 
-- The single `test` job in [ci.yml](../../.github/workflows/ci.yml) -
-  ruff, mdformat, yamllint, pytest+coverage, the structural-index check,
-  the vault-notes check, and the SonarQube scan, all bundled - has to run
-  and pass on the PR's own branch *before* it can even enter the queue.
-- Then, because it's queued, Mergify re-runs the same full ruleset again
-  on the speculative batch-merge branch to test the merge itself.
-- So the heaviest checks run twice per PR that actually merges, and the
-  second run is the expensive one to hold back, not the cheap one - the
-  opposite of "streamline entry, defer expensive checks."
+- The `test` job in [ci.yml](../../.github/workflows/ci.yml) is now an
+  aggregate status check over `cheap-checks` and `pytest`. `cheap-checks`
+  runs the lint/format, Mergify config, structural-index, and vault-notes
+  checks; `pytest` runs pytest+coverage and is skipped for light PRs and
+  drafts. For a non-draft PR with a non-light diff, the expensive pytest
+  tier runs on the PR's own branch before it can enter the queue.
+- SonarQube runs in a separate `sonar` job, rather than inside `test`.
+  It is skipped for light PRs, drafts, and Dependabot PRs; for other PRs
+  it remains a separate required check alongside the aggregate `test`
+  status.
+- Then, because it's queued, Mergify re-runs the required checks again
+  on the speculative batch-merge branch to test the merge itself. Thus
+  the expensive pytest and Sonar tiers can still run on both the PR branch
+  and the speculative branch; splitting the jobs does not change the
+  queue-entry-vs-merge gating behavior.
 
-**SonarCloud's double-run is the same root cause as the first bullet, not
-a separate mechanism.** Automatic Analysis is confirmed already disabled
-(Eric), so that's ruled out. Instead: master's ruleset lists `test` and
-`SonarCloud Code Analysis` as two separate required checks
-([[.agent-vault/ci/merge-pipeline|merge-pipeline]]), and because
+**SonarCloud's double-run has the same queue-entry-vs-merge root cause,
+though it is no longer part of the `test` job.** Automatic Analysis is
+confirmed already disabled (Eric), so that's ruled out. Master's ruleset
+lists `test` and `SonarCloud Code Analysis` as two separate required checks
+([[.agent-vault/ci/merge-pipeline|merge-pipeline]]). The workflow now runs
+SonarQube in a separate `sonar` job, gated on the cheap checks and coverage
+job and skipped for light diffs, drafts, and Dependabot PRs. Because
 `default`'s injection mode gates *both* queue entry and the merge gate on
-the full ruleset, the `test` job - which embeds the blocking
-`SonarQube Scan` step (`sonar.qualitygate.wait=true`) - genuinely
-executes in full, Sonar scan included, twice per PR that merges: once on
-the PR's own branch to satisfy entry, and again on Mergify's speculative
-batch-merge branch to satisfy the merge gate. Confirms the first bullet
-rather than adding a new problem - SonarCloud is just the most visible
-instance of the same double-run, since it's both an explicit required
-check name and the most expensive step in the job.
+the full ruleset, eligible PRs run the Sonar scan on their own branch to
+satisfy entry and again on Mergify's speculative batch-merge branch to
+satisfy the merge gate. SonarCloud remains the most visible instance of
+the same cross-branch duplication because it is both an explicit required
+check and an expensive tier.
 
 **No `checks_timeout` on the `default` queue.** The `Dependabot` and
 `Dependabot-major` queue rules both set `checks_timeout: 30m`; the
@@ -155,11 +160,11 @@ first-class pattern, and adds two more worth adopting:
   here).
 - What `checks_timeout` value the `default` queue should get, and what
   should happen on timeout (dequeue and report, vs. retry) - not scoped.
-- Whether splitting `ci.yml`'s single `test` job into a fast tier
-  (lint/format/index/vault-notes) and a slower tier (pytest+coverage,
-  SonarCloud) is worth doing independently of the injection-mode
-  question, so a genuinely fast fail (e.g. a lint error) doesn't wait on
-  the slow tier either.
+- The fast/slow split has since been implemented in `ci.yml`:
+  `cheap-checks` runs independently of the pytest and Sonar tiers, while
+  the aggregate `test` job reports the required CI status. This makes
+  cheap failures fail faster, but does not by itself change the queue's
+  entry-vs-merge check injection behavior.
 
 ## Related
 
