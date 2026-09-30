@@ -17,25 +17,18 @@ name: Auto-merge Copilot PRs
 #    assigned the issue). ready_for_review is also handled so a
 #    manually-promoted PR still gets auto-merge armed.
 #
-# 2. Fallback (fallback-sweep job): the reactive path is NOT reliable on its
-#    own - confirmed live on PR #114, where Copilot's review_requested event
-#    appears in the PR timeline but no run of this workflow was ever
-#    dispatched for it (compare against CI, which fired normally in the same
-#    window - ruled out a general Actions outage). GitHub does not expose an
-#    authoritative "Copilot finished coding" event; review_requested is an
-#    inferred proxy that several different actors (CODEOWNERS auto-request,
-#    a teammate, Gitar's review flow) can also fire, and is not guaranteed
-#    to reach Actions in every case. Without a fallback, a missed event
-#    means the PR silently sits in draft until a human notices and runs
-#    `gh pr ready` by hand (documented previously on PR #92, recurred on
-#    #114). The sweep runs on a schedule, independent of any GitHub event,
-#    and promotes any Copilot draft PR whose latest commit is older than
-#    the debounce window - long enough that Copilot is very unlikely to
-#    still be actively pushing.
+# 2. CI-driven promotion (fallback-sweep job): when the repository CI run
+#    completes on the current head, promote Copilot drafts only if all required
+#    checks on that head are green, the diff is non-empty, there is no merge
+#    conflict, and the PR is not labelled manual or repair:cap. The schedule
+#    remains as a fallback for any draft PR that missed the workflow_run event.
 
 on:
   pull_request:
     types: [review_requested, ready_for_review, reopened]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch: {}
@@ -95,11 +88,9 @@ jobs:
           fi
 
   fallback-sweep:
-    # Debounce is deliberately generous (30 minutes) - promoting a PR
-    # Copilot is still actively pushing commits to risks queueing
-    # unfinished work, same risk the opened/synchronize triggers avoid
-    # above.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: >-
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'workflow_run'
     runs-on: ubuntu-latest
     concurrency:
       group: auto-merge-copilot-fallback-sweep
@@ -107,17 +98,17 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
-      DEBOUNCE_MINUTES: 30
     steps:
       - uses: actions/checkout@v7
 
-      - name: Promote stale Copilot draft PRs out of draft
+      - name: >-
+          Promote Copilot drafts only when required checks are green,
+          the diff is non-empty, and there is no conflict
         run: |
           set -euo pipefail
 
           default_branch=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name')
           repo_owner="${GH_REPO%%/*}"
-          now_epoch=$(date -u +%s)
 
           json_fields="number,author,headRefName,isDraft,baseRefName,headRepositoryOwner,title"
           jq_filter='.[]
@@ -134,12 +125,21 @@ jobs:
                 echo "Skipping PR #$pr (base=$base_ref, head owner=$head_owner)"
                 continue
               fi
-              pr_json=$(gh pr view "$pr" --json changedFiles,commits)
+
+              pr_fields=number,isDraft,baseRefName,headRepositoryOwner,mergeable,labels,commits,
+              pr_fields+=changedFiles,statusCheckRollup
+              pr_json=$(gh pr view "$pr" --json "$pr_fields")
+              label_names=$(jq -r '.labels[].name // empty' <<<"$pr_json")
+              if printf '%s\n' "$label_names" | grep -qx 'manual' || \
+                printf '%s\n' "$label_names" | grep -qx 'repair:cap'; then
+                echo "Skipping PR #$pr: label blocklist applied."
+                continue
+              fi
+
               changed_files=$(jq -r '.changedFiles // 0' <<<"$pr_json")
               commit_count=$(jq -r '.commits | length' <<<"$pr_json")
               first_headline=$(jq -r '.commits[0].messageHeadline // ""' <<<"$pr_json")
               initial_plan_pattern='^initial[[:space:]]+plan([[:space:]:-].*)?$'
-              last_commit_date=$(jq -r '.commits[-1].committedDate // empty' <<<"$pr_json")
 
               if [ "$changed_files" -eq 0 ]; then
                 if [ "$commit_count" -eq 1 ] \
@@ -150,18 +150,45 @@ jobs:
                 fi
                 continue
               fi
-              if [ -z "$last_commit_date" ]; then
-                echo "Skipping PR #$pr: no commits found."
+
+              if [ "$(jq -r '.mergeable // empty' <<<"$pr_json")" != "MERGEABLE" ]; then
+                echo "Skipping PR #$pr: merge conflict or mergeability not yet resolved."
                 continue
               fi
 
-              commit_epoch=$(date -u -d "$last_commit_date" +%s)
-              age_minutes=$(( (now_epoch - commit_epoch) / 60 ))
+              required_checks=$(jq -r '
+                .statusCheckRollup[]?
+                | [.name, .status, .conclusion]
+                | @tsv' <<<"$pr_json")
+              if [ -z "$required_checks" ]; then
+                echo "Skipping PR #$pr: no required checks reported yet."
+                continue
+              fi
 
-              if [ "$age_minutes" -ge "$DEBOUNCE_MINUTES" ]; then
-                echo "Promoting PR #$pr out of draft (last commit ${age_minutes}m ago)"
-                gh pr ready "$pr"
-              else
-                echo "Skipping PR #$pr (${age_minutes}m old, debounce ${DEBOUNCE_MINUTES}m)"
+              failed_required=0
+              while IFS=$'\t' read -r check_name check_status check_conclusion; do
+                [ -n "$check_name" ] || continue
+                if [ "$check_status" != "COMPLETED" ] || \
+                  [ "$check_conclusion" != "SUCCESS" ]; then
+                  echo "Skipping PR #$pr: required check " \
+                    "${check_name} is ${check_status}/${check_conclusion}."
+                  failed_required=1
+                  break
+                fi
+              done <<< "$required_checks"
+              if [ "$failed_required" -ne 0 ]; then
+                continue
+              fi
+
+              echo "Promoting PR #$pr out of draft"
+              if ! gh pr ready "$pr"; then
+                pr_state=$(gh pr view "$pr" --json state -q '.state' || true)
+                if [ "$pr_state" = "CLOSED" ] || [ "$pr_state" = "MERGED" ]; then
+                  echo "PR #$pr is $pr_state; skipping ready-for-review."
+                  continue
+                fi
+                echo "Failed to mark PR #$pr ready " \
+                  "(state=${pr_state:-unknown})." >&2
+                exit 1
               fi
             done
