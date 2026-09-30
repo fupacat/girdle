@@ -114,10 +114,16 @@ jobs:
           repo_owner="${GH_REPO%%/*}"
 
           json_fields="number,author,headRefName,isDraft,baseRefName,headRepositoryOwner,title"
+          json_fields+=",labels"
+          # Copilot's own PRs, plus the Gemini agent's (opened by the publisher
+          # job: a gemini/ branch AND the agent-pr label it applies).
           jq_filter='.[]
             | select(.isDraft == true)
-            | select(.author.login == "Copilot")
-            | select(.headRefName | startswith("copilot/"))
+            | select(
+                ((.author.login == "Copilot") and (.headRefName | startswith("copilot/")))
+                or ((.headRefName | startswith("gemini/"))
+                    and any(.labels[]; .name == "agent-pr"))
+              )
             | select(.title | test("^\\[WIP\\]") | not)
             | [.number, .baseRefName, .headRepositoryOwner.login]
             | @tsv'

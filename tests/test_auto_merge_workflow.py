@@ -64,3 +64,17 @@ def test_conflict_nudge_sweep_uses_master_sha_marker_and_clears_label() -> None:
     assert "@copilot This PR has a merge conflict with `master`." in run_script
     assert "labels[]=conflict-nudged" in run_script
     assert "labels/conflict-nudged\" -X DELETE" in run_script
+
+
+def test_fallback_sweep_also_promotes_labelled_gemini_agent_prs() -> None:
+    workflow = _workflow()
+    steps = workflow["jobs"]["fallback-sweep"]["steps"]
+    run_script = next(s["run"] for s in steps if "jq_filter=" in s.get("run", ""))
+
+    assert 'json_fields+=",labels"' in run_script
+    # Both conditions are required: the gemini/ branch AND the agent-pr label.
+    assert 'startswith("gemini/")' in run_script
+    assert 'any(.labels[]; .name == "agent-pr")' in run_script
+    # Copilot PRs keep their own author + branch-prefix condition.
+    assert '.author.login == "Copilot"' in run_script
+    assert 'startswith("copilot/")' in run_script
