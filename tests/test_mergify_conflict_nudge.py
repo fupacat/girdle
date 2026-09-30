@@ -30,6 +30,13 @@ def test_light_queue_does_not_inject_master_ruleset_sonar_gate():
     )
 
 
+def test_light_queue_sets_merge_bot_for_none_injection_mode():
+    queue = _queue_rule_by_name('light')
+
+    assert queue['branch_protection_injection_mode'] == 'none'
+    assert queue['merge_bot_account'] == 'fupacat'
+
+
 def test_conflict_nudge_is_gated_by_label_and_marks_head_sha():
     rule = _rule_by_name('nudge Copilot when a PR goes into conflict')
 
