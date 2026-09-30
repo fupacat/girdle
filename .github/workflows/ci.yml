@@ -1,5 +1,9 @@
 name: CI
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches: [master]
@@ -35,12 +39,8 @@ jobs:
             echo "light_diff=true" >> "$GITHUB_OUTPUT"
           fi
 
-  test:
+  cheap-checks:
     needs: changes
-    # needs.changes can be skipped (push event) or fail outright; always()
-    # keeps this job running either way - the steps below treat a missing
-    # light_diff output as "false" (run everything), which is the safe
-    # default if detection ever breaks.
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -58,9 +58,43 @@ jobs:
         run: |
           python -m pip install --quiet mergify-cli
           mergify config validate
+      - run: girdle index . --check AGENTS.md
+      - name: vault notes freshness (read-only)
+        # The pre-commit hook is the one place auto-reconcile makes sense
+        # (it can tell a note apart from the code it watches within a
+        # single commit being crafted); here there's no staged/unstaged
+        # distinction in a clean checkout, so this only ever verifies -
+        # closing the gap where a --no-verify bypass of the local hook
+        # would otherwise reach master with nothing checking it.
+        #
+        # Skipped on Mergify's speculative merge-queue branches
+        # (mergify/merge-queue/*): the hash comparison there is against
+        # the batched/rebased candidate, not any single PR's own diff, so
+        # a mismatch there can be caused entirely by another queued PR
+        # touching the same watched file - not something this PR (or a
+        # human) can fix on that branch. Every real PR branch and push to
+        # master still gets the real check; see issue #127 for the false
+        # positive this avoids and the planned diff-scoped replacement.
+        if: ${{ !startsWith(github.head_ref, 'mergify/merge-queue/') }}
+        run: girdle notes check .
+
+  pytest:
+    needs: [changes, cheap-checks]
+    if: >-
+      needs.cheap-checks.result == 'success' &&
+      needs.changes.outputs.light_diff != 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # SonarCloud wants full history for accurate new-code analysis
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
       - name: pytest
         id: tests
-        if: needs.changes.outputs.light_diff != 'true'
         env:
           MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
         # secrets.MERGIFY_TOKEN resolves to an empty string, not truly
@@ -84,6 +118,10 @@ jobs:
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
+      - uses: actions/upload-artifact@v5
+        with:
+          name: coverage
+          path: coverage.xml
       - name: Mergify CI Insights
         # Uploads JUnit results and evaluates quarantine status for flaky
         # tests, then gates the job on ITS exit code (quarantine-aware)
@@ -107,45 +145,63 @@ jobs:
           fi
           python -m pip install --quiet mergify-cli
           mergify ci junit-process --test-exit-code "${{ steps.tests.outputs.exit_code }}" junit.xml
-      - run: girdle index . --check AGENTS.md
-      - name: vault notes freshness (read-only)
-        # The pre-commit hook is the one place auto-reconcile makes sense
-        # (it can tell a note apart from the code it watches within a
-        # single commit being crafted); here there's no staged/unstaged
-        # distinction in a clean checkout, so this only ever verifies -
-        # closing the gap where a --no-verify bypass of the local hook
-        # would otherwise reach master with nothing checking it.
-        #
-        # Skipped on Mergify's speculative merge-queue branches
-        # (mergify/merge-queue/*): the hash comparison there is against
-        # the batched/rebased candidate, not any single PR's own diff, so
-        # a mismatch there can be caused entirely by another queued PR
-        # touching the same watched file - not something this PR (or a
-        # human) can fix on that branch. Every real PR branch and push to
-        # master still gets the real check; see issue #127 for the false
-        # positive this avoids and the planned diff-scoped replacement.
-        if: ${{ !startsWith(github.head_ref, 'mergify/merge-queue/') }}
-        run: girdle notes check .
+
+  test:
+    needs: [cheap-checks, pytest]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report required CI status
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cheap_result="${{ needs.cheap-checks.result }}"
+          pytest_result="${{ needs.pytest.result }}"
+
+          if [ "$cheap_result" = "failure" ] || [ "$cheap_result" = "cancelled" ]; then
+            echo "cheap checks failed; skipping expensive checks." >&2
+            exit 1
+          fi
+
+          if [ "$pytest_result" = "failure" ] || [ "$pytest_result" = "cancelled" ]; then
+            echo "pytest failed." >&2
+            exit 1
+          fi
+
+          if [ "$pytest_result" = "skipped" ] \
+            && [ "${{ github.event_name }}" = "pull_request" ] \
+            && [ "${{ github.event.pull_request.draft }}" = "true" ]; then
+            echo "Draft PR: cheap checks passed and expensive checks are intentionally skipped."
+            exit 0
+          fi
+
+          if [ "$pytest_result" != "success" ] && [ "$pytest_result" != "skipped" ]; then
+            echo "pytest finished in an unexpected state: $pytest_result" >&2
+            exit 1
+          fi
+
+          echo "Required CI checks passed."
+
+  sonar:
+    needs: [changes, cheap-checks, pytest]
+    if: >-
+      needs.cheap-checks.result == 'success' &&
+      needs.changes.outputs.light_diff != 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
+      github.actor != 'dependabot[bot]' && (
+        github.event_name == 'pull_request' ||
+        github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v5
+        with:
+          name: coverage
       - name: SonarQube Scan
-        # SonarCloud's free plan only analyzes the default branch and PRs, not
-        # arbitrary feature-branch pushes; with sonar.qualitygate.wait=true,
-        # attempting the latter fails hard ("Not authorized or project not
-        # found") instead of silently no-op'ing, so skip it here.
-        #
-        # GitHub also withholds repo secrets (SONAR_TOKEN included) from
-        # workflow runs triggered by Dependabot PRs as a security measure -
-        # the token would be blank there regardless of the branch/event
-        # check above, so skip explicitly rather than fail on bad auth.
-        #
-        # Runs for all non-Dependabot PRs (including "light"
-        # docs/CI-config-only diffs) so the required
-        # `SonarCloud Code Analysis` status is always reported for
-        # branches targeting protected `master`.
-        if: >-
-          github.actor != 'dependabot[bot]' && (
-            github.event_name == 'pull_request' ||
-            github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-          )
         uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
