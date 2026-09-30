@@ -54,6 +54,10 @@ jobs:
       - run: ruff check .
       - run: mdformat --check --wrap keep $(git ls-files '*.md')
       - run: yamllint .
+      - name: Validate Mergify configuration
+        run: |
+          python -m pip install --quiet mergify-cli
+          mergify config validate
       - name: pytest
         id: tests
         if: needs.changes.outputs.light_diff != 'true'

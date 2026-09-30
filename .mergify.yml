@@ -167,6 +167,7 @@ pull_request_rules:
     actions:
       queue:
         name: light
+        merge_bot_account: fupacat
 
   - name: nudge Copilot when a PR goes into conflict
     # Copilot's own PRs pile up behind each other and drift into conflict
