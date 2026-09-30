@@ -4,7 +4,7 @@ watches:
   - path: .github/workflows/gemini-agent.yml
     hash: 42ff82c7aaabdb970f3ee6550d650d39e1eb1cdb9a32671462e54cb46d09108e
   - path: .github/workflows/gemini-agent-pr.yml
-    hash: be18691ef0348649820c6392474babf93d3b3aaf66bc0dbec1c1c21e4067b1a7
+    hash: d0adeb0b8e4075fa9f38d3703160cdf26d011382d67059692ee019518ccae0e1
   - path: .github/scripts/report-agent-failure.sh
     hash: bc4b12791212df508b3bc75e43a8e1fc7ed9a86c655526db5f79a104ca9571e9
 stale: false
