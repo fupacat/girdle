@@ -96,10 +96,16 @@ jobs:
       base_sha: ${{ steps.sync.outputs.base_sha }}
       checks: ${{ steps.hygiene.outputs.checks }}
     steps:
-      - name: Checkout the PR branch
+      # This workflow runs on issue_comment, so it is privileged (it can read
+      # secrets). Code from the PR branch was written by an earlier model run
+      # and is untrusted: nothing from it is ever executed here. All tooling
+      # (pip install, pre-commit, girdle, aider config and instructions) comes
+      # from a checkout of the default branch; the PR branch is fetched into a
+      # separate worktree and only read and edited as files.
+      - name: Checkout trusted tooling (default branch)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
-          ref: ${{ needs.resolve.outputs.head_sha }}
+          path: trusted
           fetch-depth: 0
           persist-credentials: false
 
@@ -108,11 +114,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies and Aider
+      - name: Install tooling from the trusted checkout
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e "./trusted[dev]"
           pip install pre-commit aider-chat
+
+      - name: Fetch the PR head into a separate worktree (files only)
+        env:
+          HEAD_REF: ${{ needs.resolve.outputs.head_ref }}
+          HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
+        run: |
+          cd trusted
+          git fetch --no-tags origin "+refs/heads/${HEAD_REF}:refs/remotes/pr/head"
+          git cat-file -e "${HEAD_SHA}^{commit}"
+          git worktree add --detach ../pr "$HEAD_SHA"
 
       # Master is merged into the PR only for a real conflict. The merge is
       # attempted without committing; if it is clean it is aborted (a proactive
@@ -120,6 +136,7 @@ jobs:
       # as-is and becomes the baseline the agent's edits are diffed against.
       - name: Detect a real conflict with the base branch
         id: sync
+        working-directory: pr
         env:
           BASE_REF: ${{ needs.resolve.outputs.base_ref }}
         run: |
@@ -174,6 +191,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Run Aider with Gemini via OpenRouter
+        working-directory: pr
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MODEL_NAME: ${{ vars.GEMINI_MODEL || 'openrouter/google/gemini-2.5-pro' }}
@@ -183,15 +201,25 @@ jobs:
           while IFS= read -r f; do
             [ -n "$f" ] && args+=(--file "$f")
           done < "$RUNNER_TEMP/conflicted.txt"
-          # --yes-always confirms every prompt, so shell-command suggestions
-          # are disabled outright. No auto-commits: the final state is captured
-          # as a tree and diffed against the baseline, not as agent commits.
+          # A .aider.conf.yml or .env in the PR branch could set test/lint
+          # commands that run with the model key in the environment, so aider
+          # is pointed at empty trusted config files and given the repo rules
+          # from the trusted checkout. --yes-always confirms every prompt, so
+          # shell suggestions, auto-test and auto-lint are disabled outright.
+          # No auto-commits: the final state is captured as a tree and diffed
+          # against the baseline.
+          : > "$RUNNER_TEMP/empty.yml"
+          : > "$RUNNER_TEMP/empty.env"
           aider \
+            --config "$RUNNER_TEMP/empty.yml" \
+            --env-file "$RUNNER_TEMP/empty.env" \
             --model "$MODEL_NAME" \
-            --read GEMINI.md \
-            --read AGENTS.md \
+            --read "$GITHUB_WORKSPACE/trusted/GEMINI.md" \
+            --read "$GITHUB_WORKSPACE/trusted/AGENTS.md" \
             --message "Address this task per rules in GEMINI.md/AGENTS.md: $TASK" \
             --no-auto-commits \
+            --no-auto-lint \
+            --no-auto-test \
             --no-dirty-check \
             --no-suggest-shell-commands \
             --no-check-update \
@@ -201,12 +229,19 @@ jobs:
 
       - name: Enforce repository hygiene and formatting
         id: hygiene
+        working-directory: pr
+        env:
+          # Hooks come from the trusted config; pytest would execute the PR
+          # branch's tests (untrusted code) in a privileged job, so it is
+          # skipped here and left to CI.
+          SKIP: pytest
+          TRUSTED_CONFIG: ${{ github.workspace }}/trusted/.pre-commit-config.yaml
         run: |
           # Deterministic repairs only; stale note hashes stay red for the
           # repair path instead of being acked blindly.
           girdle index . --inject AGENTS.md
-          pre-commit run --all-files || true
-          if pre-commit run --all-files; then
+          pre-commit run --config "$TRUSTED_CONFIG" --all-files || true
+          if pre-commit run --config "$TRUSTED_CONFIG" --all-files; then
             echo "checks=passing" >> "$GITHUB_OUTPUT"
           else
             echo "checks=needs-repair" >> "$GITHUB_OUTPUT"
@@ -214,6 +249,7 @@ jobs:
 
       - name: Collect the agent's edits as a patch
         id: patch
+        working-directory: pr
         env:
           BASE_TREE: ${{ steps.sync.outputs.base_tree }}
         run: |
@@ -245,12 +281,25 @@ jobs:
       contents: read
       issues: write
     steps:
-      - name: Checkout the PR branch
+      # As in the agent job: the workspace is the trusted default branch and the
+      # PR head is a separate worktree that git merges and applies a patch to.
+      # Nothing from it is executed while the push token is in reach.
+      - name: Checkout the default branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
-          ref: ${{ needs.resolve.outputs.head_sha }}
+          path: trusted
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Fetch the PR head into a separate worktree (files only)
+        env:
+          HEAD_REF: ${{ needs.resolve.outputs.head_ref }}
+          HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
+        run: |
+          cd trusted
+          git fetch --no-tags origin "+refs/heads/${HEAD_REF}:refs/remotes/pr/head"
+          git cat-file -e "${HEAD_SHA}^{commit}"
+          git worktree add --detach ../pr "$HEAD_SHA"
 
       - name: Download patch
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
@@ -259,6 +308,7 @@ jobs:
           path: ${{ runner.temp }}/patch
 
       - name: Validate and apply the patch, then push
+        working-directory: pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
