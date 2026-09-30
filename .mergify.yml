@@ -300,6 +300,7 @@ queue_rules:
     # CI still reports SonarCloud on PRs so the protected-branch required
     # check is satisfied when GitHub performs the final merge.
     branch_protection_injection_mode: none
+    merge_bot_account: fupacat
     checks_timeout: 15m
     queue_conditions:
       - author!=dependabot[bot]
