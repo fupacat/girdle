@@ -85,6 +85,7 @@ jobs:
           fi
 
           if ! gh pr ready "$pr_number"; then
+            pr_state=$(gh pr view "$pr_number" --json state -q '.state' || true)
             if [ "$pr_state" = "CLOSED" ] || [ "$pr_state" = "MERGED" ]; then
               echo "PR #$pr_number is $pr_state; skipping ready-for-review."
               exit 0
