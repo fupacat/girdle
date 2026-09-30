@@ -43,6 +43,7 @@ def test_agent_job_is_read_only_and_does_not_persist_credentials() -> None:
     assert "permissions" not in workflow["jobs"]["agent"]  # inherits contents: read
     checkout = workflow["jobs"]["agent"]["steps"][0]
     assert checkout["with"]["persist-credentials"] is False
+    assert checkout["with"]["path"] == "trusted"
 
 
 def test_only_trusted_commenters_on_prs_reach_the_workflow() -> None:
@@ -99,3 +100,45 @@ def test_publisher_refuses_workflow_changes_and_labels_the_cycle() -> None:
     assert '"repair:$((REPAIR_N + 1))"' in publish
     assert "HEAD:refs/heads/${HEAD_REF}" in publish
     assert "--force" not in publish
+
+
+def test_privileged_jobs_never_check_out_the_pr_branch() -> None:
+    # issue_comment workflows can read secrets; the PR branch holds model-written
+    # code. No checkout step may take a ref, and the PR head only ever lives in a
+    # separate worktree that is read and edited as files.
+    workflow = _load(PR_WORKFLOW)
+    for job in ("agent", "publish"):
+        steps = workflow["jobs"][job]["steps"]
+        for step in steps:
+            if step.get("uses", "").startswith("actions/checkout@"):
+                assert "ref" not in step["with"]
+                assert step["with"]["path"] == "trusted"
+        worktree = [s for s in steps if "git worktree add --detach ../pr" in s.get("run", "")]
+        assert len(worktree) == 1
+
+
+def test_tooling_and_config_come_from_the_trusted_checkout() -> None:
+    workflow = _load(PR_WORKFLOW)
+    steps = workflow["jobs"]["agent"]["steps"]
+    install = next(s for s in steps if s.get("name", "").startswith("Install tooling"))
+    aider = next(s for s in steps if "aider \\" in s.get("run", ""))
+    hygiene = next(s for s in steps if s.get("id") == "hygiene")
+
+    assert './trusted[dev]' in install["run"]
+    # Repo-level aider config or .env could run commands with the model key.
+    for flag in ("--config", "--env-file", "--no-auto-test", "--no-auto-lint"):
+        assert flag in aider["run"]
+    assert "$GITHUB_WORKSPACE/trusted/AGENTS.md" in aider["run"]
+    # pytest would execute the PR branch's tests in the privileged job.
+    assert hygiene["env"]["SKIP"] == "pytest"
+    assert "trusted/.pre-commit-config.yaml" in hygiene["env"]["TRUSTED_CONFIG"]
+    assert hygiene["working-directory"] == "pr"
+
+
+def test_publisher_rejects_unresolved_conflict_markers() -> None:
+    workflow = _load(PR_WORKFLOW)
+    publish = next(
+        s for s in workflow["jobs"]["publish"]["steps"] if "BASE_SHA" in s.get("env", {})
+    )["run"]
+
+    assert "<<<<<<<" in publish and "conflict markers" in publish
