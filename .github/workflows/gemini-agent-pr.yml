@@ -268,12 +268,21 @@ jobs:
           girdle index . --inject AGENTS.md
           ruff check --fix . || true
           git ls-files -z '*.md' | xargs -0 -r mdformat --wrap keep || true
+          # girdle notes check writes a stale marker into a note's frontmatter;
+          # that is not an edit the agent made, so snapshot the state after the
+          # fixers and restore it once the checks have run.
+          # (Staging in the real index is fine: the patch step stages everything
+          # anyway. Do not copy .git/index instead: in this worktree .git is a
+          # pointer file, not a directory.)
+          git add -A
+          snapshot=$(git write-tree)
           if ruff check . && yamllint . && girdle index . --check AGENTS.md \
             && girdle notes check .; then
             echo "checks=passing" >> "$GITHUB_OUTPUT"
           else
             echo "checks=needs-repair" >> "$GITHUB_OUTPUT"
           fi
+          git read-tree -u --reset "$snapshot"
 
       - name: Collect the agent's edits as a patch
         id: patch

@@ -196,3 +196,15 @@ def test_aider_config_stub_is_a_yaml_mapping() -> None:
     aider = next(s for s in steps if "aider \\" in s.get("run", ""))["run"]
 
     assert "echo '{}' > \"$RUNNER_TEMP/empty.yml\"" in aider
+
+
+def test_pr_mode_hygiene_restores_the_state_after_the_checks() -> None:
+    # `girdle notes check` writes a stale marker into a note; snapshot the tree
+    # after the fixers and restore it once the read-only checks have run.
+    steps = _load(PR_WORKFLOW)["jobs"]["agent"]["steps"]
+    run = next(s for s in steps if s.get("id") == "hygiene")["run"]
+
+    assert 'snapshot=$(git write-tree)' in run
+    assert 'git read-tree -u --reset "$snapshot"' in run
+    assert run.index("snapshot=$(git write-tree)") < run.index("girdle notes check .")
+    assert run.index("girdle notes check .") < run.index('git read-tree -u --reset "$snapshot"')
