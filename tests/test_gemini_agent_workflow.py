@@ -138,3 +138,17 @@ def test_silent_mode_fails_only_when_the_output_shows_a_provider_error() -> None
     assert "litellm" in lib and "openrouterexception" in lib
     # The OpenRouter user id is scrubbed from the posted error text.
     assert "user_id" in lib
+
+
+def test_hygiene_checks_do_not_leave_note_edits_in_the_patch() -> None:
+    # `girdle notes check` rewrites `stale: false` -> `stale: true` in a stale
+    # note's frontmatter. That edit is not the agent's; on the first real task it
+    # ended up in the patch. The fixer pass skips the hooks that only check, and
+    # whatever the checks write afterwards is discarded.
+    workflow = _workflow()
+    hygiene = next(s for s in workflow["jobs"]["gemini-agent"]["steps"] if s.get("id") == "hygiene")
+    run = hygiene["run"]
+
+    assert "SKIP=pytest,girdle-index-fresh,girdle-notes-check" in run
+    assert run.rstrip().endswith("git checkout -- .")  # after the checks, nothing kept
+    assert run.index("git checkout -- .") > run.index("pre-commit run --all-files; then")
