@@ -2,9 +2,9 @@
 type: ci
 watches:
   - path: .github/workflows/gemini-agent.yml
-    hash: ef6ef016f1823f12d690668beb09485bf9b8b21f5f31f74ade58261e46897a14
+    hash: 967704e64d00c6136363a48c70de0d2896135817e503ba7f58870daaf791dab4
   - path: .github/workflows/gemini-agent-pr.yml
-    hash: 3c0d032b3e6bb84b872b2e1bf74163d6f8df12cf6c5324f5de79a7ca1104411e
+    hash: 3bb7dbb2f2d955612b0f8fe74e759d5c8cd5124a9f86c2882b6f65b7e8b67404
   - path: .github/scripts/report-agent-failure.sh
     hash: bc4b12791212df508b3bc75e43a8e1fc7ed9a86c655526db5f79a104ca9571e9
 stale: false
@@ -95,7 +95,13 @@ has the model's output on disk: the aider step tees it to a file, an
 `agent-failure-lib.sh`), and the result is exposed as the `failure_kind` and
 `failure_error` job outputs that the reporter reads. The error text is untrusted (it
 can echo model output or issue text): truncated, stripped of control characters and
-backticks, `@` defused. A failure in any other step or job is reported as a plain
+backticks, `@` defused. **aider exits 0 on a provider error** (a bad model id, exhausted credits, a rate limit:
+it prints `litellm.BadRequestError: OpenrouterException ...` and carries on), which
+made the forced bad-model run look like "the agent changed nothing". So after the
+patch step, when nothing was produced, a `--silent` classification checks the
+output for a provider error and, only then, fails the job with the real reason; a run
+that simply had nothing to change is left alone. The OpenRouter user id is scrubbed
+from the posted text. A failure in any other step or job is reported as a plain
 failure with its step name. A comment posted by `GITHUB_TOKEN` does not itself
 trigger a run. `workflow_dispatch` accepts a `model` override (also how to force a
 real model error for a test).
