@@ -120,13 +120,13 @@ jobs:
           pip install -e "./trusted[dev]"
           pip install pre-commit aider-chat
 
-      - name: Fetch the PR head into a separate worktree (files only)
+      # fetch-depth: 0 above already fetched every branch, so the PR head commit
+      # is in the object store; no separate fetch of a PR ref is made.
+      - name: Open the PR head as a separate worktree (files only)
         env:
-          HEAD_REF: ${{ needs.resolve.outputs.head_ref }}
           HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
         run: |
           cd trusted
-          git fetch --no-tags origin "+refs/heads/${HEAD_REF}:refs/remotes/pr/head"
           git cat-file -e "${HEAD_SHA}^{commit}"
           git worktree add --detach ../pr "$HEAD_SHA"
 
@@ -303,15 +303,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Fetch the PR head commit (objects only)
-        working-directory: trusted
-        env:
-          HEAD_REF: ${{ needs.resolve.outputs.head_ref }}
-          HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
-        run: |
-          git fetch --no-tags origin "+refs/heads/${HEAD_REF}:refs/remotes/pr/head"
-          git cat-file -e "${HEAD_SHA}^{commit}"
-
+      # No separate fetch of the PR ref: fetch-depth: 0 above already brought
+      # every branch's objects into the store, and the commit is verified below.
       - name: Download patch
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
@@ -352,6 +345,10 @@ jobs:
           if grep -E "$hdr" "$PATCH" | grep -q '\.github/workflows/'; then
             fail "The Gemini agent patch changes .github/workflows/, which agents" \
               "may not do; nothing was pushed."
+          fi
+          if ! git cat-file -e "${HEAD_SHA}^{commit}"; then
+            fail "The PR head commit is not in the repository any more;" \
+              "nothing was pushed."
           fi
           git config user.name "gemini-agent[bot]"
           git config user.email "gemini-agent[bot]@users.noreply.github.com"
