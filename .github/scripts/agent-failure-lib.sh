@@ -44,8 +44,11 @@ classify_failure_log() {
 # looks like "the agent changed nothing").
 has_model_error() {
   [ -f "$1" ] || return 1
-  # provider errors are printed on lines starting with litellm.<X>Error;
-  # ignore ones aider announced it would retry
-  grep -E '^(litellm\.[A-Za-z]*Error|.*OpenrouterException)' "$1" \
-    | grep -viq 'retrying'
+  # No special handling of errors aider retried: this is only asked when the
+  # run produced nothing (see classify-agent-failure.sh --silent), and a run
+  # that retried past a transient error and then produced changes never gets
+  # here. aider's "Retrying in N seconds" is also printed on its own line, not
+  # on the error line, so filtering on it would not work anyway.
+  grep -qiE \
+    'litellm\.[a-z]*error|openrouterexception|insufficient credits|key limit exceeded|too many requests' "$1"
 }
