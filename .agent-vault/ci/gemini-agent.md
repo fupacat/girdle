@@ -2,9 +2,9 @@
 type: ci
 watches:
   - path: .github/workflows/gemini-agent.yml
-    hash: 967704e64d00c6136363a48c70de0d2896135817e503ba7f58870daaf791dab4
+    hash: 42ff82c7aaabdb970f3ee6550d650d39e1eb1cdb9a32671462e54cb46d09108e
   - path: .github/workflows/gemini-agent-pr.yml
-    hash: 3bb7dbb2f2d955612b0f8fe74e759d5c8cd5124a9f86c2882b6f65b7e8b67404
+    hash: be18691ef0348649820c6392474babf93d3b3aaf66bc0dbec1c1c21e4067b1a7
   - path: .github/scripts/report-agent-failure.sh
     hash: bc4b12791212df508b3bc75e43a8e1fc7ed9a86c655526db5f79a104ca9571e9
 stale: false
@@ -137,6 +137,15 @@ or code from the branch; the agent job stays read-only), and the `repair:N` labe
 applied before the push so a labelling failure can never leave an uncounted push;
 and aider appends `.aider*` to
 `.gitignore` unless the repo already ignores it (now committed).
+
+The first real task (#412: add `permissions` to a `ci.yml` job) produced the correct
+change, which the publisher correctly refused because it edits `.github/workflows/`:
+**workflow-file tasks are out of scope for this agent** (and the PAT lacks the `workflows`
+scope GitHub would require anyway); it is for `src/`, `tests/` and docs. The same patch
+also carried a note-frontmatter flip the agent never made: `girdle notes check`
+rewrites `stale: false` -> `stale: true` in a stale note as a side effect, and the
+hygiene step's checks ran before the patch was collected. The fixer pass now skips the
+check-only hooks and whatever the checks write is discarded (issue mode: `git checkout -- .`; PR mode: snapshot the tree and `read-tree --reset` back).
 
 ## Not verified end to end
 

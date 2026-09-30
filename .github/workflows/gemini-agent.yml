@@ -175,8 +175,15 @@ jobs:
           # blindly here (an ack asserts the note was compared against the
           # change); they stay red in CI and Gitar's repair instructions
           # (.gitar/instructions/repo-check-repairs.md) handle them.
+          #
+          # The fixer pass skips the hooks that only check: girdle-notes-check
+          # writes a stale marker into a note's frontmatter, and that note edit
+          # the agent never made (seen on the first real task) ended up in its
+          # patch. The checks run afterwards and whatever they write is thrown
+          # away again.
           girdle index . --inject AGENTS.md
-          pre-commit run --all-files || true
+          SKIP=pytest,girdle-index-fresh,girdle-notes-check \
+            pre-commit run --all-files || true
           git add -A
           git commit -m "chore: run pre-commit and refresh repo index" || true
           if pre-commit run --all-files; then
@@ -184,6 +191,7 @@ jobs:
           else
             echo "checks=needs-repair" >> "$GITHUB_OUTPUT"
           fi
+          git checkout -- .
 
       - name: Collect the agent's changes as a patch
         id: patch
