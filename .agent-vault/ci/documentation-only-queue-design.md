@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 82b8bf5a624b8392e412913d73e4205e138a4d3de1df93a946ff6dee5ed9f8bc
+    hash: 2bf39f4e5b176a4cd434fd3b7ed3e10dbaf645bb12034294b0a456d95e8b4541
 stale: false
 ---
 
@@ -71,14 +71,12 @@ SonarCloud's analysis at all.
   motivation above: the lighter path is only safe when nothing else
   could be affected) rather than something to special-case.
 - **Does the existing branch ruleset (`test`, `SonarCloud Code Analysis`,
-  `Gitar` required checks) block this regardless of queue?** Master's
-  ruleset lists Mergify as the only bypass actor, so Mergify merging
-  through the `docs` queue without those checks green is exactly the
-  same mechanism the `Dependabot` queues already rely on
-  (`branch_protection_injection_mode: merge` with queue-specific
-  `merge_conditions` that don't include the full ruleset) - not a new
-  risk, but worth stating explicitly since it's easy to assume the
-  branch ruleset applies uniformly regardless of Mergify config.
+  `Gitar` required checks) block this regardless of queue?** The
+  `Dependabot` queues now set `branch_protection_injection_mode: none`,
+  specify `merge_bot_account: fupacat`, and use explicit queue and merge
+  conditions. The `light` queue uses the same no-injection/account
+  configuration pattern, with its own explicit conditions, rather than
+  relying on injected ruleset checks.
 
 ## Implementation
 
@@ -124,10 +122,10 @@ gap above was found. Current shape:
 Resolved the two "does this need a new queue" and "does the branch
 ruleset block this" open questions above: yes, a fourth queue is the
 right shape (matches the existing `Dependabot`/`Dependabot-major`/`default`
-pattern rather than inventing a new mechanism), and no, the branch
-ruleset doesn't block it - Mergify's bypass-actor status is exactly what
-makes the Dependabot queues' lighter `merge_conditions` work today, and
-`docs` uses the identical mechanism.
+pattern rather than inventing a new mechanism). The Dependabot queues now
+also disable ruleset injection, set `merge_bot_account: fupacat`, and use
+explicit conditions; the `light` queue follows the same configuration
+pattern with its own conditions.
 
 ## Broadened to include CI config
 
