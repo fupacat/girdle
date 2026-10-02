@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 82b8bf5a624b8392e412913d73e4205e138a4d3de1df93a946ff6dee5ed9f8bc
+    hash: 2bf39f4e5b176a4cd434fd3b7ed3e10dbaf645bb12034294b0a456d95e8b4541
 stale: false
 ---
 
@@ -72,7 +72,7 @@ would race against Mergify's queue (bypassing the speculative
 queue-ahead-PR testing the queue does) if anyone armed it via the UI or
 `gh pr merge --auto`.
 
-## Decision: `branch_protection_injection_mode: merge` for both Dependabot queues
+## Decision: disable ruleset injection for both Dependabot queues
 
 The default queue mode (`queue`) injects master's full ruleset into both
 queue *entry* and the merge gate. For Dependabot PRs this was a genuine
@@ -80,14 +80,21 @@ deadlock: entry required `check-success=Gitar`/`SonarCloud`, but those
 checks don't reliably run on a Dependabot-authored branch in the first
 place (GitHub withholds some secrets from Dependabot-triggered workflow
 runs, and Gitar/Sonar app permissions differ per-author) - confirmed live
-as "Waiting for queue conditions" stuck forever. `branch_protection_injection_mode: merge`
-injects the ruleset only at the merge gate, so entry is governed purely by
-`queue_conditions`; combined with `max_checks_retries: 1` (which forces
-Mergify to always build its own `mergify/merge-queue/*` draft branch,
-authored as `mergify` rather than `dependabot[bot]`), Gitar/SonarCloud get
-a branch they actually run checks on. The `default` queue for
-non-Dependabot PRs doesn't need this - Gitar/SonarCloud already run
-natively on human/agent-authored branches.
+as "Waiting for queue conditions" stuck forever. Disabling ruleset injection
+prevents those checks from blocking queue entry, but the speculative
+`mergify/merge-queue/*` draft still did not get Gitar/SonarCloud checks:
+Gitar skips drafts and
+`sonar` is skipped on them, so both queues' merge conditions require only
+`test` and approval (otherwise Dependabot PRs timed out after 30m, #425-#432,
+issue #465). Both queues now set `branch_protection_injection_mode: none`
+and `merge_bot_account: fupacat`, so the ruleset is not injected at either
+queue entry or merge. Their explicit conditions govern the queues: the
+patch/minor queue checks the author and update type at entry, while the
+major queue also requires approval at entry; both require `test` and an
+approval at merge. `max_checks_retries: 1` remains configured for both
+queues. The `default` queue for non-Dependabot PRs still uses the default
+`queue` mode - Gitar/SonarCloud run natively on human/agent-authored
+branches.
 
 ## Decision: Gitar as the sole automated auto-fixer, not both
 
@@ -238,6 +245,5 @@ from that queue's merge gate.
 - [[.agent-vault/decisions/dependabot-queue-branch-protection-injection-mode|dependabot-queue-branch-protection-injection-mode]]
 - [[.agent-vault/decisions/gitar-as-sole-auto-fixer|gitar-as-sole-auto-fixer]]
 - [[.agent-vault/ci/queue-entry-cost-and-timeouts|queue-entry-cost-and-timeouts]] -
-  open question of whether `default` should adopt the Dependabot queues'
-  `branch_protection_injection_mode: merge` to stop gating queue entry on
-  the full ruleset, plus the (now fixed, 20m) `checks_timeout` on `default`.
+  open question of whether `default` should stop injecting the full ruleset
+  at queue entry, plus the (now fixed, 20m) `checks_timeout` on `default`.

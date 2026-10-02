@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 82b8bf5a624b8392e412913d73e4205e138a4d3de1df93a946ff6dee5ed9f8bc
+    hash: 2bf39f4e5b176a4cd434fd3b7ed3e10dbaf645bb12034294b0a456d95e8b4541
   - path: .github/workflows/ci.yml
     hash: f3fe7dd803ebb59ebdd60d23a9e8e09aadbe5a0d0ceae99f3e5806926eb6ec05
 stale: false
@@ -20,15 +20,15 @@ that note's PR-shape/decomposition angle.
 
 **Full ruleset gates queue *entry*, not just merge, for the `default`
 queue.** Per [[.agent-vault/ci/merge-pipeline|merge-pipeline]]'s own
-notes, the Dependabot queues deliberately use
-`branch_protection_injection_mode: merge` specifically to avoid this -
-but the `default` queue (everything else: human/agent/Copilot PRs) uses
-the default `queue` mode, which injects master's full ruleset
-(`test`, `SonarCloud Code Analysis`, `Gitar`, 1 approval) into both
-`queue_conditions` and `merge_conditions` (`.mergify.yml`'s `default`
-queue rule has no explicit `merge_conditions`/`queue_conditions` beyond
-`author!=dependabot[bot]` - it's all coming from the injected ruleset).
-Concretely this means:
+notes, the Dependabot queues now set
+`branch_protection_injection_mode: none` and `merge_bot_account: fupacat`,
+with explicit queue and merge conditions. The `default` queue (everything
+else: human/agent/Copilot PRs) uses the default `queue` mode, which injects
+master's full ruleset (`test`, `SonarCloud Code Analysis`, `Gitar`, 1
+approval) into both `queue_conditions` and `merge_conditions`
+(`.mergify.yml`'s `default` queue rule has no explicit
+`merge_conditions`/`queue_conditions` beyond `author!=dependabot[bot]` -
+it's all coming from the injected ruleset). Concretely this means:
 
 - The `test` job in [ci.yml](../../.github/workflows/ci.yml) is now an
   aggregate status check over `cheap-checks` and `pytest`. `cheap-checks`
@@ -160,13 +160,12 @@ first-class pattern, and adds two more worth adopting:
 ## Not yet decided
 
 - Whether `default` should move to `branch_protection_injection_mode: merge`
-  like the Dependabot queues, so queue *entry* only needs cheap/fast
-  checks and the full ruleset gates the merge itself (checks would then
-  run once, at the point that actually matters) - or whether that mode
-  change has side effects specific to non-Dependabot PRs that haven't
-  been checked (the Dependabot rationale for `merge` mode was about
-  secrets/permissions differing per-author, which doesn't obviously apply
-  here).
+  so queue *entry* only needs cheap/fast checks and the full ruleset gates
+  the merge itself (checks would then run once, at the point that actually
+  matters) - or whether that mode change has side effects specific to
+  non-Dependabot PRs that haven't been checked. The Dependabot queues now
+  use `none` with explicit conditions, so they do not establish the effects
+  of `merge` mode for `default`.
 - What should happen on timeout (dequeue and report, vs. retry) - not scoped.
   (The `default` queue's value is decided: 20m, see the 2026-09-30 update above.)
 - The fast/slow split has since been implemented in `ci.yml`:
