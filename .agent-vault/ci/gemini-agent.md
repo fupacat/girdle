@@ -2,9 +2,9 @@
 type: ci
 watches:
   - path: .github/workflows/gemini-agent.yml
-    hash: 42ff82c7aaabdb970f3ee6550d650d39e1eb1cdb9a32671462e54cb46d09108e
+    hash: 588e92364f58a60bd5a800362545fd03b3a11bf1ffe77e1ada6cadd9bef1b7df
   - path: .github/workflows/gemini-agent-pr.yml
-    hash: d0adeb0b8e4075fa9f38d3703160cdf26d011382d67059692ee019518ccae0e1
+    hash: 77ea8775e8edf46233617316c842827358de84aa16d384afd211e67619613a25
   - path: .github/scripts/report-agent-failure.sh
     hash: bc4b12791212df508b3bc75e43a8e1fc7ed9a86c655526db5f79a104ca9571e9
 stale: false
@@ -146,6 +146,13 @@ also carried a note-frontmatter flip the agent never made: `girdle notes check`
 rewrites `stale: false` -> `stale: true` in a stale note as a side effect, and the
 hygiene step's checks ran before the patch was collected. The fixer pass now skips the
 check-only hooks and whatever the checks write is discarded (issue mode: `git checkout -- .`; PR mode: snapshot the tree and `read-tree --reset` back).
+
+Task #420 (retry the tree-sitter parser download) then failed in a way the agent
+could not have caused: `pip install aider-chat` into the repo's environment downgraded
+`tree-sitter` / `tree-sitter-language-pack` (aider pins older ones) and the agent's own
+change broke at import (`cannot import name 'DownloadError'`). **aider now lives in its
+own venv (`$RUNNER_TEMP/aider-venv`) and is run by path** in both workflows; never
+install it into the repo environment.
 
 ## Not verified end to end
 

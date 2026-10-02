@@ -95,9 +95,7 @@ def test_dispatch_can_override_the_model() -> None:
     inputs = workflow["on" if "on" in workflow else True]["workflow_dispatch"]["inputs"]
 
     assert inputs["model"]["required"] is False
-    aider = next(
-        s for s in workflow["jobs"]["gemini-agent"]["steps"] if s.get("id") == "aider"
-    )
+    aider = next(s for s in workflow["jobs"]["gemini-agent"]["steps"] if s.get("id") == "aider")
     assert "github.event.inputs.model" in aider["env"]["MODEL_NAME"]
 
 
@@ -120,9 +118,9 @@ def test_aider_is_only_given_flags_it_accepts() -> None:
         for job in workflow["jobs"].values():
             for step in job.get("steps", []):
                 run = step.get("run", "")
-                if "aider \\" not in run:
+                if 'aider-venv/bin/aider" \\' not in run:
                     continue
-                invocation = run[run.index("aider \\"):]
+                invocation = run[run.index('aider-venv/bin/aider" \\') :]
                 used = set(re.findall(r"(?<![\w-])--[a-z][a-z-]*", invocation))
                 assert used <= AIDER_FLAGS, f"{path}: {sorted(used - AIDER_FLAGS)}"
 
@@ -152,3 +150,19 @@ def test_hygiene_checks_do_not_leave_note_edits_in_the_patch() -> None:
     assert "SKIP=pytest,girdle-index-fresh,girdle-notes-check" in run
     assert run.rstrip().endswith("git checkout -- .")  # after the checks, nothing kept
     assert run.index("git checkout -- .") > run.index("pre-commit run --all-files; then")
+
+
+def test_aider_lives_in_its_own_venv_not_the_repo_environment() -> None:
+    # aider pins older tree-sitter / tree-sitter-language-pack; installed into the
+    # repo's environment it downgraded them under girdle and broke the agent's own
+    # change (ImportError: cannot import name 'DownloadError').
+    for path in (".github/workflows/gemini-agent.yml", ".github/workflows/gemini-agent-pr.yml"):
+        workflow = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        runs = [s.get("run", "") for j in workflow["jobs"].values() for s in j.get("steps", [])]
+        install = next(r for r in runs if "aider-chat" in r)
+
+        assert 'python -m venv "$RUNNER_TEMP/aider-venv"' in install
+        assert '"$RUNNER_TEMP/aider-venv/bin/python" -m pip install' in install
+        # no installation of aider by the environment's own pip
+        assert "pip install pre-commit aider-chat" not in install
+        assert "\n          pip install aider-chat" not in install
