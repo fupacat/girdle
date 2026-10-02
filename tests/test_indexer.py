@@ -1,6 +1,11 @@
 from pathlib import Path
+from unittest.mock import Mock, call
+
+import pytest
+from tree_sitter_language_pack import DownloadError
 
 from girdle.indexer import (
+    _parser,
     build_index,
     find_symbol_source,
     inject_into,
@@ -124,3 +129,50 @@ def test_find_symbol_source_js_const_arrow_includes_export():
     source = b"export const greet = () => {}\n"
     text = find_symbol_source(source, "javascript", "javascript", "greet")
     assert text.startswith("export")
+
+
+def test_parser_retry_succeeds_after_failures(monkeypatch):
+    """_parser returns a parser after transient failures."""
+    _parser.cache_clear()
+    mock_get_parser = Mock(
+        side_effect=[DownloadError("transient"), DownloadError("transient"), "parser"]
+    )
+    mock_sleep = Mock()
+    monkeypatch.setattr("girdle.indexer.get_parser", mock_get_parser)
+    monkeypatch.setattr("girdle.indexer.time.sleep", mock_sleep)
+
+    parser = _parser("python")
+
+    assert parser == "parser"
+    assert mock_get_parser.call_count == 3
+    mock_sleep.assert_has_calls([call(1), call(2)])
+
+
+def test_parser_retry_gives_up(monkeypatch):
+    """_parser gives up after 3 failures."""
+    _parser.cache_clear()
+    mock_get_parser = Mock(side_effect=DownloadError("persistent"))
+    mock_sleep = Mock()
+    monkeypatch.setattr("girdle.indexer.get_parser", mock_get_parser)
+    monkeypatch.setattr("girdle.indexer.time.sleep", mock_sleep)
+
+    with pytest.raises(DownloadError, match="persistent"):
+        _parser("python")
+
+    assert mock_get_parser.call_count == 3
+    mock_sleep.assert_has_calls([call(1), call(2)])
+
+
+def test_parser_no_retry_on_success(monkeypatch):
+    """_parser succeeds on the first try without sleeping."""
+    _parser.cache_clear()
+    mock_get_parser = Mock(return_value="parser")
+    mock_sleep = Mock()
+    monkeypatch.setattr("girdle.indexer.get_parser", mock_get_parser)
+    monkeypatch.setattr("girdle.indexer.time.sleep", mock_sleep)
+
+    parser = _parser("python")
+
+    assert parser == "parser"
+    assert mock_get_parser.call_count == 1
+    mock_sleep.assert_not_called()
