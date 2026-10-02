@@ -80,10 +80,10 @@ deadlock: entry required `check-success=Gitar`/`SonarCloud`, but those
 checks don't reliably run on a Dependabot-authored branch in the first
 place (GitHub withholds some secrets from Dependabot-triggered workflow
 runs, and Gitar/Sonar app permissions differ per-author) - confirmed live
-as "Waiting for queue conditions" stuck forever. The earlier
-`branch_protection_injection_mode: merge` setting prevented those checks
-from blocking queue entry, but the speculative `mergify/merge-queue/*`
-draft still did not get Gitar/SonarCloud checks: Gitar skips drafts and
+as "Waiting for queue conditions" stuck forever. Disabling ruleset injection
+prevents those checks from blocking queue entry, but the speculative
+`mergify/merge-queue/*` draft still did not get Gitar/SonarCloud checks:
+Gitar skips drafts and
 `sonar` is skipped on them, so both queues' merge conditions require only
 `test` and approval (otherwise Dependabot PRs timed out after 30m, #425-#432,
 issue #465). Both queues now set `branch_protection_injection_mode: none`
