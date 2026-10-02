@@ -165,4 +165,4 @@ def test_aider_lives_in_its_own_venv_not_the_repo_environment() -> None:
         assert '"$RUNNER_TEMP/aider-venv/bin/python" -m pip install' in install
         # no installation of aider by the environment's own pip
         assert "pip install pre-commit aider-chat" not in install
-        assert "\n          pip install aider-chat" not in install
+        assert "\npip install aider-chat" not in install
