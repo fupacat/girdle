@@ -229,11 +229,11 @@ queue_rules:
     # step). "merge" injects the ruleset only at the merge gate, so entry
     # stays governed purely by queue_conditions below - and once queued,
     # Mergify tests the PR on its own mergify/merge-queue/* branch under
-    # its own identity, which may get Gitar/SonarCloud to actually run
-    # where they don't on the PR's own branch (untested until now - see
-    # PR history for what actually happened). This also means no
-    # merge_bot_account is needed - Mergify merges under its own identity
-    # once the real ruleset is satisfied.
+    # its own identity. This speculative PR is a draft, which both Gitar
+    # and SonarCloud skip, so their checks are not included in the merge
+    # conditions below. This also means no merge_bot_account is needed -
+    # Mergify merges under its own identity once the real ruleset is
+    # satisfied on the master branch itself.
     branch_protection_injection_mode: merge
     max_checks_retries: 1
     checks_timeout: 30m
@@ -245,15 +245,14 @@ queue_rules:
           - dependabot-update-type=security
     merge_conditions:
       - check-success=test
-      - check-success=SonarCloud Code Analysis
-      - check-success=Gitar
       - "#approved-reviews-by>=1"
 
   - name: Dependabot-major
     # Same branch_protection_injection_mode: merge rationale as the
     # Dependabot queue above - entry stays governed by queue_conditions
-    # only, and Mergify's own draft-PR mechanism gets Gitar/SonarCloud to
-    # run. Approval is required at queue_conditions (not just
+    # only. Mergify's own draft-PR mechanism does not get Gitar/SonarCloud
+    # to run on the speculative draft, so they are not in merge_conditions.
+    # Approval is required at queue_conditions (not just
     # merge_conditions) so an unapproved major never enters the train and
     # blocks the queues behind it.
     branch_protection_injection_mode: merge
@@ -265,8 +264,6 @@ queue_rules:
       - "#approved-reviews-by>=1"
     merge_conditions:
       - check-success=test
-      - check-success=SonarCloud Code Analysis
-      - check-success=Gitar
       - "#approved-reviews-by>=1"
 
   - name: default
