@@ -20,11 +20,11 @@ oversold.
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import cache
 from pathlib import Path
-import time
 
 from tree_sitter import Node
 from tree_sitter_language_pack import DownloadError, get_parser
