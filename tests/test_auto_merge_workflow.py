@@ -78,3 +78,13 @@ def test_fallback_sweep_also_promotes_labelled_gemini_agent_prs() -> None:
     # Copilot PRs keep their own author + branch-prefix condition.
     assert '.author.login == "Copilot"' in run_script
     assert 'startswith("copilot/")' in run_script
+
+
+def test_fallback_sweep_treats_skipped_checks_as_passing() -> None:
+    # Drafts skip pytest/sonar by design (ci.yml); requiring SUCCESS on every
+    # check meant an agent draft could never be promoted.
+    steps = _workflow()["jobs"]["fallback-sweep"]["steps"]
+    run_script = next(s["run"] for s in steps if "jq_filter=" in s.get("run", ""))
+
+    for conclusion in ("SUCCESS", "SKIPPED", "NEUTRAL"):
+        assert f'[ "$check_conclusion" != "{conclusion}" ]' in run_script

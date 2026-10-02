@@ -177,8 +177,13 @@ jobs:
               failed_required=0
               while IFS=$'\t' read -r check_name check_status check_conclusion; do
                 [ -n "$check_name" ] || continue
+                # SKIPPED/NEUTRAL pass: drafts deliberately skip pytest and
+                # sonar (ci.yml), and the aggregate `test` check still has to be
+                # SUCCESS, so requiring SUCCESS everywhere could never promote.
                 if [ "$check_status" != "COMPLETED" ] || \
-                  [ "$check_conclusion" != "SUCCESS" ]; then
+                  { [ "$check_conclusion" != "SUCCESS" ] && \
+                    [ "$check_conclusion" != "SKIPPED" ] && \
+                    [ "$check_conclusion" != "NEUTRAL" ]; }; then
                   echo "Skipping PR #$pr: required check " \
                     "${check_name} is ${check_status}/${check_conclusion}."
                   failed_required=1
