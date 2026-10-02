@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 82b8bf5a624b8392e412913d73e4205e138a4d3de1df93a946ff6dee5ed9f8bc
+    hash: f37fc708e75627efc880019119326fddb56a670f7a9d9ea2e9573655742f9097
 stale: false
 ---
 
@@ -84,8 +84,11 @@ as "Waiting for queue conditions" stuck forever. `branch_protection_injection_mo
 injects the ruleset only at the merge gate, so entry is governed purely by
 `queue_conditions`; combined with `max_checks_retries: 1` (which forces
 Mergify to always build its own `mergify/merge-queue/*` draft branch,
-authored as `mergify` rather than `dependabot[bot]`), Gitar/SonarCloud get
-a branch they actually run checks on. The `default` queue for
+authored as `mergify` rather than `dependabot[bot]`). That draft was
+expected to get Gitar/SonarCloud checks, but it does not: Gitar skips drafts and
+`sonar` is skipped on them, so both queues' `merge_conditions` now require only
+`test` and the approval count (otherwise every Dependabot PR timed out after 30m,
+#425-#432, issue #465). The `default` queue for
 non-Dependabot PRs doesn't need this - Gitar/SonarCloud already run
 natively on human/agent-authored branches.
 
