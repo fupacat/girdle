@@ -125,7 +125,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e "./trusted[dev]"
-          pip install pre-commit aider-chat
+          pip install pre-commit
+          # aider pins its own versions of tree-sitter and tree-sitter-language-pack
+          # (older than this repo's); installed into the same environment it
+          # downgraded them under girdle and broke the agent's own code. It gets a
+          # venv of its own and is run by path.
+          python -m venv "$RUNNER_TEMP/aider-venv"
+          "$RUNNER_TEMP/aider-venv/bin/python" -m pip install --quiet aider-chat
 
       # fetch-depth: 0 above already fetched every branch, so the PR head commit
       # is in the object store; no separate fetch of a PR ref is made.
@@ -234,7 +240,7 @@ jobs:
           # aider's config parser rejects an empty file: it must be a YAML mapping.
           echo '{}' > "$RUNNER_TEMP/empty.yml"
           : > "$RUNNER_TEMP/empty.env"
-          aider \
+          "$RUNNER_TEMP/aider-venv/bin/aider" \
             --config "$RUNNER_TEMP/empty.yml" \
             --env-file "$RUNNER_TEMP/empty.env" \
             --model "$MODEL_NAME" \

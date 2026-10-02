@@ -64,7 +64,7 @@ def test_resolve_enforces_branch_label_fork_and_repair_cap() -> None:
     assert "gemini/*" in script
     assert "agent-pr" in script
     assert "repair:[0-9]+" in script
-    assert '-ge 2' in script and '"labels[]=manual"' in script
+    assert "-ge 2" in script and '"labels[]=manual"' in script
 
 
 def test_master_is_merged_only_for_a_real_conflict_and_at_a_pinned_sha() -> None:
@@ -88,7 +88,9 @@ def test_master_is_merged_only_for_a_real_conflict_and_at_a_pinned_sha() -> None
 def test_aider_runs_without_auto_commits_or_shell_suggestions() -> None:
     workflow = _load(PR_WORKFLOW)
     aider = next(
-        s for s in workflow["jobs"]["agent"]["steps"] if "aider \\" in s.get("run", "")
+        s
+        for s in workflow["jobs"]["agent"]["steps"]
+        if 'aider-venv/bin/aider" \\' in s.get("run", "")
     )["run"]
 
     for flag in ("--no-auto-commits", "--no-suggest-shell-commands", "--yes-always"):
@@ -134,19 +136,17 @@ def test_tooling_and_config_come_from_the_trusted_checkout() -> None:
     workflow = _load(PR_WORKFLOW)
     steps = workflow["jobs"]["agent"]["steps"]
     install = next(s for s in steps if s.get("name", "").startswith("Install tooling"))
-    aider = next(s for s in steps if "aider \\" in s.get("run", ""))
+    aider = next(s for s in steps if 'aider-venv/bin/aider" \\' in s.get("run", ""))
     hygiene = next(s for s in steps if s.get("id") == "hygiene")
 
-    assert './trusted[dev]' in install["run"]
+    assert "./trusted[dev]" in install["run"]
     # Repo-level aider config or .env could run commands with the model key.
     for flag in ("--config", "--env-file", "--no-auto-test", "--no-auto-lint"):
         assert flag in aider["run"]
     assert "$GITHUB_WORKSPACE/trusted/AGENTS.md" in aider["run"]
     # pre-commit runs hooks (pytest among them) that would execute the PR
     # branch's code in the privileged job; only direct, trusted fixers are used.
-    commands = [
-        line for line in hygiene["run"].splitlines() if not line.strip().startswith("#")
-    ]
+    commands = [line for line in hygiene["run"].splitlines() if not line.strip().startswith("#")]
     code = chr(10).join(commands)
     assert "pre-commit" not in code
     assert "pytest" not in code
@@ -193,7 +193,7 @@ def test_jobs_that_comment_on_the_pr_have_pull_requests_write() -> None:
 def test_aider_config_stub_is_a_yaml_mapping() -> None:
     # aider's parser rejects an empty config file ("returned type NoneType").
     steps = _load(PR_WORKFLOW)["jobs"]["agent"]["steps"]
-    aider = next(s for s in steps if "aider \\" in s.get("run", ""))["run"]
+    aider = next(s for s in steps if 'aider-venv/bin/aider" \\' in s.get("run", ""))["run"]
 
     assert "echo '{}' > \"$RUNNER_TEMP/empty.yml\"" in aider
 
@@ -204,7 +204,7 @@ def test_pr_mode_hygiene_restores_the_state_after_the_checks() -> None:
     steps = _load(PR_WORKFLOW)["jobs"]["agent"]["steps"]
     run = next(s for s in steps if s.get("id") == "hygiene")["run"]
 
-    assert 'snapshot=$(git write-tree)' in run
+    assert "snapshot=$(git write-tree)" in run
     assert 'git read-tree -u --reset "$snapshot"' in run
     assert run.index("snapshot=$(git write-tree)") < run.index("girdle notes check .")
     assert run.index("girdle notes check .") < run.index('git read-tree -u --reset "$snapshot"')

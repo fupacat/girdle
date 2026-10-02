@@ -90,7 +90,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-          pip install pre-commit aider-chat
+          pip install pre-commit
+          # aider pins its own versions of tree-sitter and tree-sitter-language-pack
+          # (older than this repo's); installed into the same environment it
+          # downgraded them under girdle and broke the agent's own code. It gets a
+          # venv of its own and is run by path.
+          python -m venv "$RUNNER_TEMP/aider-venv"
+          "$RUNNER_TEMP/aider-venv/bin/python" -m pip install --quiet aider-chat
 
       - name: Prepare Prompt
         id: prompt
@@ -151,7 +157,7 @@ jobs:
           # --yes-always confirms every prompt, so shell-command suggestions
           # are disabled outright. Aider's own commits skip git hooks by
           # default; the hygiene step below is the real check.
-          aider \
+          "$RUNNER_TEMP/aider-venv/bin/aider" \
             --model "$MODEL_NAME" \
             --read GEMINI.md \
             --read AGENTS.md \
