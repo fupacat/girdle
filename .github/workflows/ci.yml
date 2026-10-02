@@ -126,7 +126,7 @@ jobs:
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7.0.1
         with:
           name: coverage
           path: coverage.xml
