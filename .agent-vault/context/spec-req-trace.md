@@ -1,5 +1,12 @@
 ---
 type: context
+watches:
+  - path: src/girdle/reqtrace.py
+  - path: src/girdle/cli.py
+    symbol: reqs
+  - path: src/girdle/cli.py
+    symbol: reqs_check
+  - path: tests/test_reqtrace.py
 ---
 
 # Spec: requirement-to-test traceability check
