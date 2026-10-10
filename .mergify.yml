@@ -1,26 +1,4 @@
 pull_request_rules:
-  - name: enable Gitar auto-apply on all PRs
-    # Gitar's CI-failure auto-fix (build/test/lint/flaky-test) is opt-in
-    # per PR, not a global default - it activates via either a PR comment
-    # (`gitar auto-apply:on`) or the `gitar-managed` label. Applying the
-    # label here on every PR is what makes fix automation actually
-    # blanket instead of needing a manual step per PR. Gitar's own
-    # auto-merge is deliberately never enabled (no .gitar/config/merge.md
-    # exists) - Mergify remains the only thing that merges, so this only
-    # reaches into the fix loop, not the merge decision. Excludes
-    # dependabot[bot]: a Gitar auto-fix commit pushed onto a Dependabot
-    # PR's branch is "a commit from someone else" - the same condition
-    # that makes Dependabot stop auto-managing the branch (losing its own
-    # rebase/conflict-resolution/version-refresh behavior), documented on
-    # the rebase rule below.
-    conditions:
-      - -closed
-      - author!=dependabot[bot]
-    actions:
-      label:
-        add:
-          - gitar-managed
-
   - name: keep safe Dependabot PRs up to date with master
     # master's ruleset requires strict status checks (branch must be
     # current before merge), so a Dependabot PR that sits for a while
@@ -67,7 +45,7 @@ pull_request_rules:
     # any reason during review, at which point the queue would silently
     # auto-merge it with no explicit merge step, undermining "label major
     # bumps for manual review". Master's full ruleset (test, SonarCloud,
-    # Gitar, 1 approving review) is what actually gates the merge, via
+    # 1 approving review) is what actually gates the merge, via
     # the queue rule's branch_protection_injection_mode: merge - not a
     # hand-picked subset duplicated here, and not something blocking
     # queue entry either. Uses Mergify's own bot identity to merge (a
@@ -120,7 +98,7 @@ pull_request_rules:
 
   - name: queue development PRs
     # Non-Dependabot PRs (human-authored, or agent-authored like this
-    # session's own ci/* branches) already get Gitar/SonarCloud checks
+    # session's own ci/* branches) already get their SonarCloud check
     # natively on their own branch - confirmed repeatedly tonight (#37,
     # #39, #47 all showed both checks directly, no draft-PR workaround
     # needed). So this queue uses default branch_protection_injection_mode
@@ -298,10 +276,10 @@ queue_rules:
     checks_timeout: 15m
     queue_conditions:
       - author!=dependabot[bot]
-    # No check-success=Gitar here: Gitar skips draft PRs (dashboard setting)
-    # and merge_conditions are evaluated on Mergify's speculative draft, so
-    # a Gitar check never appears there and the queue times out. Gitar's
-    # approval is already covered by the approval count below.
+    # No review-bot check here: merge_conditions are evaluated on Mergify's
+    # speculative draft, which review bots skip, so such a check never appears
+    # there and the queue times out. The reviewer's approval is already
+    # covered by the approval count below.
     merge_conditions:
       - check-success=test
       - "#approved-reviews-by>=1"

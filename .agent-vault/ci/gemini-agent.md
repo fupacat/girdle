@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .github/workflows/gemini-agent.yml
-    hash: a3ec79996a745b4d0c8064b8191fcae22697521f54471d7ffd71aa289fb8ff50
+    hash: 9ad4b53c9d2c9a8ae6af608e4270c270da24fb230d9371bd90a9d16e804219d5
   - path: .github/workflows/gemini-agent-pr.yml
     hash: 1b58c02892f6b8910b5d1d4af04bf2f20316522f23413d2d3cfce8f4734afdf9
   - path: .github/scripts/report-agent-failure.sh
