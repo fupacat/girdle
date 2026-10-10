@@ -19,6 +19,7 @@
 .agent-vault/context/dashboard-pillars-backlog.md | context | stale=False | watches: -
 .agent-vault/context/generated-index-churn.md | context | stale=False | watches: -
 .agent-vault/context/license-visibility-design.md | context | stale=False | watches: src/girdle/hygiene.py
+.agent-vault/context/spec-req-trace.md | context | stale=False | watches: -
 .agent-vault/context/vault-freshness-redesign.md | context | stale=False | watches: -
 .agent-vault/research/coding-agent-sandbox-bootstrap-conventions-2026-09-26.md | research | stale=False | watches: -
 .agent-vault/brainstorm/dashboard-scoring-tiers-2026-09-28.md | brainstorm | stale=False | watches: -
