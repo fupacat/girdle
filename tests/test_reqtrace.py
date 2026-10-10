@@ -127,7 +127,7 @@ def test_nonliteral_marker_is_reported(tmp_path: Path):
         dedent("""
         import pytest
         SOME_VAR = "req-trace"
-        @pytest.mark.req(SOME_VAR)
+        @pytest.mark.req(SOME_VAR, "REQ-001")
         def test_one(): pass
         @pytest.mark.req("req-trace")
         def test_two(): pass
