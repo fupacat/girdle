@@ -99,7 +99,10 @@ jobs:
       group: auto-merge-copilot-fallback-sweep
       cancel-in-progress: false
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # A PAT, not GITHUB_TOKEN: GitHub does not start workflows from events made
+      # with GITHUB_TOKEN, so a promotion by it never fires the
+      # `ready_for_review` run of the Gemini review and the PR waits forever.
+      GH_TOKEN: ${{ secrets.AGENT_PR_TOKEN || secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v7
