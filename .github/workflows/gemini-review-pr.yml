@@ -20,7 +20,6 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: write
     outputs:
       proceed: ${{ steps.resolve.outputs.proceed }}
       mode: ${{ steps.resolve.outputs.mode }}
@@ -54,7 +53,8 @@ jobs:
           pr=$(gh api "repos/$GH_REPO/pulls/$PR_NUM")
           state=$(jq -r '.state' <<<"$pr")
           draft=$(jq -r '.draft' <<<"$pr")
-          fork=$(jq -r '.head.repo.fork' <<<"$pr")
+          head_repo=$(jq -r '.head.repo.full_name' <<<"$pr")
+          base_repo=$(jq -r '.base.repo.full_name' <<<"$pr")
           author=$(jq -r '.user.login' <<<"$pr")
           assoc=$(jq -r '.author_association' <<<"$pr")
           head_sha=$(jq -r '.head.sha' <<<"$pr")
@@ -70,7 +70,7 @@ jobs:
             echo "reason=pr-is-draft" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if [ "$fork" = "true" ]; then
+          if [ "$head_repo" != "$base_repo" ]; then
             refuse "This workflow does not review fork PRs."
           fi
           case "$assoc" in OWNER|MEMBER|COLLABORATOR) ;; *)
