@@ -24,3 +24,8 @@ approve on overall impression.
   `governs:` means a human decides: do not approve.
 - **Single source of truth.** A requirement that adds a second
   representation of scan output, instead of extending `ScanResult`, fails.
+
+Report in the review body under a **Per-REQ findings** heading, one entry per
+requirement: `REQ` (id or short quote), `Status` (`OK` or `BLOCKING`), and
+`Evidence` (file and path from the diff). Use `REQUEST_CHANGES` if any
+requirement is blocking.
