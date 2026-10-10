@@ -14,6 +14,10 @@ approve on overall impression.
   names a concrete test node id. Reject "handle gracefully", "efficient",
   "robust", or an acceptance line that restates the requirement without an
   input and an expected output.
+- **Namespaces and collisions.** Ids, names, paths and markers a requirement
+  introduces must stay unambiguous when a second spec, module or file uses the
+  same shape (every spec has a REQ-001; two tests directories can share a
+  name). If two such things would be indistinguishable, the requirement fails.
 - **Decision conflicts.** Compare the spec with the notes in
   `.agent-vault/decisions/` and `.agent-vault/context/`. Cite the note that
   applies, or state that none do. A spec that contradicts a decision note
@@ -26,6 +30,14 @@ approve on overall impression.
   representation of scan output, instead of extending `ScanResult`, fails.
 
 Report in the review body under a **Per-REQ findings** heading, one entry per
-requirement: `REQ` (id or short quote), `Status` (`OK` or `BLOCKING`), and
-`Evidence` (file and path from the diff). Use `REQUEST_CHANGES` if any
-requirement is blocking.
+requirement: `REQ` (id or short quote), `Status` (`OK` or `BLOCKING`),
+`Defeat attempt`, and `Evidence` (file and path from the diff). Use
+`REQUEST_CHANGES` if any requirement is blocking.
+
+`Defeat attempt` is mandatory and must be concrete: write the smallest wrong or
+trivial implementation you can think of (a stub that returns the expected
+value, ignores a case, matches too broadly or too narrowly) and name the
+acceptance test line that rejects it. "The test is specific" is not a defeat
+attempt. If you cannot name a rejecting test, the status is `BLOCKING`. An
+entry without a defeat attempt counts as missing, and a spec with a missing
+entry is not approved.
