@@ -12,22 +12,25 @@ parts that matter and maps each onto machinery girdle already has.
 
 ## What is kept, and where it lives
 
-| MCSWE idea                      | Here                                                                                             |
-| ------------------------------- | ------------------------------------------------------------------------------------------------ |
-| SRS with `REQ-NNN` lines        | A spec note: `.agent-vault/context/spec-<topic>.md`, template below                              |
-| Acceptance record per REQ       | One line per REQ naming a test node id and its expected observable result                        |
-| Traceability                    | Tests carry `@pytest.mark.req("REQ-NNN")` (marker and trace check are future tooling, see below) |
-| Revision-bound approval         | The spec note's `watches` hashes and `girdle notes ack`; editing an approved spec marks it stale |
-| Approver gates                  | Gitar, using `.gitar/review/spec-review.md`; humans decide anything touching core contracts      |
-| Amend on change                 | Edit the spec in its own PR; implementation PRs reference the approved spec                      |
-| ICD and per-function trace tags | Dropped. They are the retrofit cost and add little over tests plus the structural index          |
+| MCSWE idea                      | Here                                                                                                                               |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| SRS with `REQ-NNN` lines        | A spec note: `.agent-vault/context/spec-<topic>.md`, template below                                                                |
+| Acceptance record per REQ       | One line per REQ naming a test node id and its expected observable result                                                          |
+| Traceability                    | Tests carry `@pytest.mark.req("REQ-NNN")` (marker and trace check are future tooling, see below)                                   |
+| Revision-bound approval         | The merged spec PR *is* the approval of that text. Later edits are new PRs that go through the same review                         |
+| Approver gates                  | Gitar, using `.gitar/review/spec-review.md`; humans decide anything touching core contracts                                        |
+| Amend on change                 | Edit the spec in its own PR. Once the code exists, the spec `watches` it, so drift in the code marks the spec stale until re-acked |
+| ICD and per-function trace tags | Dropped. They are the retrofit cost and add little over tests plus the structural index                                            |
 
 ## Flow
 
 1. **Spec PR.** The spec note only, no implementation. Gitar reviews it against
    the rubric; a human approves anything it refuses to.
 1. **Implementation PR.** Code and tests governed by the spec's `governs:`
-   paths. Each REQ has at least one passing test.
+   paths. Each REQ has at least one passing test. This PR also adds the
+   governed code paths to the spec's frontmatter `watches` (they cannot exist
+   earlier: a watch on a missing path is a dangling watch and blocks the
+   commit), so later drift in that code marks the spec stale.
 1. **Change.** New behavior means amending the spec first, in its own PR.
 
 This matches the minimal-discrete-PR policy and gives the Gemini and Copilot
@@ -58,6 +61,12 @@ governs:
 ```
 
 ## Approval
+
+What the vault hashes do and do not give you: `girdle notes check` marks a note
+stale when a *watched target* changes, and skips notes with no `watches`.
+Editing a spec's own prose does not mark it stale. So the approval of a spec's
+text is the merged spec PR, and `watches` (added with the implementation) covers
+the other direction: code that drifts from an approved spec.
 
 Approval is an agent's, not a rubber stamp: the rubric in
 `.gitar/review/spec-review.md` asks Gitar to try to defeat each requirement
