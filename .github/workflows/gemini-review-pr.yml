@@ -155,6 +155,16 @@ jobs:
           title=$(gh api "repos/$GH_REPO/pulls/$PR_NUM" --jq '.title')
           head_sha=$(gh api "repos/$GH_REPO/pulls/$PR_NUM" --jq '.head.sha')
 
+          # Fail closed: GitHub omits .patch for large or binary files, and the
+          # diff is capped below. A review of a partial diff must never approve.
+          if jq -e 'any(.[]; (.patch == null) and (.status != "removed") and (.changes > 0))' \
+            <<<"$files_json" > /dev/null; then
+            echo "status=incomplete" >> "$GITHUB_OUTPUT"
+            echo "decision=" >> "$GITHUB_OUTPUT"
+            echo "body=Some changed files have no patch (too large or binary)." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           has_spec="false"
           if jq -e '.[] | .filename | test("spec"; "i")' <<<"$files_json" > /dev/null; then
             has_spec="true"
@@ -168,7 +178,10 @@ jobs:
           ' <<<"$files_json")
           MAX_DIFF_CHARS=120000
           if [ "${#diff_data}" -gt "$MAX_DIFF_CHARS" ]; then
-            diff_data="${diff_data:0:$MAX_DIFF_CHARS}"$'\n''[TRUNCATED_FOR_BUDGET]'
+            echo "status=incomplete" >> "$GITHUB_OUTPUT"
+            echo "decision=" >> "$GITHUB_OUTPUT"
+            echo "body=The diff is larger than the review budget." >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           conventions=$(cat trusted/.github/review/conventions.md)
@@ -303,10 +316,18 @@ jobs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ "$MODE" = "high-risk" ]; then
+            # COMMENT, not REQUEST_CHANGES: a requested-changes review blocks the
+            # merge until someone dismisses it. Withholding the approval is enough.
             gh api -X POST "repos/$GH_REPO/pulls/$PR_NUM/reviews" \
-              -f event='REQUEST_CHANGES' \
+              -f event='COMMENT' \
               -f commit_id="$HEAD_SHA" \
-              -f body="High-risk files changed ($REASON). Human review is required."
+              -f body="High-risk files changed ($REASON). Human review required; no approval."
+            exit 0
+          fi
+
+          if [ "$STATUS" = "incomplete" ]; then
+            gh api -X POST "repos/$GH_REPO/issues/$PR_NUM/comments" \
+              -f body="$BODY Human review required; no approval."
             exit 0
           fi
 
