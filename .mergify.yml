@@ -274,8 +274,16 @@ queue_rules:
     branch_protection_injection_mode: none
     merge_bot_account: fupacat
     checks_timeout: 15m
+    # Entry is gated like the merge: with injection mode none, nothing else
+    # stops a PR entering the instant it leaves draft (auto_merge_conditions
+    # enqueues whatever matches these). That entered it before the review and
+    # checks settled, then dequeued it ~15s later after spawning a speculative
+    # draft PR (wasted CI, a stale failing check and the `dequeued` label).
     queue_conditions:
       - author!=dependabot[bot]
+      - -draft
+      - "#approved-reviews-by>=1"
+      - check-success=test
     # No review-bot check here: merge_conditions are evaluated on Mergify's
     # speculative draft, which review bots skip, so such a check never appears
     # there and the queue times out. The reviewer's approval is already
