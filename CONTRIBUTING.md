@@ -49,16 +49,17 @@ the merge-queue friction this addresses:
 ## Branch protection
 
 `master` is protected, including for admins: changes land via a PR with
-three passing status checks (`test`, `SonarCloud Code Analysis`, `Gitar`)
+two passing status checks (`test`, `SonarCloud Code Analysis`)
 and one approving review. Direct `git push` to `master` will be rejected,
 even from the repo owner — open a branch and PR instead.
 
 Merging itself goes through Mergify's queue, not GitHub's native
 auto-merge (disabled repo-wide) or a manual merge button. The required
-review is satisfied by Gitar's automated review (or Mergify self-approving
-for low-risk Dependabot bumps) rather than a human, since this is a
-single-author repo. Full rationale for how Mergify, Gitar, SonarCloud,
-Copilot, and GitHub Actions divide the work — and why — is in the
+review is satisfied by Mergify self-approving low-risk Dependabot bumps, or
+by an approving review on everything else (Gitar's trial ended and it was
+removed; a Gemini review workflow is the planned replacement). Full
+rationale for how Mergify, SonarCloud, Copilot, Gemini and GitHub Actions
+divide the work — and why — is in the
 `.agent-vault/ci/merge-pipeline.md` vault note.
 
 ## Adding a new ecosystem detector

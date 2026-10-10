@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 2bf39f4e5b176a4cd434fd3b7ed3e10dbaf645bb12034294b0a456d95e8b4541
+    hash: 52f5381b7b5a3afb1539432427cb495d2956270f558b469443ebdbaf85b69078
 stale: false
 ---
 
@@ -95,6 +95,10 @@ approval at merge. `max_checks_retries: 1` remains configured for both
 queues. The `default` queue for non-Dependabot PRs still uses the default
 `queue` mode - Gitar/SonarCloud run natively on human/agent-authored
 branches.
+
+> **Superseded 2026-10-10:** Gitar's trial ended and it was removed; see
+> [[.agent-vault/decisions/gitar-removed-trial-ended|gitar-removed-trial-ended]].
+> Gemini replaces its repair and (planned) approval roles.
 
 ## Decision: Gitar as the sole automated auto-fixer, not both
 
