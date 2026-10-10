@@ -121,3 +121,13 @@ def test_model_id_is_sent_in_openrouter_form_not_aider_form() -> None:
     review = _job_text(_load(), "review")
 
     assert "${MODEL_NAME#openrouter/}" in review
+
+
+def test_unparseable_replies_are_diagnosed_and_given_room_to_finish() -> None:
+    # The first real run ended "not valid review JSON" with no way to see why; a
+    # reasoning model can spend a small max_tokens before it writes the answer.
+    review = _job_text(_load(), "review")
+
+    assert "max_tokens: 16000" in review
+    assert "finish_reason" in review
+    assert "content head" in review
