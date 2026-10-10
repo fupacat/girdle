@@ -20,6 +20,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: read
     outputs:
       proceed: ${{ steps.resolve.outputs.proceed }}
       mode: ${{ steps.resolve.outputs.mode }}
