@@ -67,7 +67,10 @@ def test_high_risk_changes_are_never_auto_approved() -> None:
     assert "src/girdle/schema.py" in resolve
     assert "src/girdle/detectors/base.py" in resolve
     assert "mode=high-risk" in resolve
-    assert "REQUEST_CHANGES" in publish
+    # A requested-changes review blocks the merge until dismissed; withholding the
+    # approval is enough, so high-risk PRs get a plain comment review.
+    assert "event='COMMENT'" in publish
+    assert "event='REQUEST_CHANGES'" not in publish
     assert "needs.review.result == 'skipped'" in publish_if
 
 
@@ -83,6 +86,7 @@ def test_prompt_uses_trusted_rubric_and_caps_diff_size() -> None:
     assert "trusted/.github/review/risk.md" in review
     assert "trusted/.github/review/spec-review.md" in review
     assert "MAX_DIFF_CHARS=120000" in review
+    assert "TRUNCATED_FOR_BUDGET" not in review  # never review a partial diff
     assert "json_object" in review
     assert "has_spec=true" in review
 
@@ -95,3 +99,25 @@ def test_model_or_api_error_posts_neutral_comment_not_approval() -> None:
     assert "STATUS" in publish and "DECISION" in publish
     assert "model/API error" in publish
     assert "pulls/$PR_NUM/reviews" in publish
+
+
+def test_partial_diffs_fail_closed_and_are_never_approved() -> None:
+    workflow = _load()
+    review = _job_text(workflow, "review")
+    publish = _job_text(workflow, "publish")
+
+    # Large or binary files have no .patch in the API, and an over-budget diff is
+    # not truncated: both end the job before the model is called, with no decision.
+    assert "(.patch == null)" in review
+    assert review.count("status=incomplete") == 2
+    assert review.index("status=incomplete") < review.index("openrouter.ai")
+    assert "incomplete" in publish
+    assert "no approval." in publish
+
+
+def test_model_id_is_sent_in_openrouter_form_not_aider_form() -> None:
+    # The repo's variables use aider's "openrouter/<vendor>/<model>"; OpenRouter's
+    # own API rejects that prefix with HTTP 400.
+    review = _job_text(_load(), "review")
+
+    assert "${MODEL_NAME#openrouter/}" in review
