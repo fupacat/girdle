@@ -1,5 +1,17 @@
 ---
 type: context
+watches:
+  - path: src/girdle/reqtrace.py
+    hash: 8b8f63880513ccb051509098909b482ac1de82dfdc0f8171b77d9c78180f231d
+  - path: src/girdle/cli.py
+    symbol: reqs
+    hash: 9e1da73badcc53a2b48c79ffbbf3f0677682b8039cf58c091f257184e184de3c
+  - path: src/girdle/cli.py
+    symbol: reqs_check
+    hash: 36d943dc966e8cfa3c028d1d230acc2efa5f4c7bf57229a0678ede569b8a53db
+  - path: tests/test_reqtrace.py
+    hash: 7bbf5e1b8975e8a77707645a85e65890065e550c81912c535f3e183245c42810
+stale: false
 ---
 
 # Spec: requirement-to-test traceability check
