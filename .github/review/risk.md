@@ -1,5 +1,5 @@
-This repository-level guidance can only raise, never lower, the
-organization-level risk assessment (Gitar's default behavior).
+Risk guidance for reviewers (human or agent). It can only raise, never
+lower, a PR's assessed risk.
 
 - Changes to `.mergify.yml`, `.github/dependabot.yml`, or any GitHub
   Actions workflow under `.github/workflows/` are always at least
