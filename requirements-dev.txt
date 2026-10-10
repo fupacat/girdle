@@ -50,7 +50,7 @@ mdit-py-plugins==0.6.1
     #   mdformat-gfm
 mdurl==0.1.2
     # via markdown-it-py
-nodeenv==1.10.0
+nodeenv==1.11.0
     # via pre-commit
 packaging==26.3
     # via pytest
