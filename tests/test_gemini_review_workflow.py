@@ -109,7 +109,7 @@ def test_partial_diffs_fail_closed_and_are_never_approved() -> None:
     # Large or binary files have no .patch in the API, and an over-budget diff is
     # not truncated: both end the job before the model is called, with no decision.
     assert "(.patch == null)" in review
-    assert review.count("status=incomplete") == 2
+    assert review.count("status=incomplete") == 3  # no patch, over budget, unreadable spec
     assert review.index("status=incomplete") < review.index("openrouter.ai")
     assert "incomplete" in publish
     assert "no approval." in publish
@@ -131,3 +131,15 @@ def test_unparseable_replies_are_diagnosed_and_given_room_to_finish() -> None:
     assert "max_tokens: 16000" in review
     assert "finish_reason" in review
     assert "content head" in review
+
+
+def test_spec_reviews_see_the_whole_spec_not_just_the_diff() -> None:
+    # #503 changed only a spec's frontmatter; a reviewer shown the patch alone
+    # concluded the spec "defines no requirements" and requested changes.
+    review = _job_text(_load(), "review")
+
+    assert "spec-.*[.]md" in review  # the rubric's own scope, not any "spec" filename
+    assert "application/vnd.github.raw" in review
+    assert "SPEC_FILES" in review
+    assert "SPEC_FILE:" in review
+    assert "Could not read the full spec" in review  # fails closed, no approval
