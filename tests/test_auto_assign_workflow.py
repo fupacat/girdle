@@ -102,3 +102,13 @@ def test_ci_workflow_uses_pr_scoped_concurrency_and_fast_checks() -> None:
     assert "needs.pytest.result != 'skipped'" in pytest_gate_if
     assert "needs.changes.outputs.light_diff != 'true'" in pytest_gate_if
     assert "github.event.pull_request.draft == false" in pytest_gate_if
+
+
+def test_sync_skips_copilot_assignment_for_opt_out_labels() -> None:
+    text = _normalized_workflow_text()
+
+    assert 'const optOutLabels = ["manual", "agent:gemini"];' in text
+    # No status:ready label and no assignment for opted-out issues.
+    assert "issue.assignees.totalCount === 0 && !optedOut" in text
+    assert "if (optedOut) {" in text
+    assert "not assigning to Copilot" in text

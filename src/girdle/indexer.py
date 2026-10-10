@@ -20,13 +20,14 @@ oversold.
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import cache
 from pathlib import Path
 
 from tree_sitter import Node
-from tree_sitter_language_pack import get_parser
+from tree_sitter_language_pack import DownloadError, get_parser
 
 from girdle.fsutil import walk_excluding
 
@@ -51,7 +52,16 @@ LANGUAGE_BY_EXT = {
 
 @cache
 def _parser(grammar: str):
-    return get_parser(grammar)
+    """Cached tree-sitter parser fetch, with retries for transient network errors."""
+    last_exc = None
+    for i in range(3):
+        try:
+            return get_parser(grammar)
+        except DownloadError as e:
+            last_exc = e
+            if i < 2:  # attempts 0 and 1, before the 2nd and 3rd tries
+                time.sleep(2**i)  # 1s, 2s
+    raise last_exc
 
 
 def _text(node: Node, source: bytes) -> str:

@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Shared by classify-agent-failure.sh (runs inside the agent job, where the
+# model step's output is available locally) and report-agent-failure.sh.
+#
+# Why the classification happens in the agent job: a run's job logs cannot be
+# read through the API until the whole run has completed, and the reporting job
+# runs inside that run, so it cannot classify from the log itself (the first
+# real reports had no error line, and a spend limit could never have been
+# detected). The agent job has the text on disk, so it classifies there and
+# passes the result on as job outputs.
+#
+# The text is treated as untrusted: it can echo model output or issue text.
+
+# Truncate, strip control characters and backticks, defuse @-mentions.
+clean_line() {
+  tr -d '\000-\010\013-\037`' | sed 's/@/(at)/g' | cut -c1-300
+}
+
+# classify_failure_log FILE -> sets KIND (spend | rate | failure) and ERR (the
+# first error-looking line). Looks at error-looking lines only, so stray numbers
+# in ordinary output cannot match.
+classify_failure_log() {
+  local file=$1 errors
+  KIND=failure
+  ERR=''
+  [ -f "$file" ] || return 0
+  errors=$(grep -iE 'error|exception' "$file" | head -n 60 | tr '[:upper:]' '[:lower:]' || true)
+  if printf '%s\n' "$errors" | grep -Eq \
+    'insufficient credits|payment required|key limit exceeded|credit limit|spend limit|"code": ?402|status ?code: ?402|error code: ?402'; then
+    KIND=spend
+  elif printf '%s\n' "$errors" | grep -Eq \
+    'rate.?limit|too many requests|"code": ?429|status ?code: ?429|error code: ?429'; then
+    KIND=rate
+  fi
+  # The first error-looking line plus the next one (aider prints the provider's
+  # JSON message on the following line), with the OpenRouter user id scrubbed.
+  ERR=$(awk 'tolower($0) ~ /error|exception/ { print; if ((getline nxt) > 0) print nxt; exit }' \
+    "$file" | tr '\n' ' ' | sed 's/"user_id": *"[^"]*"//g' | clean_line || true)
+}
+
+# has_model_error FILE: true when the model step's output shows the model
+# provider rejecting or failing a call (aider prints these and still exits 0,
+# so a bad model id, an exhausted credit balance or a rate limit otherwise
+# looks like "the agent changed nothing").
+has_model_error() {
+  [ -f "$1" ] || return 1
+  # No special handling of errors aider retried: this is only asked when the
+  # run produced nothing (see classify-agent-failure.sh --silent), and a run
+  # that retried past a transient error and then produced changes never gets
+  # here. aider's "Retrying in N seconds" is also printed on its own line, not
+  # on the error line, so filtering on it would not work anyway.
+  grep -qiE \
+    'litellm\.[a-z]*error|openrouterexception|insufficient credits|key limit exceeded|too many requests' "$1"
+}

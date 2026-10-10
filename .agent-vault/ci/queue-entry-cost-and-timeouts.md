@@ -2,9 +2,9 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 94d6c83865c57389ae3465eadb271da1dcc8ac0ed385d6a9432cc45f14438560
+    hash: 2bf39f4e5b176a4cd434fd3b7ed3e10dbaf645bb12034294b0a456d95e8b4541
   - path: .github/workflows/ci.yml
-    hash: c1e62ce524bb40ec9a782007168f643a621c186d353878bd79065e74402a5a38
+    hash: 322a88352e8a86656348792c3bacd17c72e5e4c78e81b859f8d89a8b3bfd6fb3
 stale: false
 ---
 
@@ -20,15 +20,15 @@ that note's PR-shape/decomposition angle.
 
 **Full ruleset gates queue *entry*, not just merge, for the `default`
 queue.** Per [[.agent-vault/ci/merge-pipeline|merge-pipeline]]'s own
-notes, the Dependabot queues deliberately use
-`branch_protection_injection_mode: merge` specifically to avoid this -
-but the `default` queue (everything else: human/agent/Copilot PRs) uses
-the default `queue` mode, which injects master's full ruleset
-(`test`, `SonarCloud Code Analysis`, `Gitar`, 1 approval) into both
-`queue_conditions` and `merge_conditions` (`.mergify.yml`'s `default`
-queue rule has no explicit `merge_conditions`/`queue_conditions` beyond
-`author!=dependabot[bot]` - it's all coming from the injected ruleset).
-Concretely this means:
+notes, the Dependabot queues now set
+`branch_protection_injection_mode: none` and `merge_bot_account: fupacat`,
+with explicit queue and merge conditions. The `default` queue (everything
+else: human/agent/Copilot PRs) uses the default `queue` mode, which injects
+master's full ruleset (`test`, `SonarCloud Code Analysis`, `Gitar`, 1
+approval) into both `queue_conditions` and `merge_conditions`
+(`.mergify.yml`'s `default` queue rule has no explicit
+`merge_conditions`/`queue_conditions` beyond `author!=dependabot[bot]` -
+it's all coming from the injected ruleset). Concretely this means:
 
 - The `test` job in [ci.yml](../../.github/workflows/ci.yml) is now an
   aggregate status check over `cheap-checks` and `pytest`. `cheap-checks`
@@ -60,6 +60,14 @@ satisfy entry and again on Mergify's speculative batch-merge branch to
 satisfy the merge gate. SonarCloud remains the most visible instance of
 the same cross-branch duplication because it is both an explicit required
 check and an expensive tier.
+
+**Update 2026-09-30: the `default` queue now sets `checks_timeout: 20m`.** It was
+not actually unbounded: without an explicit value Mergify derives an automatic
+timeout from the queue's recent CI runtime ("automatic checks timeout of 3
+minutes 7 seconds" in a real dequeue reason). After a run of fast light-queue
+merges that was far too short for a full run, and #413's speculative check
+timed out waiting for the SonarCloud check, dequeuing a healthy PR. The text
+below is the original (superseded) analysis.
 
 **No `checks_timeout` on the `default` queue.** The `Dependabot` and
 `Dependabot-major` queue rules both set `checks_timeout: 30m`; the
@@ -152,15 +160,14 @@ first-class pattern, and adds two more worth adopting:
 ## Not yet decided
 
 - Whether `default` should move to `branch_protection_injection_mode: merge`
-  like the Dependabot queues, so queue *entry* only needs cheap/fast
-  checks and the full ruleset gates the merge itself (checks would then
-  run once, at the point that actually matters) - or whether that mode
-  change has side effects specific to non-Dependabot PRs that haven't
-  been checked (the Dependabot rationale for `merge` mode was about
-  secrets/permissions differing per-author, which doesn't obviously apply
-  here).
-- What `checks_timeout` value the `default` queue should get, and what
-  should happen on timeout (dequeue and report, vs. retry) - not scoped.
+  so queue *entry* only needs cheap/fast checks and the full ruleset gates
+  the merge itself (checks would then run once, at the point that actually
+  matters) - or whether that mode change has side effects specific to
+  non-Dependabot PRs that haven't been checked. The Dependabot queues now
+  use `none` with explicit conditions, so they do not establish the effects
+  of `merge` mode for `default`.
+- What should happen on timeout (dequeue and report, vs. retry) - not scoped.
+  (The `default` queue's value is decided: 20m, see the 2026-09-30 update above.)
 - The fast/slow split has since been implemented in `ci.yml`:
   `cheap-checks` runs independently of the pytest and Sonar tiers, while
   the aggregate `test` job reports the required CI status. This makes

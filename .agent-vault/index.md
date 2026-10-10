@@ -19,6 +19,7 @@
 .agent-vault/context/dashboard-pillars-backlog.md | context | stale=False | watches: -
 .agent-vault/context/generated-index-churn.md | context | stale=False | watches: -
 .agent-vault/context/license-visibility-design.md | context | stale=False | watches: src/girdle/hygiene.py
+.agent-vault/context/process-spec-first.md | context | stale=False | watches: -
 .agent-vault/context/vault-freshness-redesign.md | context | stale=False | watches: -
 .agent-vault/research/coding-agent-sandbox-bootstrap-conventions-2026-09-26.md | research | stale=False | watches: -
 .agent-vault/brainstorm/dashboard-scoring-tiers-2026-09-28.md | brainstorm | stale=False | watches: -
@@ -26,6 +27,7 @@
 (none) | data-model
 (none) | diagram
 .agent-vault/ci/documentation-only-queue-design.md | ci | stale=False | watches: .mergify.yml
+.agent-vault/ci/gemini-agent.md | ci | stale=False | watches: .github/workflows/gemini-agent.yml; .github/workflows/gemini-agent-pr.yml; .github/scripts/report-agent-failure.sh
 .agent-vault/ci/merge-pipeline.md | ci | stale=False | watches: .mergify.yml
 .agent-vault/ci/queue-entry-cost-and-timeouts.md | ci | stale=False | watches: .mergify.yml; .github/workflows/ci.yml
 .agent-vault/environment/external-services.md | environment | stale=False | watches: -
