@@ -165,9 +165,26 @@ jobs:
             exit 0
           fi
 
+          # Spec notes only (the rubric's own scope); a looser match such as any
+          # filename containing "spec" also catches the process note and the rubric.
           has_spec="false"
-          if jq -e '.[] | .filename | test("spec"; "i")' <<<"$files_json" > /dev/null; then
+          spec_files=""
+          spec_paths=$(jq -r '.[] | select(.status != "removed") | .filename
+            | select(test("^[.]agent-vault/context/spec-.*[.]md$"))' <<<"$files_json")
+          if [ -n "$spec_paths" ]; then
             has_spec="true"
+            # The diff may touch only part of a spec (e.g. its frontmatter), so a
+            # reviewer shown the patch alone would judge requirements it never saw.
+            while IFS= read -r spec_path; do
+              if ! spec_text=$(gh api -H "Accept: application/vnd.github.raw" \
+                "repos/$GH_REPO/contents/$spec_path?ref=$head_sha"); then
+                echo "status=incomplete" >> "$GITHUB_OUTPUT"
+                echo "decision=" >> "$GITHUB_OUTPUT"
+                echo "body=Could not read the full spec $spec_path." >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              spec_files+="SPEC_FILE: $spec_path"$'\n'"${spec_text:0:30000}"$'\n---\n'
+            done <<<"$spec_paths"
           fi
 
           diff_data=$(jq -r '
@@ -210,7 +227,9 @@ jobs:
           - decision must be APPROVE only when no blocking issue exists.
           - On blocking issues, decision must be REQUEST_CHANGES.
           - Keep the body concise and actionable.
-          - If has_spec=true, include a "Per-REQ findings" section.
+          - If has_spec=true, include a "Per-REQ findings" section, and judge the
+            requirements against the full SPEC_FILE content, not only the diff:
+            a diff that touches part of a spec does not mean the rest is absent.
 
           Metadata:
           - has_spec=$has_spec
@@ -222,6 +241,9 @@ jobs:
 
           PR_DIFF:
           $diff_data
+
+          SPEC_FILES (full content at the reviewed commit, empty if none):
+          $spec_files
           $marker
           EOF
           )
