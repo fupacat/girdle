@@ -113,3 +113,11 @@ def test_partial_diffs_fail_closed_and_are_never_approved() -> None:
     assert review.index("status=incomplete") < review.index("openrouter.ai")
     assert "incomplete" in publish
     assert "no approval." in publish
+
+
+def test_model_id_is_sent_in_openrouter_form_not_aider_form() -> None:
+    # The repo's variables use aider's "openrouter/<vendor>/<model>"; OpenRouter's
+    # own API rejects that prefix with HTTP 400.
+    review = _job_text(_load(), "review")
+
+    assert "${MODEL_NAME#openrouter/}" in review

@@ -227,7 +227,7 @@ jobs:
           )
 
           payload=$(jq -n \
-            --arg model "$MODEL_NAME" \
+            --arg model "${MODEL_NAME#openrouter/}" \
             --arg prompt "$prompt" \
             '{
               model: $model,
@@ -240,6 +240,8 @@ jobs:
           if ! response=$(PAYLOAD="$payload" python - <<'PY'
           import json
           import os
+          import sys
+          import urllib.error
           import urllib.request
 
           payload = os.environ["PAYLOAD"]
@@ -253,8 +255,13 @@ jobs:
               },
               method="POST",
           )
-          with urllib.request.urlopen(request, timeout=60) as response:
-              print(response.read().decode("utf-8"))
+          try:
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  print(response.read().decode("utf-8"))
+          except urllib.error.HTTPError as err:
+              # Say why in the job log (the API names the bad field), then fail.
+              print(err.read().decode("utf-8", "replace")[:500], file=sys.stderr)
+              raise
           PY
           ); then
             echo "status=error" >> "$GITHUB_OUTPUT"
