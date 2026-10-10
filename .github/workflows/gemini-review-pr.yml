@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      issues: write
       pull-requests: write
     outputs:
       proceed: ${{ steps.resolve.outputs.proceed }}
