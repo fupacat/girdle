@@ -16,7 +16,7 @@ parts that matter and maps each onto machinery girdle already has.
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | SRS with `REQ-NNN` lines        | A spec note: `.agent-vault/context/spec-<topic>.md`, template below                                                                |
 | Acceptance record per REQ       | One line per REQ naming a test node id and its expected observable result                                                          |
-| Traceability                    | Tests carry `@pytest.mark.req("REQ-NNN")` (marker and trace check are future tooling, see below)                                   |
+| Traceability                    | Tests carry `@pytest.mark.req("<spec-slug>", "REQ-NNN")` (marker and trace check are future tooling, see below)                    |
 | Revision-bound approval         | The merged spec PR *is* the approval of that text. Later edits are new PRs that go through the same review                         |
 | Approver gates                  | The reviewing agent, using `.github/review/spec-review.md`; humans decide anything touching core contracts                         |
 | Amend on change                 | Edit the spec in its own PR. Once the code exists, the spec `watches` it, so drift in the code marks the spec stale until re-acked |
