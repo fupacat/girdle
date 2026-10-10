@@ -8,6 +8,7 @@
 .agent-vault/decisions/dependabot-queue-branch-protection-injection-mode.md | decision | stale=False | watches: -
 .agent-vault/decisions/girdle-audit-command-design.md | decision | stale=False | watches: -
 .agent-vault/decisions/gitar-as-sole-auto-fixer.md | decision | stale=False | watches: -
+.agent-vault/decisions/gitar-removed-trial-ended.md | decision | stale=False | watches: -
 .agent-vault/decisions/merge-pipeline-tool-roles-and-paths.md | decision | stale=False | watches: -
 .agent-vault/decisions/minimal-discrete-pr-policy.md | decision | stale=False | watches: -
 .agent-vault/decisions/staged-pr-pipeline-checks-review-repair.md | decision | stale=False | watches: -
