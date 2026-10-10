@@ -26,6 +26,9 @@ girdle = ["templates/*.jinja"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "req(spec_slug, req_id): mark test as tracing a requirement",
+]
 
 [tool.coverage.run]
 source = ["src/girdle"]

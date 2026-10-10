@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 
-from girdle import audit
+from girdle import audit, reqtrace
 from girdle.align import apply_plan, build_align_plans
 from girdle.badge import badge_endpoint, badge_markdown, badge_url
 from girdle.dashboard import render_dashboard
@@ -372,6 +372,47 @@ def _print_platform(platform: dict) -> None:
         click.echo(f"  required status checks  {named}")
     for rec in platform["recommendations"]:
         click.echo(f"  fix: {rec}")
+
+
+@main.group()
+def reqs() -> None:
+    """Requirement-to-test traceability checks."""
+
+
+@reqs.command("check")
+@click.argument("spec", type=click.Path(exists=True, dir_okay=False))
+@click.option(
+    "--tests",
+    "tests_dir",
+    default="tests",
+    type=click.Path(exists=True, file_okay=False),
+    help="Directory containing tests (default: tests).",
+)
+def reqs_check(spec: str, tests_dir: str) -> None:
+    """Check that every REQ-NNN in a spec is traced by a test."""
+    spec_path = Path(spec)
+    tests_path = Path(tests_dir)
+    result = reqtrace.check_traceability(spec_path, tests_path)
+
+    if result.problems:
+        click.echo("Problems found:")
+        for problem in result.problems:
+            click.echo(f"  - {problem}")
+
+    if result.untraced:
+        click.echo("Untraced requirements:")
+        for req in result.untraced:
+            click.echo(f"  - {req}")
+
+    if result.orphaned:
+        click.echo("Orphaned test markers:")
+        for req in result.orphaned:
+            click.echo(f"  - {req}")
+
+    if result.has_failures():
+        sys.exit(1)
+
+    click.echo("All requirements traced.")
 
 
 @main.group()
