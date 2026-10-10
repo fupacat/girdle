@@ -277,7 +277,9 @@ jobs:
 
   publish:
     needs: [resolve, review]
-    if: needs.resolve.outputs.proceed == 'true'
+    if: >-
+      needs.resolve.outputs.proceed == 'true' &&
+      (needs.review.result == 'success' || needs.review.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

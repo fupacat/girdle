@@ -60,6 +60,7 @@ def test_high_risk_changes_are_never_auto_approved() -> None:
     workflow = _load()
     resolve = _job_text(workflow, "resolve")
     publish = _job_text(workflow, "publish")
+    publish_if = workflow["jobs"]["publish"]["if"]
 
     assert ".mergify.yml" in resolve
     assert '.github/workflows/' in resolve
@@ -67,6 +68,7 @@ def test_high_risk_changes_are_never_auto_approved() -> None:
     assert "src/girdle/detectors/base.py" in resolve
     assert "mode=high-risk" in resolve
     assert "REQUEST_CHANGES" in publish
+    assert "needs.review.result == 'skipped'" in publish_if
 
 
 def test_prompt_uses_trusted_rubric_and_caps_diff_size() -> None:
