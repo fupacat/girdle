@@ -90,9 +90,26 @@ def test_fallback_sweep_treats_skipped_checks_as_passing() -> None:
         assert f'[ "$check_conclusion" != "{conclusion}" ]' in run_script
 
 
-def test_fallback_sweep_promotes_with_a_pat_so_the_review_workflow_fires() -> None:
+def test_reactive_and_fallback_promote_with_a_pat_so_the_review_workflow_fires() -> None:
     # Events made with GITHUB_TOKEN do not start workflows, so a promotion by it
     # never triggered the Gemini review's ready_for_review run (seen on #503).
-    sweep = _workflow()["jobs"]["fallback-sweep"]
+    workflow = _workflow()
 
-    assert "secrets.AGENT_PR_TOKEN" in sweep["env"]["GH_TOKEN"]
+    for job_name, expected_pr_var in {
+        "auto-merge": "$pr_number",
+        "fallback-sweep": "$pr",
+    }.items():
+        env_token = workflow["jobs"][job_name]["env"]["GH_TOKEN"]
+        assert "secrets.AGENT_PR_TOKEN" in env_token
+        assert "secrets.GITHUB_TOKEN" in env_token
+
+        ready_step = next(
+            (
+                step
+                for step in workflow["jobs"][job_name]["steps"]
+                if "gh pr ready" in step.get("run", "")
+            ),
+            None,
+        )
+        assert ready_step is not None
+        assert expected_pr_var in ready_step["run"]
