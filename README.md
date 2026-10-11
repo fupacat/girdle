@@ -33,6 +33,8 @@ girdle scan . --platform               # also check live GitHub branch protectio
 
 girdle align .                          # dry-run: show what would be added to .editorconfig/.gitattributes/.gitignore
 girdle align . --write                  # apply it
+
+girdle audit . --json                   # review AGENTS.md-style instruction files via the configured agent CLI
 ```
 
 ## When to run what
