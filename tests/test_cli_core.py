@@ -145,7 +145,7 @@ def test_notes_check_handles_dangling_watch_error(tmp_path: Path, monkeypatch):
             [WatchEntry(path="src/example.py", symbol="greet")],
         )
 
-    monkeypatch.setattr(cli, "vault_check", _raise)
+    monkeypatch.setattr("girdle.cli.vault_check", _raise)
     result = CliRunner().invoke(main, ["notes", "check", str(tmp_path)])
     assert result.exit_code == 1
     assert "error:" in result.output
