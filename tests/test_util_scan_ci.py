@@ -94,3 +94,36 @@ def test_non_first_workflow_selected_when_first_is_not_pr_gating(tmp_path: Path)
     result = scan_ci(tmp_path, r"\bpytest\b", "pytest")
     assert result.tier == Tier.CONFIGURED
     assert result.evidence == [".github/workflows/z-ci.yml: runs pytest"]
+
+
+def test_push_branch_wildcard_counts_as_default_branch_inclusive(tmp_path: Path):
+    wf_dir = tmp_path / ".github" / "workflows"
+    wf_dir.mkdir(parents=True)
+    (wf_dir / "ci.yml").write_text(
+        "on:\n  push:\n    branches: ['**']\n"
+        "jobs:\n  test:\n    steps:\n      - run: pytest\n"
+    )
+    result = scan_ci(tmp_path, r"\bpytest\b", "pytest")
+    assert result.tier == Tier.CONFIGURED
+
+
+def test_push_non_default_branch_only_not_counted(tmp_path: Path):
+    wf_dir = tmp_path / ".github" / "workflows"
+    wf_dir.mkdir(parents=True)
+    (wf_dir / "ci.yml").write_text(
+        "on:\n  push:\n    branches: [release]\n"
+        "jobs:\n  test:\n    steps:\n      - run: pytest\n"
+    )
+    result = scan_ci(tmp_path, r"\bpytest\b", "pytest")
+    assert result.tier == Tier.ABSENT
+
+
+def test_push_list_event_without_filters_counts(tmp_path: Path):
+    wf_dir = tmp_path / ".github" / "workflows"
+    wf_dir.mkdir(parents=True)
+    (wf_dir / "ci.yml").write_text(
+        "on: [push]\n"
+        "jobs:\n  test:\n    steps:\n      - run: pytest\n"
+    )
+    result = scan_ci(tmp_path, r"\bpytest\b", "pytest")
+    assert result.tier == Tier.CONFIGURED

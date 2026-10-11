@@ -139,6 +139,8 @@ def _gha_workflow_runs_tool_on_pr_or_default_push(
         return False
     if not isinstance(workflow, dict):
         return False
+    # PyYAML follows YAML 1.1 booleans, so an unquoted top-level `on:` key may
+    # load as True instead of the literal "on".
     on_config = workflow.get("on", workflow.get(True))
     if not _gha_triggers_pr_or_default_push(on_config):
         return False
@@ -161,24 +163,33 @@ def _gha_workflow_runs_tool_on_pr_or_default_push(
 
 
 def _run_step_matches(run_cmd: str, run_re: re.Pattern[str]) -> bool:
-    for line in run_cmd.splitlines() or [run_cmd]:
+    for line in run_cmd.splitlines():
         stripped = line.lstrip()
         if stripped.startswith("#"):
             continue
-        if run_re.search(line):
+        if run_re.search(stripped):
             return True
     return False
 
 
 def _gha_triggers_pr_or_default_push(on_config: object) -> bool:
     if isinstance(on_config, str):
-        return on_config in {"pull_request", "pull_request_target", "merge_group", "push"}
+        if on_config in {"pull_request", "pull_request_target", "merge_group"}:
+            return True
+        if on_config == "push":
+            return _gha_push_targets_default_branch(None)
+        return False
     if isinstance(on_config, list):
-        return any(
+        if any(
             isinstance(event, str)
-            and event in {"pull_request", "pull_request_target", "merge_group", "push"}
+            and event in {"pull_request", "pull_request_target", "merge_group"}
             for event in on_config
-        )
+        ):
+            return True
+        if any(isinstance(event, str) and event == "push" for event in on_config):
+            # List form (`on: [push, ...]`) can't carry push branch filters.
+            return _gha_push_targets_default_branch(None)
+        return False
     if not isinstance(on_config, dict):
         return False
     if any(event in on_config for event in ("pull_request", "pull_request_target", "merge_group")):
@@ -189,6 +200,8 @@ def _gha_triggers_pr_or_default_push(on_config: object) -> bool:
 
 
 def _gha_push_targets_default_branch(push_config: object) -> bool:
+    # A push trigger without branch filters includes every branch, which
+    # necessarily includes the repository's default branch.
     if push_config is None:
         return True
     if not isinstance(push_config, dict):
@@ -218,7 +231,15 @@ def _string_values(value: object) -> list[str]:
 
 def _is_default_branch_selector(value: str) -> bool:
     normalized = value.strip().removeprefix("refs/heads/")
-    return (
-        normalized in {"master", "main"}
-        or "default_branch" in normalized
-    )
+    # Wildcard selectors include all (or effectively all) branches, which
+    # necessarily includes the default branch.
+    return normalized in {
+        "*",
+        "**",
+        "main",
+        "master",
+        "trunk",
+        "$default_branch",
+        "${{ github.event.repository.default_branch }}",
+        "${{github.event.repository.default_branch}}",
+    }
