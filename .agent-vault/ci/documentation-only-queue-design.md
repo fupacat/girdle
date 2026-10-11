@@ -2,7 +2,7 @@
 type: ci
 watches:
   - path: .mergify.yml
-    hash: 52f5381b7b5a3afb1539432427cb495d2956270f558b469443ebdbaf85b69078
+    hash: 0a5579de7d40eb2519006f3f2564f3ca1198ea517d450973b966132667500378
 stale: false
 ---
 
@@ -171,6 +171,17 @@ false-positive-substring case (`scripts/not.mergify.yml.bak`).
   says otherwise for anything touching `AGENTS.md`'s index block
   specifically. Revisit once there's real docs-queue traffic to tune
   against, rather than guessing ahead of evidence.
+
+## Entry gate (2026-10-10)
+
+`merge_protections_settings.auto_merge_conditions: true` enqueues a PR as soon as a
+queue's own `queue_conditions` match, whatever the `pull_request_rules` say. The
+`light` queue (`branch_protection_injection_mode: none`) originally listed only
+`author!=dependabot[bot]`, so a docs PR entered the instant it left draft, was
+dequeued about 15s later when the merge gate found no approval, and left a
+speculative draft PR, a stale failing check and a `dequeued` label behind. Its
+`queue_conditions` now also require `-draft`, `#approved-reviews-by>=1` and
+`check-success=test`, matching the merge gate, so entry waits for the review.
 
 ## Related
 
