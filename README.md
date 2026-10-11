@@ -20,6 +20,8 @@ standalone HTML report.
 pip install -e .
 girdle scan .              # static analysis, JSON if piped
 girdle scan . --run        # also execute test/lint tooling for tier-2 verification
+girdle audit --file AGENTS.md --json  # review agent-instruction files with an authenticated CLI
+
 girdle dashboard .          # writes girdle-report.html
 girdle badge . --markdown           # print a shields.io badge snippet reflecting overall readiness tier
 girdle badge . --json -o girdle.json  # shields.io endpoint-badge JSON, for publishing to a static host
@@ -59,9 +61,9 @@ lifecycles:
   to run in a tight local loop. `girdle scan --platform` is a live
   authenticated GitHub API call, unrelated to code changes (branch
   protection doesn't drift per-commit) - better suited to a scheduled/cron
-  check than per-PR. `girdle audit` (not yet on `master` - landing via #16)
-  is periodic by design, not continuous - it costs a real LLM call and its
-  output is a review proposal for a human, not a pass/fail gate.
+  check than per-PR. `girdle audit` is periodic by design, not continuous -
+  it costs a real LLM call and its output is a review proposal for a human,
+  not a pass/fail gate.
 
 `girdle index` is a separate, mechanically-generated structural index — not
 part of the verification score. It's a flat, budget-capped (`--budget-tokens`,
