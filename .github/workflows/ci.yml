@@ -64,6 +64,8 @@ jobs:
           python -m pip install --quiet mergify-cli
           mergify config validate
       - run: girdle index . --check AGENTS.md
+      - name: requirements traceability (spec-*.md)
+        run: ./scripts/check-spec-reqs.sh
       - name: vault notes freshness (read-only)
         # The pre-commit hook is the one place auto-reconcile makes sense
         # (it can tell a note apart from the code it watches within a

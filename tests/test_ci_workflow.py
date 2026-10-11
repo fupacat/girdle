@@ -30,3 +30,29 @@ def test_ci_runs_cheap_checks_before_expensive_and_skips_draft_prs() -> None:
 
     assert jobs["test"]["if"] == "always()"
     assert jobs["test"]["needs"] == ["changes", "cheap-checks", "pytest"]
+
+
+def test_precommit_enforces_reqtrace_for_all_specs() -> None:
+    workflow = _workflow()
+    cheap_steps = workflow["jobs"]["cheap-checks"]["steps"]
+    reqs_step = next(
+        step
+        for step in cheap_steps
+        if step.get("name") == "requirements traceability (spec-*.md)"
+    )
+    assert reqs_step["run"] == "./scripts/check-spec-reqs.sh"
+
+    precommit = yaml.safe_load(Path(".pre-commit-config.yaml").read_text(encoding="utf-8"))
+    local_repo = next(repo for repo in precommit["repos"] if repo["repo"] == "local")
+    reqs_hook = next(hook for hook in local_repo["hooks"] if hook["id"] == "girdle-reqs-check")
+    assert reqs_hook["pass_filenames"] is False
+    assert reqs_hook["always_run"] is True
+    assert reqs_hook["entry"] == "./scripts/check-spec-reqs.sh"
+
+
+def test_reqtrace_wrapper_checks_each_spec_file() -> None:
+    script = Path("scripts/check-spec-reqs.sh").read_text(encoding="utf-8")
+    assert ".agent-vault/context/spec-*.md" in script
+    assert "failed=0" in script
+    assert 'if ! girdle reqs check "$spec"' in script
+    assert 'exit "$failed"' in script
