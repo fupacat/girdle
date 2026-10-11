@@ -32,6 +32,8 @@ girdle scan . --platform               # also check live GitHub branch protectio
 
 girdle align .                          # dry-run: show what would be added to .editorconfig/.gitattributes/.gitignore
 girdle align . --write                  # apply it
+
+girdle audit . --json                   # review AGENTS.md-style instruction files via the configured agent CLI
 ```
 
 ## When to run what
@@ -59,9 +61,9 @@ lifecycles:
   to run in a tight local loop. `girdle scan --platform` is a live
   authenticated GitHub API call, unrelated to code changes (branch
   protection doesn't drift per-commit) - better suited to a scheduled/cron
-  check than per-PR. `girdle audit` (not yet on `master` - landing via #16)
-  is periodic by design, not continuous - it costs a real LLM call and its
-  output is a review proposal for a human, not a pass/fail gate.
+  check than per-PR. `girdle audit` is periodic by design, not continuous -
+  it costs a real LLM call and its output is a review proposal for a human,
+  not a pass/fail gate.
 
 `girdle index` is a separate, mechanically-generated structural index — not
 part of the verification score. It's a flat, budget-capped (`--budget-tokens`,
