@@ -2,6 +2,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from conftest import git_clean_env
 
 from girdle.vault import (
     NOTE_TYPES,
@@ -19,7 +20,9 @@ from girdle.vault import (
 
 
 def _git(root: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", *args], cwd=root, check=True, capture_output=True, env=git_clean_env(),
+    )
 
 
 def _init_repo(root: Path) -> None:
@@ -53,6 +56,30 @@ def _write_note(root: Path, note_hash: str | None = None) -> Path:
         encoding="utf-8",
     )
     return note_path
+
+
+def test_git_helpers_ignore_outer_git_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    decoy = tmp_path / "decoy"
+    decoy.mkdir()
+    subprocess.run(
+        ["git", "init", "-q"], cwd=decoy, check=True, capture_output=True, env=git_clean_env(),
+    )
+    decoy_config = (decoy / ".git" / "config").read_text(encoding="utf-8")
+    decoy_index = decoy / ".git" / "index"
+    decoy_index_bytes = decoy_index.read_bytes() if decoy_index.exists() else None
+
+    monkeypatch.setenv("GIT_DIR", str(decoy / ".git"))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(decoy_index))
+
+    target = tmp_path / "target"
+    target.mkdir()
+    _init_repo(target)
+    _write_example(target)
+    _git(target, "add", "-A")
+
+    assert (decoy / ".git" / "config").read_text(encoding="utf-8") == decoy_config
+    new_decoy_index_bytes = decoy_index.read_bytes() if decoy_index.exists() else None
+    assert new_decoy_index_bytes == decoy_index_bytes
 
 
 def test_load_note_parses_frontmatter(tmp_path: Path):
@@ -116,7 +143,7 @@ def test_ack_records_current_hash_and_stages(tmp_path: Path):
 
     staged = subprocess.run(
         ["git", "diff", "--cached", "--name-only"], cwd=tmp_path,
-        capture_output=True, text=True, check=True,
+        capture_output=True, text=True, check=True, env=git_clean_env(),
     ).stdout
     assert "greet-note.md" in staged
 
