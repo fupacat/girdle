@@ -4,7 +4,7 @@ watches:
   - path: .mergify.yml
     hash: 0a5579de7d40eb2519006f3f2564f3ca1198ea517d450973b966132667500378
   - path: .github/workflows/ci.yml
-    hash: 322a88352e8a86656348792c3bacd17c72e5e4c78e81b859f8d89a8b3bfd6fb3
+    hash: 85ef00b5982af136e4b8994ccb60e570b81fd2461fa2aa712942482710e977e5
 stale: false
 ---
 

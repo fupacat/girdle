@@ -16,7 +16,7 @@ parts that matter and maps each onto machinery girdle already has.
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | SRS with `REQ-NNN` lines        | A spec note: `.agent-vault/context/spec-<topic>.md`, template below                                                                |
 | Acceptance record per REQ       | One line per REQ naming a test node id and its expected observable result                                                          |
-| Traceability                    | Tests carry `@pytest.mark.req("<spec-slug>", "REQ-NNN")` (marker and trace check are future tooling, see below)                    |
+| Traceability                    | Tests carry `@pytest.mark.req("<spec-slug>", "REQ-NNN")`; `girdle reqs check` enforces marker↔REQ consistency in pre-commit and CI |
 | Revision-bound approval         | The merged spec PR *is* the approval of that text. Later edits are new PRs that go through the same review                         |
 | Approver gates                  | The reviewing agent, using `.github/review/spec-review.md`; humans decide anything touching core contracts                         |
 | Amend on change                 | Edit the spec in its own PR. Once the code exists, the spec `watches` it, so drift in the code marks the spec stale until re-acked |
@@ -78,9 +78,9 @@ ended; see the tool-roles decision notes).
 
 ## Open items
 
-- **Marker and trace check.** A pytest marker plus a check that every REQ has a
-  passing test and every marker points at a real REQ. Not built yet; until it
-  is, the review rubric and human review carry this.
+- **Marker and trace check.** Implemented as `girdle reqs check .agent-vault/context/spec-*.md` (run one spec at a time via loop) in both
+  `.pre-commit-config.yaml` and `.github/workflows/ci.yml`: every REQ must be
+  traced by a test marker and every marker must point at a real REQ.
 - **Native note type.** `girdle notes` recognises fixed folders, so specs live in
   `context/` with a `spec-` prefix for now. A `specs/` type would let the
   hook treat them as approvals proper.

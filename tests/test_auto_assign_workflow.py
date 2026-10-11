@@ -79,6 +79,7 @@ def test_ci_workflow_uses_pr_scoped_concurrency_and_fast_checks() -> None:
     assert any("yamllint ." in step for step in cheap_run_steps)
     assert any("mergify config validate" in step for step in cheap_run_steps)
     assert any("girdle index . --check AGENTS.md" in step for step in cheap_run_steps)
+    assert any("./scripts/check-spec-reqs.sh" in step for step in cheap_run_steps)
     assert any("girdle notes check ." in step for step in cheap_run_steps)
 
     pytest_if = " ".join(jobs["pytest"]["if"].split())
