@@ -17,3 +17,8 @@ def test_queue_rules_require_approval_and_real_diff() -> None:
 
         assert '#approved-reviews-by>=1' in rule['conditions']
         assert '#files>=1' in rule['conditions']
+
+
+def test_throwaway_diagnostic_file_is_removed() -> None:
+    repo_root = Path(__file__).resolve().parent.parent
+    assert not (repo_root / '.mergify-diagnostic-throwaway').exists()
