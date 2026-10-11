@@ -33,7 +33,6 @@ the gap even if the block is never manually cleared.
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 import subprocess
 from dataclasses import dataclass, field
@@ -41,6 +40,7 @@ from pathlib import Path
 
 import yaml
 
+from girdle.git_env import clean_git_env
 from girdle.indexer import LANGUAGE_BY_EXT, find_symbol_source
 
 VAULT_DIR = ".agent-vault"
@@ -200,18 +200,14 @@ def _write_note(note: Note) -> None:
     note.file_path.write_text(_render_frontmatter(data, note.body), encoding="utf-8")
 
 
-def _git_clean_env() -> dict[str, str]:
-    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-
-
 def _git_add(root: Path, rel_path: str) -> None:
-    subprocess.run(["git", "add", rel_path], cwd=root, check=False, env=_git_clean_env())
+    subprocess.run(["git", "add", rel_path], cwd=root, check=False, env=clean_git_env())
 
 
 def _staged_files(root: Path) -> set[str]:
     result = subprocess.run(
         ["git", "diff", "--cached", "--name-only"],
-        cwd=root, capture_output=True, text=True, check=False, env=_git_clean_env(),
+        cwd=root, capture_output=True, text=True, check=False, env=clean_git_env(),
     )
     return set(result.stdout.splitlines())
 
@@ -237,7 +233,7 @@ def _head_signature(root: Path, rel: str) -> tuple[dict, str] | None:
     """
     result = subprocess.run(
         ["git", "show", f"HEAD:{rel}"], cwd=root, capture_output=True,
-        text=True, check=False, env=_git_clean_env(),
+        text=True, check=False, env=clean_git_env(),
     )
     if result.returncode != 0:
         return None
