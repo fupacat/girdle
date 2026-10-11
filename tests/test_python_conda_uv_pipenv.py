@@ -103,7 +103,7 @@ def test_uv_run_commands_with_and_without_lint(tmp_path: Path):
     assert commands["coverage"] == ["uv", "run", "pytest", "--cov"]
 
     (tmp_path / "ruff.toml").write_text("line-length = 88\n", encoding="utf-8")
-    commands_with_lint = det.run_commands(fp)
+    commands_with_lint = det.run_commands(det.detect(tmp_path))
     assert commands_with_lint["lint"] == ["uv", "run", "ruff", "check", "."]
 
 
@@ -148,5 +148,5 @@ def test_pipenv_run_commands_with_and_without_lint(tmp_path: Path):
     assert commands["coverage"] == ["pipenv", "run", "pytest", "--cov"]
 
     (tmp_path / "ruff.toml").write_text("line-length = 88\n", encoding="utf-8")
-    commands_with_lint = det.run_commands(fp)
+    commands_with_lint = det.run_commands(det.detect(tmp_path))
     assert commands_with_lint["lint"] == ["pipenv", "run", "ruff", "check", "."]
