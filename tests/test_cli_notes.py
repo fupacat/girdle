@@ -8,12 +8,15 @@ import subprocess
 from pathlib import Path
 
 from click.testing import CliRunner
+from conftest import git_clean_env
 
 from girdle.cli import main
 
 
 def _git(root: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", *args], cwd=root, check=True, capture_output=True, env=git_clean_env(),
+    )
 
 
 def _init_repo(root: Path) -> None:
