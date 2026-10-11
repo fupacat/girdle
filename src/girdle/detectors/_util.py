@@ -145,12 +145,14 @@ def _workflow_runs_tool_on_gating_trigger(workflow_text: str, run_pattern: str) 
 
 
 def _workflow_has_gating_trigger(workflow: dict) -> bool:
+    # PyYAML parses unquoted `on:` keys as boolean True (YAML 1.1 behavior).
     on_cfg = workflow.get(True, workflow.get("on"))
     pr_events = {"pull_request", "pull_request_target", "merge_group"}
     if isinstance(on_cfg, str):
         if on_cfg in pr_events:
             return True
         if on_cfg == "push":
+            # No branch filters means push applies to all branches, including default.
             return _push_targets_default_branch(None)
         return False
     if isinstance(on_cfg, list):
@@ -158,6 +160,7 @@ def _workflow_has_gating_trigger(workflow: dict) -> bool:
         if events & pr_events:
             return True
         if "push" in events:
+            # List form cannot carry push branch filters; treat as unconstrained push.
             return _push_targets_default_branch(None)
         return False
     if not isinstance(on_cfg, dict):
