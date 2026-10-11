@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 
 import tomllib
+import yaml
 
 from girdle.schema import CategoryResult, Tier
 
@@ -108,9 +109,9 @@ def scan_ci(root: Path, run_pattern: str, run_label: str) -> CategoryResult:
     """
     wf_dir = root / ".github" / "workflows"
     if wf_dir.exists():
-        for wf in wf_dir.glob("*.y*ml"):
+        for wf in sorted(wf_dir.glob("*.y*ml")):
             text = read_text(wf) or ""
-            if re.search(run_pattern, text):
+            if _workflow_runs_tool_on_gating_trigger(text, run_pattern):
                 return CategoryResult(
                     Tier.CONFIGURED,
                     evidence=[f".github/workflows/{wf.name}: runs {run_label}"],
@@ -126,3 +127,92 @@ def scan_ci(root: Path, run_pattern: str, run_label: str) -> CategoryResult:
             f"Add a GitHub Actions workflow (.github/workflows/ci.yml) that runs `{run_label}`."
         ),
     )
+
+
+def _workflow_runs_tool_on_gating_trigger(workflow_text: str, run_pattern: str) -> bool:
+    try:
+        data = yaml.safe_load(workflow_text) or {}
+    except yaml.YAMLError:
+        return False
+    if not isinstance(data, dict):
+        return False
+    if not _workflow_has_gating_trigger(data):
+        return False
+    for run in _iter_run_steps(data):
+        if _run_step_invokes_tool(run, run_pattern):
+            return True
+    return False
+
+
+def _workflow_has_gating_trigger(workflow: dict) -> bool:
+    on_cfg = workflow.get("on", workflow.get(True))
+    if isinstance(on_cfg, str):
+        return on_cfg in {"pull_request", "pull_request_target", "merge_group", "push"}
+    if isinstance(on_cfg, list):
+        events = {event for event in on_cfg if isinstance(event, str)}
+        return bool(events & {"pull_request", "pull_request_target", "merge_group", "push"})
+    if not isinstance(on_cfg, dict):
+        return False
+    event_names = {event for event in on_cfg if isinstance(event, str)}
+    if event_names & {"pull_request", "pull_request_target", "merge_group"}:
+        return True
+    if "push" in on_cfg:
+        return _push_targets_default_branch(on_cfg.get("push"))
+    return False
+
+
+def _push_targets_default_branch(push_cfg: object) -> bool:
+    if not isinstance(push_cfg, dict):
+        return True
+    branches = push_cfg.get("branches")
+    if branches is not None:
+        return any(_targets_default_branch(v) for v in _as_str_list(branches))
+    ignored = push_cfg.get("branches-ignore")
+    if ignored is not None and any(_targets_default_branch(v) for v in _as_str_list(ignored)):
+        return False
+    return True
+
+
+def _targets_default_branch(branch_pattern: str) -> bool:
+    pattern = branch_pattern.strip()
+    if not pattern:
+        return False
+    if pattern in {"main", "master", "refs/heads/main", "refs/heads/master", "*", "**"}:
+        return True
+    return "default_branch" in pattern
+
+
+def _as_str_list(value: object) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [v for v in value if isinstance(v, str)]
+    return []
+
+
+def _iter_run_steps(workflow: dict):
+    jobs = workflow.get("jobs")
+    if not isinstance(jobs, dict):
+        return
+    for job in jobs.values():
+        if not isinstance(job, dict):
+            continue
+        steps = job.get("steps")
+        if not isinstance(steps, list):
+            continue
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            run = step.get("run")
+            if isinstance(run, str):
+                yield run
+
+
+def _run_step_invokes_tool(run_script: str, run_pattern: str) -> bool:
+    for line in run_script.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if re.search(run_pattern, stripped):
+            return True
+    return False

@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 
 from girdle.detectors._util import read_text, read_toml
+from girdle.detectors._util import scan_ci as scan_ci_shared
 from girdle.fsutil import rglob_excluding
 from girdle.schema import CategoryResult, Tier
 
@@ -79,24 +80,7 @@ def coverage_command() -> list[str]:
 
 
 def scan_ci(root: Path) -> CategoryResult:
-    wf_dir = root / ".github" / "workflows"
-    if wf_dir.exists():
-        for wf in wf_dir.glob("*.y*ml"):
-            text = read_text(wf) or ""
-            if re.search(r"\bpytest\b", text) or re.search(r"python\s+-m\s+pytest", text):
-                return CategoryResult(
-                    Tier.CONFIGURED, evidence=[f".github/workflows/{wf.name}: runs pytest"]
-                )
-    for f in (".gitlab-ci.yml", "azure-pipelines.yml"):
-        p = root / f
-        if p.exists() and re.search(r"\bpytest\b", read_text(p) or ""):
-            return CategoryResult(Tier.CONFIGURED, evidence=[f"{f}: runs pytest"])
-    return CategoryResult(
-        Tier.ABSENT, reason="no CI config found running pytest",
-        recommendation=(
-            "Add a GitHub Actions workflow (.github/workflows/ci.yml) that runs `pytest`."
-        ),
-    )
+    return scan_ci_shared(root, r"\bpytest\b", "pytest")
 
 
 def is_lockfile_gitignored(root: Path, lockfile_name: str) -> bool:
