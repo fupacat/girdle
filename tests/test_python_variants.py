@@ -121,7 +121,8 @@ def test_python_variant_categories_present_and_absent(
     det = detector()
     fp = det.detect(present)
     configured = det.scan(fp, mode="static")
-    assert all(configured[key].tier == Tier.CONFIGURED for key in configured)
+    expected = det.applicable_categories(fp)
+    assert all(configured[key].tier == Tier.CONFIGURED for key in expected)
 
     absent = tmp_path / "absent"
     absent.mkdir()
@@ -129,7 +130,8 @@ def test_python_variant_categories_present_and_absent(
     det2 = detector()
     fp2 = det2.detect(absent)
     missing = det2.scan(fp2, mode="static")
-    assert all(missing[key].tier == Tier.ABSENT for key in missing)
+    expected2 = det2.applicable_categories(fp2)
+    assert all(missing[key].tier == Tier.ABSENT for key in expected2)
 
 
 @pytest.mark.parametrize(

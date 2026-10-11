@@ -1,7 +1,6 @@
 """CLI-level coverage for user-facing CLI commands.
 
-`girdle badge`:
-badge.py's own unit tests exercise
+`girdle badge`: badge.py's own unit tests exercise
 the URL/markdown/endpoint-schema functions directly, but the Click command
 wiring (default vs --markdown vs --json, and -o file output) is only
 exercised here.
