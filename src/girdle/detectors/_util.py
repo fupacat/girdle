@@ -145,7 +145,7 @@ def _workflow_runs_tool_on_gating_trigger(workflow_text: str, run_pattern: str) 
 
 
 def _workflow_has_gating_trigger(workflow: dict) -> bool:
-    on_cfg = workflow.get("on", workflow.get(True))
+    on_cfg = workflow.get(True, workflow.get("on"))
     if isinstance(on_cfg, str):
         return on_cfg in {"pull_request", "pull_request_target", "merge_group", "push"}
     if isinstance(on_cfg, list):
