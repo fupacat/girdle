@@ -10,6 +10,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from girdle.cli import main
+from girdle.vault import DanglingWatchError, WatchEntry
 
 
 def _git(root: Path, *args: str) -> None:
@@ -106,3 +107,17 @@ def test_notes_index_writes_catalog(tmp_path: Path):
 
     index_text = (tmp_path / ".agent-vault" / "index.md").read_text(encoding="utf-8")
     assert "greet-note.md" in index_text
+
+
+def test_notes_check_dangling_error(tmp_path: Path, monkeypatch):
+    def _raise(_: Path):
+        raise DanglingWatchError(
+            ".agent-vault/context/greet-note.md",
+            [WatchEntry(path="src/example.py", symbol="greet")],
+        )
+
+    monkeypatch.setattr("girdle.cli.vault_check", _raise)
+    result = CliRunner().invoke(main, ["notes", "check", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "error:" in result.output
+    assert "dangling watch" in result.output
