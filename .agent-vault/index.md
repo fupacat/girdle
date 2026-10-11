@@ -28,6 +28,7 @@
 .agent-vault/brainstorm/workstream-visibility-2026-09-28.md | brainstorm | stale=False | watches: -
 (none) | data-model
 (none) | diagram
+.agent-vault/ci/copilot-pr-approval-and-token-events.md | ci | stale=False | watches: -
 .agent-vault/ci/documentation-only-queue-design.md | ci | stale=False | watches: .mergify.yml
 .agent-vault/ci/gemini-agent.md | ci | stale=False | watches: .github/workflows/gemini-agent.yml; .github/workflows/gemini-agent-pr.yml; .github/scripts/report-agent-failure.sh
 .agent-vault/ci/merge-pipeline.md | ci | stale=False | watches: .mergify.yml
