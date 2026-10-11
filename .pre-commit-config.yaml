@@ -46,3 +46,10 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+
+      - id: girdle-reqs-check
+        name: requirements traceability (spec-*.md)
+        entry: ./scripts/check-spec-reqs.sh
+        language: system
+        pass_filenames: false
+        always_run: true
