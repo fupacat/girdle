@@ -95,6 +95,21 @@ def test_notes_ack_reports_dangling_watch_cleanly(tmp_path: Path):
     assert "dangling watch" in result.output
 
 
+def test_notes_check_reports_dangling_watch_cleanly(tmp_path: Path):
+    _init_repo(tmp_path)
+    _write_example(tmp_path)
+    _write_note(tmp_path)
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "init")
+    (tmp_path / "src" / "example.py").unlink()
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["notes", "check", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "stale:" in result.output
+    assert "dangling watch" in result.output
+
+
 def test_notes_index_writes_catalog(tmp_path: Path):
     _write_example(tmp_path)
     _write_note(tmp_path)
