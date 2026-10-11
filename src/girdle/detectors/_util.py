@@ -146,15 +146,24 @@ def _workflow_runs_tool_on_gating_trigger(workflow_text: str, run_pattern: str) 
 
 def _workflow_has_gating_trigger(workflow: dict) -> bool:
     on_cfg = workflow.get(True, workflow.get("on"))
+    pr_events = {"pull_request", "pull_request_target", "merge_group"}
     if isinstance(on_cfg, str):
-        return on_cfg in {"pull_request", "pull_request_target", "merge_group", "push"}
+        if on_cfg in pr_events:
+            return True
+        if on_cfg == "push":
+            return _push_targets_default_branch(None)
+        return False
     if isinstance(on_cfg, list):
         events = {event for event in on_cfg if isinstance(event, str)}
-        return bool(events & {"pull_request", "pull_request_target", "merge_group", "push"})
+        if events & pr_events:
+            return True
+        if "push" in events:
+            return _push_targets_default_branch(None)
+        return False
     if not isinstance(on_cfg, dict):
         return False
     event_names = {event for event in on_cfg if isinstance(event, str)}
-    if event_names & {"pull_request", "pull_request_target", "merge_group"}:
+    if event_names & pr_events:
         return True
     if "push" in on_cfg:
         return _push_targets_default_branch(on_cfg.get("push"))
