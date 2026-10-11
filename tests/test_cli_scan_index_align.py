@@ -23,14 +23,18 @@ def test_scan_defaults_to_json_output(tmp_path: Path):
     _minimal_python_repo(tmp_path)
     result = CliRunner().invoke(main, ["scan", str(tmp_path), "--fail-under", "0"])
     assert result.exit_code == 0
-    assert json.loads(result.output.strip())["repo_root"].endswith(str(tmp_path))
+    assert json.loads(result.output.strip())["repo_root"] == str(tmp_path)
 
 
 def test_scan_human_output_when_tty(monkeypatch, tmp_path: Path):
     _minimal_python_repo(tmp_path)
+
+    def _raise_exit(code: int) -> None:
+        raise SystemExit(code)
+
     fake_sys = types.SimpleNamespace(
         stdout=types.SimpleNamespace(isatty=lambda: True),
-        exit=lambda code: (_ for _ in ()).throw(SystemExit(code)),
+        exit=_raise_exit,
     )
     monkeypatch.setattr("girdle.cli.sys", fake_sys)
     result = CliRunner().invoke(main, ["scan", str(tmp_path), "--fail-under", "0"])
