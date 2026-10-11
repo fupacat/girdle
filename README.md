@@ -20,6 +20,8 @@ standalone HTML report.
 pip install -e .
 girdle scan .              # static analysis, JSON if piped
 girdle scan . --run        # also execute test/lint tooling for tier-2 verification
+girdle audit --file AGENTS.md --json  # review agent-instruction files with the configured agent CLI
+
 girdle dashboard .          # writes girdle-report.html
 girdle badge . --markdown           # print a shields.io badge snippet reflecting overall readiness tier
 girdle badge . --json -o girdle.json  # shields.io endpoint-badge JSON, for publishing to a static host
