@@ -63,7 +63,7 @@ pluggy==1.6.0
     #   pytest
     #   pytest-cov
     #   pytest-mergify
-pre-commit==4.6.2
+pre-commit==4.7.0
     # via girdle (pyproject.toml)
 pygments==2.21.0
     # via pytest
