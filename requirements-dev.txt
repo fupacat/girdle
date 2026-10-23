@@ -79,7 +79,7 @@ pytest-mergify==2026.9.24.1
     # via girdle (pyproject.toml)
 pytest-timeout==2.4.0
     # via pytest-mergify
-python-discovery==1.6.1
+python-discovery==1.6.4
     # via virtualenv
 pyyaml==6.0.3
     # via
@@ -94,7 +94,7 @@ tree-sitter==0.26.0
     # via
     #   girdle (pyproject.toml)
     #   tree-sitter-language-pack
-tree-sitter-language-pack==1.20.0
+tree-sitter-language-pack==1.22.1
     # via girdle (pyproject.toml)
 virtualenv==21.14.7
     # via pre-commit
