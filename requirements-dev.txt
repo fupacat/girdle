@@ -58,7 +58,7 @@ pathspec==1.1.1
     # via yamllint
 platformdirs==4.13.0
     # via virtualenv
-pluggy==1.6.0
+pluggy==1.7.0
     # via
     #   pytest
     #   pytest-cov
