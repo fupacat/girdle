@@ -98,7 +98,7 @@ tree-sitter-language-pack==1.22.1
     # via girdle (pyproject.toml)
 virtualenv==21.14.7
     # via pre-commit
-wcwidth==0.9.1
+wcwidth==0.9.4
     # via mdformat-gfm
 yamllint==1.38.0
     # via girdle (pyproject.toml)
