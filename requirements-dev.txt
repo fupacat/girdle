@@ -38,7 +38,7 @@ mdformat==1.0.0
     #   mdformat-frontmatter
     #   mdformat-gfm
     #   mdformat-wikilink
-mdformat-frontmatter==2.1.2
+mdformat-frontmatter==2.2.0
     # via girdle (pyproject.toml)
 mdformat-gfm==1.0.0
     # via girdle (pyproject.toml)
