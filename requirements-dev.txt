@@ -50,7 +50,7 @@ mdit-py-plugins==0.6.1
     #   mdformat-gfm
 mdurl==0.1.2
     # via markdown-it-py
-nodeenv==1.11.0
+nodeenv==1.12.0
     # via pre-commit
 packaging==26.3
     # via pytest
@@ -67,7 +67,7 @@ pre-commit==4.7.0
     # via girdle (pyproject.toml)
 pygments==2.21.0
     # via pytest
-pytest==9.1.1
+pytest==9.2.0
     # via
     #   girdle (pyproject.toml)
     #   pytest-cov
@@ -75,7 +75,7 @@ pytest==9.1.1
     #   pytest-timeout
 pytest-cov==7.1.0
     # via girdle (pyproject.toml)
-pytest-mergify==2026.9.24.1
+pytest-mergify==2026.11.1
     # via girdle (pyproject.toml)
 pytest-timeout==2.4.0
     # via pytest-mergify
@@ -94,9 +94,9 @@ tree-sitter==0.26.0
     # via
     #   girdle (pyproject.toml)
     #   tree-sitter-language-pack
-tree-sitter-language-pack==1.22.1
+tree-sitter-language-pack==1.23.1
     # via girdle (pyproject.toml)
-virtualenv==21.15.0
+virtualenv==21.15.2
     # via pre-commit
 wcwidth==0.9.4
     # via mdformat-gfm
