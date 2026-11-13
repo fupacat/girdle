@@ -94,7 +94,7 @@ tree-sitter==0.26.0
     # via
     #   girdle (pyproject.toml)
     #   tree-sitter-language-pack
-tree-sitter-language-pack==1.23.1
+tree-sitter-language-pack==1.25.0
     # via girdle (pyproject.toml)
 virtualenv==21.15.2
     # via pre-commit
