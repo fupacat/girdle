@@ -23,7 +23,9 @@ def test_full_configured_repo(tmp_path: Path):
     )
     (tmp_path / ".eslintrc.json").write_text("{}")
     (tmp_path / ".github" / "workflows").mkdir(parents=True)
-    (tmp_path / ".github" / "workflows" / "ci.yml").write_text("run: npm test\n")
+    (tmp_path / ".github" / "workflows" / "ci.yml").write_text(
+        "on: pull_request\njobs:\n  test:\n    steps:\n      - run: npm test\n"
+    )
 
     det = JsNpmDetector()
     fp = det.detect(tmp_path)
