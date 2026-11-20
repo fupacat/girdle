@@ -6,7 +6,7 @@
 #
 cfgv==3.5.0
     # via pre-commit
-click==8.5.0
+click==8.5.1
     # via girdle (pyproject.toml)
 colorama==0.4.6
     # via pytest
