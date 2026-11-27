@@ -10,7 +10,7 @@ click==8.5.1
     # via girdle (pyproject.toml)
 colorama==0.4.6
     # via pytest
-coverage[toml]==7.17.3
+coverage[toml]==7.17.5
     # via pytest-cov
 distlib==0.4.4
     # via virtualenv
@@ -30,7 +30,7 @@ markdown-it-py==4.2.0
     #   mdformat-gfm
     #   mdformat-wikilink
     #   mdit-py-plugins
-markupsafe==3.0.3
+markupsafe==3.0.4
     # via jinja2
 mdformat==1.0.0
     # via
@@ -75,11 +75,11 @@ pytest==9.2.0
     #   pytest-timeout
 pytest-cov==7.1.0
     # via girdle (pyproject.toml)
-pytest-mergify==2026.11.11
+pytest-mergify==2026.11.19
     # via girdle (pyproject.toml)
 pytest-timeout==2.4.0
     # via pytest-mergify
-python-discovery==1.9.5
+python-discovery==1.9.7
     # via virtualenv
 pyyaml==6.0.3
     # via
@@ -88,7 +88,7 @@ pyyaml==6.0.3
     #   yamllint
 ruamel-yaml==0.19.1
     # via mdformat-frontmatter
-ruff==0.17.3
+ruff==0.17.6
     # via girdle (pyproject.toml)
 tree-sitter==0.26.1
     # via
