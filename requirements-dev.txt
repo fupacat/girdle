@@ -30,7 +30,7 @@ markdown-it-py==4.2.0
     #   mdformat-gfm
     #   mdformat-wikilink
     #   mdit-py-plugins
-markupsafe==3.0.3
+markupsafe==3.0.4
     # via jinja2
 mdformat==1.0.0
     # via
