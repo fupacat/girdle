@@ -29,6 +29,7 @@ girdle badge . --json -o girdle.json  # shields.io endpoint-badge JSON, for publ
 girdle index .                        # deterministic structural manifest (path/language/symbols)
 girdle index . --inject AGENTS.md     # insert/update the manifest between markers in a file
 girdle index . --check AGENTS.md      # exit nonzero if that file's manifest block is stale (for CI/hooks)
+girdle audit . --file AGENTS.md --agent-cmd "claude -p" --timeout 60 --json  # opt-in LLM audit of instruction files, proposal for a human (not a gate)
 
 girdle scan . --platform               # also check live GitHub branch protection via `gh`
 
