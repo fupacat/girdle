@@ -79,7 +79,7 @@ pytest-mergify==2026.11.19
     # via girdle (pyproject.toml)
 pytest-timeout==2.4.0
     # via pytest-mergify
-python-discovery==1.9.5
+python-discovery==1.9.7
     # via virtualenv
 pyyaml==6.0.3
     # via
